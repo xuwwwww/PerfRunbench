@@ -22,4 +22,5 @@ profiler:
   warmup: 5
   repeat: 20
   output: results/raw/resnet18_profile.json
-
+  csv_output: results/raw/resnet18_profile.csv
+  onnx_dir: artifacts/onnx

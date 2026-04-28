@@ -2,7 +2,7 @@
 
 Cost-model-guided inference optimization and scheduling framework for resource-constrained AI systems.
 
-This repository is being built as a reproducible AI systems project. The first version focuses on a working CLI, configuration search, synthetic profiling data, and inference request scheduling. PyTorch and ONNX Runtime backends are scaffolded so real model benchmarks can be added incrementally.
+This repository is being built as a reproducible AI systems project. The first version includes a working CLI, configuration search, synthetic profiling data, real PyTorch CPU benchmarking, ONNX export, ONNX Runtime CPU benchmarking, and inference request scheduling.
 
 ## Goals
 
@@ -27,8 +27,37 @@ If the environment already exists:
 
 ```bash
 conda activate autotuneai
+python -m pip install -r requirements.txt
 python scripts/run_all_experiments.py
 ```
+
+## Real Benchmark Smoke Tests
+
+Run a single PyTorch CPU configuration:
+
+```bash
+python scripts/run_benchmark.py \
+  --config configs/resnet18.yaml \
+  --mode real \
+  --backends pytorch \
+  --max-configs 1 \
+  --output results/raw/resnet18_pytorch_smoke.json \
+  --csv-output results/raw/resnet18_pytorch_smoke.csv
+```
+
+Run a single ONNX Runtime CPU configuration:
+
+```bash
+python scripts/run_benchmark.py \
+  --config configs/resnet18.yaml \
+  --mode real \
+  --backends onnxruntime \
+  --max-configs 1 \
+  --output results/raw/resnet18_onnx_smoke.json \
+  --csv-output results/raw/resnet18_onnx_smoke.csv
+```
+
+The first ONNX Runtime run exports `artifacts/onnx/resnet18.onnx`. Generated ONNX files and result files are ignored by git.
 
 ## Repository Layout
 
@@ -51,4 +80,4 @@ tests/            Unit tests for core logic.
 
 ## Current Status
 
-The current implementation is a project skeleton with executable synthetic experiments. It is designed to validate the architecture before adding heavier dependencies such as PyTorch, ONNX Runtime, and plotting libraries.
+The current implementation supports synthetic experiments for fast development and real CPU benchmark smoke tests for ResNet18. Real profiling currently supports `fp32`; INT8 quantization is planned as a later experiment stage.

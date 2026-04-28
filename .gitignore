@@ -6,6 +6,11 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+artifacts/*
+!artifacts/.gitkeep
+!artifacts/onnx/
+artifacts/onnx/*
+!artifacts/onnx/.gitkeep
 results/raw/*
 results/processed/*
 results/figures/*
@@ -14,4 +19,3 @@ results/reports/*
 !results/processed/.gitkeep
 !results/figures/.gitkeep
 !results/reports/.gitkeep
-

@@ -22,4 +22,5 @@ profiler:
   warmup: 5
   repeat: 20
   output: results/raw/mobilenetv3_profile.json
-
+  csv_output: results/raw/mobilenetv3_profile.csv
+  onnx_dir: artifacts/onnx

@@ -1,2 +1,6 @@
-# The initial synthetic pipeline uses only the Python standard library.
-# Add PyYAML, torch, onnx, and onnxruntime when real model profiling is wired in.
+torch
+torchvision
+onnx
+onnxscript
+onnxruntime
+psutil
