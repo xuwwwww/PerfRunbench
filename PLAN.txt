@@ -1,0 +1,1261 @@
+研究計劃名稱：
+
+AutoTuneAI-Serve Cost-Model-Guided Inference Optimization and Scheduling Framework for Resource-Constrained AI Systems
+
+核心目標：
+
+做一個完整的 AI inference 系統優化框架，不只是 benchmark，也不是單純調 batch size，而是設計一套可以自動 profiling、建立 cost model、搜尋最佳部署設定、模擬 request scheduling 的系統
+
+最終要能證明：
+
+1. 這個系統可以根據硬體限制，自動選出較好的 inference configuration
+
+2. cost-model-guided search 可以用較少的測試次數找到接近最佳的設定
+
+3. deadline-aware dynamic batching 可以在不同 workload 下改善 throughput，同時控制 p95 latency 或 deadline miss rate
+
+4. 這個 project 可以完整展現 CE + AI systems + performance optimization 的能力
+
+一、最終成果
+
+最後要交出 5 個東西：
+
+1. GitHub repo
+
+包含完整 code、README、installation、usage、example commands、reproducible scripts
+
+2. Technical report
+
+約 8～12 頁，格式像 paper，但不一定要投稿
+
+3. Project webpage
+
+放在個人網站上，包含 system architecture、results、figures、demo、GitHub link、report PDF
+
+4. Experiment results
+
+至少包含 6～8 張圖，能展示你的設計真的有效
+
+5. Resume  SOP 可用素材
+
+最後能濃縮成 2～3 個強 bullet，直接放履歷跟申請文件
+
+二、系統總目標
+
+輸入：
+
+model
+hardware environment
+backend options
+latency budget
+memory budget
+throughput goal
+search strategy
+workload pattern
+
+輸出：
+
+recommended backend
+recommended batch size
+recommended precision
+recommended thread setting
+predicted latency
+measured latency
+throughput
+memory usage
+scheduler performance
+final report
+
+簡單說，你要做的不是：
+
+我測了 PyTorch 跟 ONNX Runtime 哪個比較快
+
+而是：
+
+我設計了一個 inference deployment optimizer，它可以在不同限制下自動做部署決策
+
+三、系統架構
+
+整個系統分成 6 個模組：
+
+1. Model Loader
+
+負責載入模型
+
+第一版支援：
+
+ResNet18
+ResNet50
+MobileNetV3
+DistilBERT
+
+後續可加：
+
+TinyLlama
+YOLOv8n
+BERT-base
+
+第一版不要碰太大模型，先讓系統完整跑起來
+
+2. Runtime Backend
+
+支援不同 inference backend
+
+第一版：
+
+PyTorch CPU
+ONNX Runtime CPU
+
+第二版：
+
+ONNX Runtime CUDA, 用 Colab GPU
+PyTorch CUDA, 用 Colab GPU
+
+進階版：
+
+TensorRT, 有時間再做
+TVM, 只做研究背景，不一定實作
+
+3. Profiler
+
+負責量測每個 configuration 的表現
+
+量測項目：
+
+latency p50
+latency p95
+latency p99
+throughput
+peak memory
+CPU thread count
+backend
+batch size
+precision
+graph optimization level
+hardware metadata
+
+每次實驗都要存成 jsoncsv，不能只印在 terminal
+
+4. Cost Model
+
+負責預測某個 configuration 的效能
+
+輸入 feature：
+
+model type
+parameter count
+input shape
+backend
+batch size
+precision
+thread count
+graph optimization level
+hardware metadata
+
+預測目標：
+
+latency
+throughput
+memory usage
+
+第一版方法：
+
+linear regression
+random forest
+rule-based model
+
+不用追求模型很潮，重點是你有完整 problem formulation
+
+5. Auto-Tuner
+
+負責搜尋最佳部署設定
+
+要實作三種 search strategy：
+
+Exhaustive Search
+Random Search
+Cost-Model-Guided Search
+
+比較重點：
+
+找到最佳設定所需 trial 數
+搜尋時間
+找到的設定跟真正最佳設定差多少
+是否滿足 latency  memory constraint
+
+6. Request Scheduler Simulator
+
+負責模擬 AI serving request
+
+每個 request 有：
+
+arrival time
+input size
+deadline
+service time
+finish time
+latency
+
+要實作：
+
+FCFS
+Static Batching
+Dynamic Batching
+Deadline-Aware Dynamic Batching
+Memory-Aware Dynamic Batching, optional
+
+比較指標：
+
+average latency
+p95 latency
+p99 latency
+throughput
+deadline miss rate
+queue length
+batch utilization
+
+四、研究問題
+
+這四個問題就是 technical report 的主軸
+
+RQ1
+
+Can a lightweight cost model predict inference latency and memory usage across runtime configurations
+
+要回答：
+
+cost model 的預測準不準
+不同模型上是否穩定
+哪些 feature 最影響 latency
+
+評估方法：
+
+predicted vs measured latency scatter plot
+MAE
+MAPE
+error distribution
+
+RQ2
+
+Can cost-model-guided search reduce profiling cost while finding near-optimal deployment configurations
+
+要回答：
+
+不用全部測，能不能找到接近最佳的設定
+測試次數能不能下降
+搜尋時間能不能下降
+
+評估方法：
+
+exhaustive search 當 ground truth
+random search 當 baseline
+cost-model-guided search 當你的方法
+
+指標：
+
+number of trials
+best-found latency gap
+search time reduction
+constraint satisfaction rate
+
+RQ3
+
+Can deadline-aware dynamic batching improve throughput while controlling tail latency
+
+要回答：
+
+dynamic batching 是否比 FCFS 更好
+deadline-aware batching 是否能降低 deadline miss
+不同 request arrival pattern 下是否穩定
+
+評估方法：
+
+low load
+medium load
+burst load
+
+指標：
+
+throughput
+p95 latency
+p99 latency
+deadline miss rate
+
+RQ4
+
+How do backend, batch size, precision, and threading interact under resource-constrained hardware
+
+要回答：
+
+ONNX Runtime 什麼情況下比較好
+INT8 什麼情況下值得
+batch size 增加何時開始傷害 latency
+thread number 增加是否一定有效
+
+這題可以讓 report 有分析深度
+
+五、技術目標
+
+Level 1 Benchmark Pipeline
+
+必須完成：
+
+PyTorch inference
+ONNX export
+ONNX Runtime inference
+latency measurement
+throughput measurement
+memory measurement
+CSV  JSON logging
+
+這是最低可行版本
+
+Level 2 Auto-Tuning Engine
+
+必須完成：
+
+configuration search space
+exhaustive search
+random search
+constraint filtering
+best configuration selection
+
+這時候才開始像 optimizer
+
+Level 3 Cost-Model-Guided Search
+
+必須完成：
+
+profiling dataset collection
+cost model training
+latency prediction
+memory prediction
+guided search policy
+comparison with exhaustiverandom search
+
+這是 RD 感最重要的部分
+
+Level 4 Inference Request Scheduler
+
+必須完成：
+
+request simulator
+FCFS
+static batching
+dynamic batching
+deadline-aware batching
+scheduler evaluation
+
+這會讓 project 變成 systems project，而不是 benchmark project
+
+Level 5 Reproducible System
+
+必須完成：
+
+CLI
+config file
+automated report generator
+plots
+README
+GitHub Actions sanity test
+project webpage
+technical report
+
+六、具體設計
+
+Configuration space 先設成：
+
+backend
+
+pytorch
+onnxruntime
+
+batch size
+
+1, 2, 4, 8, 16
+
+thread count
+
+1, 2, 4, 8
+
+precision
+
+fp32
+int8
+
+graph optimization
+
+disable
+basic
+extended
+all
+
+objective
+
+minimize latency
+maximize throughput
+minimize memory
+satisfy latency budget
+satisfy memory budget
+
+constraint
+
+latency = latency_budget
+memory = memory_budget
+
+可以用這個形式表示：
+
+[
+c = (b, s, t, p, g)
+]
+
+其中：
+
+[
+b
+]
+
+代表 backend
+
+[
+s
+]
+
+代表 batch size
+
+[
+t
+]
+
+代表 thread count
+
+[
+p
+]
+
+代表 precision
+
+[
+g
+]
+
+代表 graph optimization level
+
+Cost model 預測：
+
+[
+hat{L}(c), hat{T}(c), hat{M}(c)
+]
+
+Optimizer 目標：
+
+[
+min_{c in C} hat{L}(c)
+]
+
+subject to
+
+[
+hat{M}(c) leq M_{budget}
+]
+
+[
+hat{L}(c) leq L_{budget}
+]
+
+如果目標是 throughput：
+
+[
+max_{c in C} hat{T}(c)
+]
+
+subject to
+
+[
+hat{M}(c) leq M_{budget}
+]
+
+[
+hat{L}(c) leq L_{budget}
+]
+
+七、Scheduler 設計
+
+每個 request 定義：
+
+[
+r_i = (a_i, d_i, x_i)
+]
+
+其中：
+
+[
+a_i
+]
+
+是 arrival time
+
+[
+d_i
+]
+
+是 deadline
+
+[
+x_i
+]
+
+是 input size 或 request type
+
+完成時間：
+
+[
+f_i
+]
+
+latency：
+
+[
+L_i = f_i - a_i
+]
+
+deadline miss：
+
+[
+miss_i = 1[f_i  d_i]
+]
+
+要比較的 scheduler：
+
+1. FCFS
+
+request 來了就照順序處理
+
+優點：簡單
+缺點：throughput 差，batch utilization 低
+
+2. Static Batching
+
+固定湊 batch size
+
+優點：throughput 比較好
+缺點：可能讓早來的 request 等太久
+
+3. Dynamic Batching
+
+設定 max wait time
+
+如果 batch 滿了就跑
+如果等太久也跑
+
+優點：平衡 latency 跟 throughput
+缺點：沒有 deadline awareness
+
+4. Deadline-Aware Dynamic Batching
+
+根據最早 deadline 決定要不要繼續等
+
+核心規則：
+
+如果繼續等待會讓某個 request 超過 deadline，就立刻 dispatch
+
+這是你自己的設計重點
+
+八、實驗設計
+
+Experiment 1 Backend Comparison
+
+目的：
+
+比較 PyTorch 與 ONNX Runtime 在不同模型上的 latency  throughput
+
+模型：
+
+ResNet18
+ResNet50
+MobileNetV3
+DistilBERT
+
+變因：
+
+backend
+batch size
+thread count
+
+輸出圖：
+
+backend vs latency
+backend vs throughput
+batch size vs throughput
+batch size vs p95 latency
+
+Experiment 2 Precision  Quantization
+
+目的：
+
+比較 FP32 與 INT8 的效能差異
+
+變因：
+
+precision
+model
+backend
+
+輸出圖：
+
+FP32 vs INT8 latency
+FP32 vs INT8 memory
+FP32 vs INT8 throughput
+
+注意：
+
+不用把 accuracy 當主軸
+但可以做簡單 sanity check，避免 INT8 完全壞掉
+
+Experiment 3 Cost Model Accuracy
+
+目的：
+
+驗證 cost model 是否能預測 latency  memory
+
+資料：
+
+profiling results
+
+方法：
+
+traintest split
+train latency predictor
+train memory predictor
+
+指標：
+
+MAE
+MAPE
+predicted vs measured plot
+
+輸出圖：
+
+predicted latency vs measured latency
+prediction error distribution
+
+Experiment 4 Search Efficiency
+
+目的：
+
+證明 cost-model-guided search 比 random search 更有效
+
+比較：
+
+exhaustive search
+random search
+cost-model-guided search
+
+指標：
+
+number of trials
+best-found latency
+gap to optimal
+search time
+
+輸出圖：
+
+trial count vs best-found latency
+search strategy comparison bar chart
+
+Experiment 5 Scheduler Evaluation
+
+目的：
+
+比較不同 scheduler 在 AI serving workload 下的效果
+
+workload：
+
+low load
+medium load
+burst load
+
+scheduler：
+
+FCFS
+static batching
+dynamic batching
+deadline-aware dynamic batching
+
+指標：
+
+average latency
+p95 latency
+p99 latency
+throughput
+deadline miss rate
+
+輸出圖：
+
+scheduler vs p95 latency
+scheduler vs throughput
+scheduler vs deadline miss rate
+
+Experiment 6 End-to-End Recommendation
+
+目的：
+
+展示系統可以根據 user target 給出部署建議
+
+案例：
+
+Case 1 latency  30 ms
+Case 2 memory  1 GB
+Case 3 maximize throughput
+Case 4 bursty workload with deadline constraint
+
+輸出：
+
+recommended configuration
+predicted performance
+measured performance
+reasoning summary
+
+九、資料夾架構
+
+建議 repo 長這樣：
+
+```text
+autotuneai-serve
+  autotune
+    backends
+      pytorch_backend.py
+      onnxruntime_backend.py
+    models
+      model_loader.py
+      onnx_exporter.py
+    profiler
+      benchmark_runner.py
+      memory_profiler.py
+      hardware_info.py
+    tuner
+      search_space.py
+      exhaustive_search.py
+      random_search.py
+      cost_model_search.py
+      objective.py
+    cost_model
+      dataset.py
+      train.py
+      predict.py
+      evaluate.py
+    scheduler
+      request.py
+      workload_generator.py
+      fcfs.py
+      static_batching.py
+      dynamic_batching.py
+      deadline_aware.py
+      simulator.py
+    report
+      plot.py
+      markdown_report.py
+    utils
+      logger.py
+      timer.py
+      config.py
+
+  configs
+    resnet18.yaml
+    resnet50.yaml
+    mobilenetv3.yaml
+    distilbert.yaml
+
+  scripts
+    run_benchmark.py
+    run_autotune.py
+    run_scheduler.py
+    run_all_experiments.py
+
+  results
+    raw
+    processed
+    figures
+    reports
+
+  docs
+    architecture.md
+    methodology.md
+    report.md
+
+  tests
+    test_profiler.py
+    test_scheduler.py
+
+  README.md
+  requirements.txt
+  environment.yml
+```
+
+十、CLI 目標
+
+最後至少要支援這種 command：
+
+```bash
+python scriptsrun_autotune.py 
+  --model resnet18 
+  --backends pytorch onnxruntime 
+  --objective latency 
+  --latency-budget 30 
+  --memory-budget 2048 
+  --search cost_model 
+  --output resultsreportsresnet18_latency.md
+```
+
+輸出要像這樣：
+
+```text
+Best configuration
+Backend onnxruntime
+Precision int8
+Batch size 4
+Threads 4
+Graph optimization all
+
+Predicted latency 22.8 ms
+Measured latency 24.1 ms
+Throughput 166 sampless
+Peak memory 812 MB
+Search trials used 18  96
+```
+
+十一、每週進度
+
+第 1 週：最小可行版本
+
+目標：
+
+repo 開好
+README 寫好
+ResNet18 PyTorch inference 跑通
+ONNX export 跑通
+ONNX Runtime inference 跑通
+latency measurement 跑通
+結果存 CSV
+
+完成標準：
+
+可以用 command 跑一次 benchmark
+可以得到 latency 數字
+可以產生 result file
+
+第 2 週：Profiler 完整化
+
+目標：
+
+加入 warmup
+加入 repeat
+加入 p50  p95  p99
+加入 throughput
+加入 memory usage
+加入 hardware metadata
+結果存成 json
+
+完成標準：
+
+每次實驗都有完整 metadata
+不同 batch size 可以自動 sweep
+有第一張 latency plot
+
+第 3 週：Search Space
+
+目標：
+
+建立 configuration space
+支援 backend  batch size  threads  precision  graph optimization
+實作 exhaustive search
+實作 random search
+
+完成標準：
+
+可以自動跑多組 configuration
+可以找出 best configuration
+可以用 latency 或 throughput 當 objective
+
+第 4 週：Constraint Optimization
+
+目標：
+
+加入 latency budget
+加入 memory budget
+加入 objective function
+加入 constraint filtering
+輸出 recommended configuration
+
+完成標準：
+
+系統可以回答：
+
+在 latency  30 ms 且 memory  2 GB 的限制下，哪個 setting 最好
+
+第 5～6 週：Cost Model v1
+
+目標：
+
+收集 profiling dataset
+整理 feature
+訓練 latency predictor
+訓練 memory predictor
+計算 MAE  MAPE
+畫 predicted vs measured
+
+完成標準：
+
+有 cost model result
+有 prediction error 圖
+有第一版 RQ1 結果
+
+第 7～8 週：Cost-Model-Guided Search
+
+目標：
+
+用 cost model 排序 candidate configurations
+只測 top-k
+跟 exhaustiverandom search 比較
+計算 trial reduction
+
+完成標準：
+
+可以得到這種結論：
+
+cost-model-guided search uses fewer trials while reaching near-optimal latency
+
+第 9～10 週：Scheduler Simulator
+
+目標：
+
+實作 request generator
+實作 FCFS
+實作 static batching
+實作 dynamic batching
+實作 deadline-aware batching
+
+完成標準：
+
+可以模擬 low  medium  burst workload
+可以輸出 p95 latency、throughput、deadline miss rate
+
+第 11～12 週：Scheduler Evaluation
+
+目標：
+
+完整比較 scheduler
+產生圖表
+加入 report
+
+完成標準：
+
+有 scheduler comparison plots
+能說明 deadline-aware batching 的 trade-off
+
+第 13～14 週：Report Generator
+
+目標：
+
+自動產生 Markdown report
+自動畫圖
+每次實驗能重現
+整理 results folder
+
+完成標準：
+
+一行 command 跑完一個模型的 benchmark + tuning + report
+
+第 15～16 週：系統整合
+
+目標：
+
+整理 CLI
+整理 config
+整理 README
+加入 GitHub Actions sanity test
+加入 Docker 或 environment.yml
+
+完成標準：
+
+別人 clone repo 後能照 README 跑小型 demo
+
+第 17～18 週：Technical Report v1
+
+目標：
+
+寫完整 report 第一版
+
+章節：
+
+Abstract
+System Overview
+Cost Model
+Auto-Tuning Algorithm
+Scheduler Design
+Evaluation
+Limitations
+Conclusion
+
+完成標準：
+
+至少 8 頁
+至少 6 張圖
+至少 3 個主要實驗
+
+第 19～20 週：網站頁面
+
+目標：
+
+個人網站新增 project page
+
+內容：
+
+project summary
+architecture diagram
+demo command
+key results
+GitHub link
+report PDF
+
+完成標準：
+
+申請審查的人點進去 30 秒內知道你做了什麼
+
+第 21～22 週：強化實驗
+
+根據結果補強
+
+可能補：
+
+更多模型
+Colab GPU result
+更多 scheduler workload
+更多 cost model comparison
+ablation study
+
+完成標準：
+
+report 結果更完整，不像只跑一次 demo
+
+第 23～24 週：申請包裝
+
+目標：
+
+整理履歷 bullet
+整理 SOP paragraph
+整理推薦信 project summary
+整理 1-page project summary 給教授
+
+完成標準：
+
+這個 project 可以直接進 CV  SOP  website  recommendation package
+
+十二、technical report 大綱
+
+標題：
+
+AutoTuneAI-Serve Cost-Model-Guided Inference Optimization and Scheduling under Resource Constraints
+
+Abstract
+
+簡短寫：
+
+本 project 設計一個 resource-constrained AI inference optimization framework
+系統支援 profiling、cost modeling、configuration search、request scheduling
+實驗比較 backend、batch size、precision、threading、scheduler
+結果顯示 cost-model-guided search 可以減少 profiling trials，deadline-aware batching 可以改善 throughput-latency trade-off
+
+1. System Goal
+
+寫你要解決的問題：
+
+AI deployment 需要滿足 latency、throughput、memory constraints
+手動調整 backend、batch size、precision、threading 很花時間
+所以設計一個自動化 inference optimizer
+
+2. System Architecture
+
+放架構圖
+
+模組：
+
+Model Loader
+Runtime Backend
+Profiler
+Cost Model
+Auto-Tuner
+Scheduler
+Report Generator
+
+3. Profiling Methodology
+
+寫：
+
+warmup
+repeat
+p50  p95  p99
+throughput
+memory
+hardware metadata
+reproducibility
+
+4. Cost Model
+
+寫：
+
+features
+targets
+model choices
+training method
+evaluation metrics
+
+5. Auto-Tuning Algorithm
+
+寫三個 search：
+
+exhaustive
+random
+cost-model-guided
+
+寫 objective function 跟 constraint
+
+6. Scheduling Algorithm
+
+寫：
+
+FCFS
+static batching
+dynamic batching
+deadline-aware batching
+
+7. Evaluation
+
+放實驗結果
+
+8. Limitations
+
+誠實寫：
+
+hardware limited
+not production-scale
+GPU result limited
+cost model trained on small dataset
+scheduler is simulation-based
+
+9. Future Work
+
+寫：
+
+real GPU server evaluation
+support TensorRT  TVM
+support LLM serving
+online adaptive tuning
+multi-tenant scheduling
+
+十三、履歷 bullet 預計成果
+
+最後履歷可以寫成：
+
+Designed and implemented AutoTuneAI-Serve, a cost-model-guided AI inference optimization framework that profiles PyTorch and ONNX Runtime deployments, predicts latency and memory behavior, and recommends configurations under latency and memory constraints.
+
+Developed an auto-tuning engine that compares exhaustive, random, and cost-model-guided search strategies to reduce profiling trials while finding near-optimal inference configurations.
+
+Built a deadline-aware dynamic batching simulator for inference serving workloads, evaluating p95 latency, throughput, and deadline miss rate under bursty request patterns.
+
+十四、SOP 可用段落方向
+
+你未來可以寫：
+
+My recent project, AutoTuneAI-Serve, reflects my interest in computer engineering for efficient AI systems. I designed a resource-constrained inference optimization framework that profiles runtime backends, builds lightweight latency and memory cost models, and automatically recommends deployment configurations under system constraints. I also implemented a deadline-aware batching scheduler to study the trade-off between throughput and tail latency in inference serving workloads.
+
+這段可以放進 UCLA ECE  UCSD ECE  Gatech ECE  Purdue ECE  UCB MEng EECS 的 SOP
+
+十五、判斷 project 是否夠強的標準
+
+不夠強的版本：
+
+只有 benchmark
+只有比較 PyTorch  ONNX
+只有幾張速度圖
+沒有自己的方法
+沒有 report
+沒有 reproducibility
+
+夠強的版本：
+
+有 optimizer
+有 cost model
+有 scheduler
+有 baseline
+有 ablation
+有 technical report
+有 CLI
+有網站展示
+有可重現 repo
+
+你的最低目標是做到：
+
+optimizer + cost model + scheduler + report
+
+這樣就不是普通調參
+
+十六、目前最優先的開工順序
+
+今天：
+
+開 repo
+寫 README
+建立資料夾
+決定第一個模型 ResNet18
+安裝 PyTorch、ONNX、ONNX Runtime
+
+明天：
+
+跑通 PyTorch inference
+記錄 latency
+
+第三天：
+
+export ONNX
+跑通 ONNX Runtime inference
+
+第四天：
+
+寫 benchmark runner
+支援 batch size sweep
+
+第五天：
+
+輸出 CSV  JSON
+
+第六天：
+
+畫第一張圖
+
+第七天：
+
+寫 Week 1 progress note 到網站或 docs
+
+第一週只求跑通，不求完美
+
+第二週開始再做 profiler 跟 search space
+
+十七、這個 project 對你申請的定位
+
+這個 project 最後要讓你的 profile 變成：
+
+不是普通 AI applicant
+不是單純 firmware intern
+不是只有 server performance 經驗
+而是有明確 CE + AI systems identity 的申請者
+
+你的整體故事會變成：
+
+EE + CS background
+AMD server performance
+Lenovo UEFI firmware
+AutoTuneAI-Serve inference optimization system
+目標是 efficient AI systems  computer engineering  hardware-software co-design  performance optimization
+
+這條線是合理的，而且比硬湊一篇普通 AI paper 更適合你。
