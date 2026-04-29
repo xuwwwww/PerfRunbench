@@ -1,0 +1,3 @@
+batch_size = 64
+dataloader_workers = 4
+

@@ -541,6 +541,50 @@ git status
 
 但 restore 不應該無腦 `git reset --hard`，因為那會刪掉使用者本來的未 commit 修改。
 
+## 10.1 Source-safe tuning 目前怎麼用
+
+目前已經有第一版可回復 source tuning CLI：
+
+```bash
+python scripts/tune_source.py \
+  --file train.py \
+  --find "batch_size = 64" \
+  --replace "batch_size = 16"
+```
+
+預設是 dry run，不會修改檔案。要真的修改，必須明確加 `--apply`：
+
+```bash
+python scripts/tune_source.py \
+  --file train.py \
+  --find "batch_size = 64" \
+  --replace "batch_size = 16" \
+  --apply
+```
+
+套用時會：
+
+- 建立 `.autotuneai/runs/<run_id>/`。
+- 修改前備份原檔。
+- 把 changed file 記錄到 `manifest.json`。
+- 記錄 `before_status.txt`、`before_diff.patch`、`head.txt`。
+
+還原：
+
+```bash
+python scripts/restore_run.py --run-id <run_id>
+```
+
+目前限制：
+
+- 只允許明確 find/replace。
+- `find` 文字必須剛好出現一次。
+- 如果出現 0 次或多次，tool 會拒絕修改。
+- 不做 AST refactor。
+- 不會自動猜 training code 裡哪個變數是 batch size。
+
+這個設計比較保守，但安全。之後可以在這個 transaction 基礎上加 batch size tuner、dataloader worker tuner、gradient accumulation tuner。
+
 ## 12. BIOS / UEFI tuning 的邊界
 
 這個 tool 應該主打 runtime-level tuning，不應該自動進 BIOS / UEFI 改設定。
