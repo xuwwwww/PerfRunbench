@@ -262,7 +262,7 @@ Reasoning
 
 你的想法很合理：這個 tool 不只可以做 inference optimization，也可以包住 training entrypoint，當成 resource monitor / limiter。
 
-目標形式：
+目前已經有第一版 wrapper：
 
 ```bash
 python scripts/run_with_budget.py \
@@ -272,19 +272,63 @@ python scripts/run_with_budget.py \
   -- python train.py --config configs/train.yaml
 ```
 
-它可以做：
+目前會做：
 
-- 執行前記錄環境與資源狀態。
-- 執行中持續 sampling RAM / CPU / process RSS。
-- 超過 soft budget 時 warning。
-- 超過 hard budget 時 terminate child process。
-- 保留 CPU core。
-- 記錄完整 resource timeline。
-- 訓練結束後輸出 summary。
+- 建立 `.autotuneai/runs/<run_id>/`。
+- 記錄 `manifest.json`。
+- 記錄執行前 git 狀態到 `before_status.txt`。
+- 記錄執行前 git diff 到 `before_diff.patch`。
+- 記錄目前 git HEAD 到 `head.txt`。
+- 記錄 Python / platform environment 到 `env.json`。
+- 執行 child command。
+- 監控 child process 與其子 process 的 RSS / CPU。
+- 輸出 `resource_timeline.json`。
+- 輸出 `resource_summary.json`。
+- Ctrl-C 中斷時會 terminate child process 並把 run 標成 `interrupted`。
 
-更進一步可以支援：
+範例：
 
-- `systemd-run --scope -p MemoryMax=22G`，在 Linux systemd 環境做 hard memory limit。
+```bash
+python scripts/run_with_budget.py \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  --sample-interval-seconds 0.5 \
+  -- python train.py
+```
+
+如果想讓 wrapper 在超過 effective memory budget 時終止 child process：
+
+```bash
+python scripts/run_with_budget.py \
+  --memory-budget-gb 22 \
+  --hard-kill \
+  -- python train.py
+```
+
+查看歷史 runs：
+
+```bash
+python scripts/list_runs.py
+```
+
+回復某個 run 修改過的檔案：
+
+```bash
+python scripts/restore_run.py --run-id <run_id>
+```
+
+目前 wrapper 還不會自動修改 source code，所以通常會看到：
+
+```text
+Run <run_id> has no changed files to restore.
+```
+
+這是正常的。`restore_run.py` 是為下一階段 reversible source tuner 先建立的安全入口。
+
+後續可做：
+
+- soft budget warning。
+- `systemd-run --scope -p MemoryMax=22G` hard memory limit。
 - Docker `--memory` / `--cpus`。
 - Linux cgroup v2。
 - WSL `.wslconfig` 檢查與提醒。
@@ -535,4 +579,3 @@ Lightweight local resource-aware optimizer and guard for constrained AI workload
 4. 最後才做 reversible source tuner。
 
 原因是 source tuner 風險比較高，必須先有穩定的 monitoring / manifest / restore infrastructure。
-
