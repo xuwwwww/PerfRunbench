@@ -18,13 +18,6 @@ objective:
   latency_budget_ms: 20
   memory_budget_mb: 1024
 
-resource_budget:
-  memory_budget_gb: 22
-  reserve_memory_gb: 1.7
-  reserve_cores: 1
-  cpu_quota_percent: 90
-  enforce: true
-
 profiler:
   warmup: 5
   repeat: 20

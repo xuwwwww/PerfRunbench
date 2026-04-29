@@ -23,6 +23,12 @@ python scripts/run_scheduler.py --workload burst --scheduler deadline_aware
 python -m unittest discover -s tests
 ```
 
+User guide:
+
+```text
+USER_GUIDE.md
+```
+
 If the environment already exists:
 
 ```bash
