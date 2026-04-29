@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import csv
 import json
-import os
 from statistics import quantiles
 from pathlib import Path
 
+from autotune.resource.budget import ResourceBudget
+from autotune.resource.guard import check_memory_start_guard
+from autotune.resource.monitor import ResourceMonitor
 from autotune.tuner.search_space import InferenceConfig
 from autotune.utils.config import ensure_parent
 
@@ -49,6 +51,8 @@ def real_profile(
     model_config: dict,
     profiler_config: dict | None = None,
     model_cache: dict | None = None,
+    resource_budget: ResourceBudget | None = None,
+    resource_context: dict | None = None,
 ) -> dict:
     if config.precision != "fp32":
         raise ValueError("real profiling currently supports fp32 only")
@@ -59,42 +63,52 @@ def real_profile(
     from autotune.models.onnx_exporter import export_to_onnx
 
     profiler = profiler_config or {}
+    budget = resource_budget or ResourceBudget()
     warmup = int(profiler.get("warmup", 5))
     repeat = int(profiler.get("repeat", 20))
     model_cache = model_cache if model_cache is not None else {}
+    resource_context = resource_context or {}
 
     model_name = model_config.get("name", "resnet18")
     input_shape = [int(item) for item in model_config.get("input_shape", [1, 3, 224, 224])]
     input_shape[0] = 1
-    model = model_cache.get("torch_model")
-    if model is None:
-        model = load_torchvision_model(model_name)
-        model_cache["torch_model"] = model
 
-    memory_before = _current_rss_mb()
-    if config.backend == "pytorch":
-        backend = PyTorchBackend(model, input_shape, config.thread_count)
-        latencies = backend.run(config.batch_size, warmup, repeat)
-        summary = summarize_latencies(latencies)
-    elif config.backend == "onnxruntime":
-        onnx_path = _onnx_path(model_name, profiler)
-        if not onnx_path.exists():
-            export_to_onnx(model, input_shape, onnx_path)
-        backend = ONNXRuntimeBackend(str(onnx_path), input_shape, config.thread_count, config.graph_optimization)
-        latencies = backend.run(config.batch_size, warmup, repeat)
-        summary = summarize_onnx_latencies(latencies)
-    else:
-        raise ValueError(f"Unsupported real backend: {config.backend}")
-    memory_after = _current_rss_mb()
+    start_guard = check_memory_start_guard(budget)
+    with ResourceMonitor(budget) as monitor:
+        model = model_cache.get("torch_model")
+        if model is None:
+            model = load_torchvision_model(model_name)
+            model_cache["torch_model"] = model
+
+        if config.backend == "pytorch":
+            backend = PyTorchBackend(model, input_shape, config.thread_count)
+            latencies = backend.run(config.batch_size, warmup, repeat)
+            summary = summarize_latencies(latencies)
+        elif config.backend == "onnxruntime":
+            onnx_path = _onnx_path(model_name, profiler)
+            if not onnx_path.exists():
+                export_to_onnx(model, input_shape, onnx_path)
+            backend = ONNXRuntimeBackend(str(onnx_path), input_shape, config.thread_count, config.graph_optimization)
+            latencies = backend.run(config.batch_size, warmup, repeat)
+            summary = summarize_onnx_latencies(latencies)
+        else:
+            raise ValueError(f"Unsupported real backend: {config.backend}")
+    resource_summary = monitor.summary()
     latency_ms = summary["latency_ms"]
     throughput = (config.batch_size * 1000.0) / latency_ms if latency_ms else 0.0
+    total_cores = resource_context.get("logical_cpu_count")
+    total_memory_mb = start_guard.get("total_memory_mb")
     return {
         "mode": "real",
         "model": model_name,
         **config.__dict__,
         **summary,
         "throughput": round(throughput, 3),
-        "memory_mb": round(max(memory_before, memory_after), 3),
+        "memory_mb": resource_summary["peak_rss_mb"],
+        **budget.to_record(total_cores, total_memory_mb),
+        **resource_context,
+        **start_guard,
+        **resource_summary,
     }
 
 
@@ -124,12 +138,3 @@ def write_csv_records(records: list[dict], output: str) -> None:
 def _onnx_path(model_name: str, profiler: dict) -> Path:
     onnx_dir = Path(profiler.get("onnx_dir", "artifacts/onnx"))
     return onnx_dir / f"{model_name}.onnx"
-
-
-def _current_rss_mb() -> float:
-    try:
-        import psutil
-
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
-    except ModuleNotFoundError:
-        return 0.0

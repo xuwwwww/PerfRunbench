@@ -59,6 +59,41 @@ python scripts/run_benchmark.py \
 
 The first ONNX Runtime run exports `artifacts/onnx/resnet18.onnx`. Generated ONNX files and result files are ignored by git.
 
+## Resource Budgets
+
+Benchmark configs can reserve RAM and CPU capacity for the rest of the system:
+
+```yaml
+resource_budget:
+  memory_budget_gb: 22
+  reserve_memory_gb: 1.7
+  reserve_cores: 1
+  cpu_quota_percent: 90
+  enforce: true
+```
+
+For real benchmarks, the CLI applies the budget by:
+
+- Filtering out configurations whose `thread_count` exceeds the allowed CPU threads.
+- Applying process CPU affinity so one or more cores can remain available for other work.
+- Sampling process RSS and CPU usage during the benchmark.
+- Recording `peak_rss_mb`, `effective_memory_budget_mb`, `available_memory_before_mb`, `available_memory_after_mb`, and CPU utilization fields.
+
+You can override the config from the command line:
+
+```bash
+python scripts/run_benchmark.py \
+  --config configs/resnet18.yaml \
+  --mode real \
+  --backends pytorch \
+  --max-configs 1 \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  --cpu-quota-percent 90
+```
+
+In WSL, the Linux VM may expose less RAM than Windows reports. The benchmark records both `memory_budget_mb` and `effective_memory_budget_mb`; the effective budget is capped by the RAM visible inside WSL minus reserved memory.
+
 ## Repository Layout
 
 ```text
@@ -66,6 +101,7 @@ autotune/
   backends/       Runtime backend adapters.
   models/         Model loading and export boundaries.
   profiler/       Benchmark and hardware metadata collection.
+  resource/       Resource budgets, CPU affinity, and runtime monitoring.
   tuner/          Search spaces, objectives, and tuning strategies.
   cost_model/     Dataset, training, prediction, and evaluation helpers.
   scheduler/      Request workload simulation and batching policies.
