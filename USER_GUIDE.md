@@ -177,6 +177,82 @@ python scripts/run_autotune.py \
 
 下一階段會把 real benchmark sweep 的結果接到 recommender，讓它從實測資料中選出 safe best configuration。
 
+## 5.1 Real mini sweep 和 recommender
+
+目前已經有第一版 real mini sweep：
+
+```bash
+python scripts/run_real_sweep.py \
+  --config configs/resnet18.yaml \
+  --output results/raw/resnet18_real_sweep.json \
+  --csv-output results/raw/resnet18_real_sweep.csv
+```
+
+預設會跑一個小 search space：
+
+```text
+backend: pytorch, onnxruntime
+batch size: 1, 2, 4
+threads: 1, 2, 4
+precision: fp32
+ONNX graph optimization: disable, all
+```
+
+如果只想跑很小的 smoke test：
+
+```bash
+python scripts/run_real_sweep.py \
+  --config configs/resnet18.yaml \
+  --backends pytorch \
+  --batch-sizes 1 \
+  --threads 1 \
+  --output results/raw/test_real_sweep.json \
+  --csv-output results/raw/test_real_sweep.csv
+```
+
+也可以加 resource budget：
+
+```bash
+python scripts/run_real_sweep.py \
+  --config configs/resnet18.yaml \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  --cpu-quota-percent 90
+```
+
+產生 sweep 結果後，可以用 recommender 從實測 records 裡挑出 safe best configuration：
+
+```bash
+python scripts/recommend_config.py \
+  --input results/raw/resnet18_real_sweep.json \
+  --objective throughput \
+  --latency-budget-ms 100 \
+  --memory-budget-gb 22
+```
+
+支援 objective：
+
+- `throughput`
+- `latency`
+- `memory`
+
+輸出會包含：
+
+```text
+Recommended configuration
+Measured performance
+Reasoning
+```
+
+如果要給其他程式讀：
+
+```bash
+python scripts/recommend_config.py \
+  --input results/raw/resnet18_real_sweep.json \
+  --objective throughput \
+  --json
+```
+
 ## 6. Scheduler 怎麼跑
 
 ```bash
