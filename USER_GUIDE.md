@@ -1,29 +1,35 @@
 # AutoTuneAI-Serve User Guide
 
-這份文件是專案 root 的主要說明書，說明目前版本怎麼使用、最終版目標、resource guard / training wrapper 的設計方向，以及哪些 tuning 可以做、哪些不該自動做。
+這份文件只寫「目前 repo 真的能跑的東西」和「下一步目標」。如果文件提到 YAML / JSON / Python 範例檔，檔案會放在 repo 裡，可以直接照指令跑。
 
-## 1. 專案目前定位
+## 0. 目前做到哪
 
-AutoTuneAI-Serve 目前是一個 resource-aware AI inference optimization project。
+目前已完成：
 
-它現在已經可以：
+- Synthetic inference benchmark。
+- PyTorch CPU ResNet18 benchmark。
+- ONNX export + ONNX Runtime CPU benchmark。
+- Resource-aware benchmark monitoring。
+- Real mini sweep + safe config recommender。
+- Training / arbitrary command resource wrapper。
+- Reversible source tuning transaction。
+- Source edit + workload wrapper + auto-restore。
+- Batch-size training tuner。
 
-- 在 WSL conda environment 裡執行。
-- 跑 synthetic benchmark，快速驗證 CLI、tuner、scheduler。
-- 跑真實 PyTorch CPU ResNet18 inference benchmark。
-- 匯出 ONNX 並跑 ONNX Runtime CPU benchmark。
-- 記錄 latency、throughput、memory、CPU usage。
-- 用 CLI 選擇 memory budget、保留 CPU cores、CPU quota。
-- 用 CPU affinity 保留部分 core 給系統或其他工作。
-- 模擬 inference scheduler，包括 FCFS、static batching、dynamic batching、deadline-aware batching。
+目前還沒完成：
 
-它還不是最終版。現階段最重要的是建立正確的架構、資料格式和實驗流程。
+- 真正 ML cost model training。
+- INT8 real quantization。
+- GPU backend / TensorRT / TVM。
+- Plot/report generator。
+- AST-level source refactor。
+- BIOS / UEFI tuning。
 
-## 2. WSL conda 使用方式
+## 1. 環境啟動
 
-進入 WSL：
+從 PowerShell 進 WSL：
 
-```bash
+```powershell
 wsl
 ```
 
@@ -33,7 +39,7 @@ wsl
 cd /mnt/d/School/AutoTuneAI
 ```
 
-啟用 conda environment：
+啟用 conda：
 
 ```bash
 source /home/louis/miniforge3/etc/profile.d/conda.sh
@@ -58,11 +64,38 @@ python -m pip install -r requirements.txt
 python -m unittest discover -s tests
 ```
 
-## 3. Benchmark 怎麼跑
+預期看到：
 
-### 3.1 快速 synthetic benchmark
+```text
+OK
+```
 
-Synthetic benchmark 不跑真模型，用公式模擬 latency / throughput / memory，適合快速測整體流程。
+## 2. Inference Benchmark
+
+### 2.1 Config 檔在哪
+
+目前 inference benchmark config 放在：
+
+```text
+configs/resnet18.yaml
+configs/mobilenetv3.yaml
+```
+
+`configs/resnet18.yaml` 內容控制：
+
+- model name
+- input shape
+- search space
+- objective
+- profiler warmup / repeat
+- output path
+- ONNX output directory
+
+目前 config 不預設 resource limit。資源限制用 CLI 加，避免把你的機器設定寫死到 shared config。
+
+### 2.2 Synthetic benchmark
+
+Synthetic benchmark 不跑真模型，用公式模擬 latency / throughput / memory，適合快速確認流程。
 
 ```bash
 python scripts/run_benchmark.py \
@@ -70,14 +103,14 @@ python scripts/run_benchmark.py \
   --mode synthetic
 ```
 
-預設輸出：
+輸出：
 
 ```text
 results/raw/resnet18_profile.json
 results/raw/resnet18_profile.csv
 ```
 
-### 3.2 PyTorch CPU real benchmark
+### 2.3 PyTorch CPU real benchmark
 
 ```bash
 python scripts/run_benchmark.py \
@@ -89,7 +122,7 @@ python scripts/run_benchmark.py \
   --csv-output results/raw/resnet18_pytorch_smoke.csv
 ```
 
-### 3.3 ONNX Runtime CPU real benchmark
+### 2.4 ONNX Runtime CPU real benchmark
 
 ```bash
 python scripts/run_benchmark.py \
@@ -107,13 +140,11 @@ python scripts/run_benchmark.py \
 artifacts/onnx/resnet18.onnx
 ```
 
-這些產生物已經被 `.gitignore` 排除，不會進 git。
+`artifacts/` 和 `results/` 產物已被 `.gitignore` 排除。
 
-## 4. Resource budget 怎麼用
+## 3. Resource Budget
 
-目前 config 檔不預設資源限制。這是刻意的，因為這個專案希望能跑在不只一台電腦上，不應該把你的 RAM / CPU 設定寫死在 shared config 裡。
-
-如果你要限制 benchmark 資源，用 CLI 指定：
+Resource budget 用 CLI 指定：
 
 ```bash
 python scripts/run_benchmark.py \
@@ -126,60 +157,33 @@ python scripts/run_benchmark.py \
   --cpu-quota-percent 90
 ```
 
-這些參數目前的意義：
+參數意思：
 
-- `--memory-budget-gb 22`: 希望 process peak RSS 不超過 22GB。
-- `--reserve-cores 1`: 至少保留 1 個 logical CPU core，不讓 benchmark 使用。
+- `--memory-budget-gb 22`: process peak RSS 希望不超過 22GB。
+- `--reserve-cores 1`: 保留 1 個 logical CPU core。
 - `--cpu-quota-percent 90`: 根據 CPU 數量限制可用 thread 數，並記錄 CPU 是否超標。
 
-結果會包含：
+結果 JSON 裡會出現：
 
 ```text
+peak_rss_mb
 memory_budget_mb
 effective_memory_budget_mb
-reserve_cores
-cpu_quota_percent
-allowed_threads
-cpu_affinity_applied
-affinity_cores
-total_memory_mb
 available_memory_before_mb
 available_memory_after_mb
-peak_rss_mb
+cpu_affinity_applied
+affinity_cores
 average_process_cpu_percent
 peak_process_cpu_percent
-average_system_cpu_percent
-peak_system_cpu_percent
 memory_budget_exceeded
 cpu_quota_exceeded
 ```
 
-注意：WSL 看到的 RAM 可能比 Windows 少。例如 Windows 顯示 23.7GB，但 WSL 可能只暴露 11.8GB。這時候 `effective_memory_budget_mb` 會自動用 WSL 可見 RAM 扣掉 reserved memory 後的安全值，不會盲目相信 22GB。
+注意：WSL 可見 RAM 可能比 Windows 少。如果 Windows 顯示 23.7GB，但 WSL 只暴露 11.8GB，`effective_memory_budget_mb` 會用 WSL 實際可用上限計算。
 
-## 5. Auto-tuning 怎麼跑
+## 4. Real Mini Sweep + Recommender
 
-目前 auto-tuning 還是用 synthetic profiler / synthetic cost model，目的是先驗證 search flow：
-
-```bash
-python scripts/run_autotune.py \
-  --config configs/resnet18.yaml \
-  --search cost_model \
-  --trials 18
-```
-
-目前支援：
-
-- exhaustive search
-- random search
-- cost-model-guided search
-- latency / throughput / memory objective
-- latency budget / memory budget filtering
-
-下一階段會把 real benchmark sweep 的結果接到 recommender，讓它從實測資料中選出 safe best configuration。
-
-## 5.1 Real mini sweep 和 recommender
-
-目前已經有第一版 real mini sweep：
+### 4.1 跑 mini sweep
 
 ```bash
 python scripts/run_real_sweep.py \
@@ -188,7 +192,7 @@ python scripts/run_real_sweep.py \
   --csv-output results/raw/resnet18_real_sweep.csv
 ```
 
-預設會跑一個小 search space：
+預設 search space：
 
 ```text
 backend: pytorch, onnxruntime
@@ -198,7 +202,7 @@ precision: fp32
 ONNX graph optimization: disable, all
 ```
 
-如果只想跑很小的 smoke test：
+很小的 smoke test：
 
 ```bash
 python scripts/run_real_sweep.py \
@@ -210,17 +214,7 @@ python scripts/run_real_sweep.py \
   --csv-output results/raw/test_real_sweep.csv
 ```
 
-也可以加 resource budget：
-
-```bash
-python scripts/run_real_sweep.py \
-  --config configs/resnet18.yaml \
-  --memory-budget-gb 22 \
-  --reserve-cores 1 \
-  --cpu-quota-percent 90
-```
-
-產生 sweep 結果後，可以用 recommender 從實測 records 裡挑出 safe best configuration：
+### 4.2 推薦 safe config
 
 ```bash
 python scripts/recommend_config.py \
@@ -232,19 +226,13 @@ python scripts/recommend_config.py \
 
 支援 objective：
 
-- `throughput`
-- `latency`
-- `memory`
-
-輸出會包含：
-
 ```text
-Recommended configuration
-Measured performance
-Reasoning
+throughput
+latency
+memory
 ```
 
-如果要給其他程式讀：
+JSON 輸出：
 
 ```bash
 python scripts/recommend_config.py \
@@ -253,7 +241,7 @@ python scripts/recommend_config.py \
   --json
 ```
 
-## 6. Scheduler 怎麼跑
+## 5. Scheduler Simulator
 
 ```bash
 python scripts/run_scheduler.py \
@@ -262,12 +250,14 @@ python scripts/run_scheduler.py \
   --count 100
 ```
 
-目前 scheduler simulator 支援：
+支援 scheduler：
 
-- `fcfs`
-- `static`
-- `dynamic`
-- `deadline_aware`
+```text
+fcfs
+static
+dynamic
+deadline_aware
+```
 
 輸出：
 
@@ -279,66 +269,11 @@ throughput
 deadline_miss_rate
 ```
 
-Dynamic batching 主要對 inference serving 有用。它不是 training memory 的直接解法。對 training RAM 爆掉，更有用的是 training wrapper、memory guard、batch-size tuning、gradient accumulation、checkpointing 等策略。
+Dynamic batching 主要是 inference serving 的 throughput/latency trade-off，不是 training RAM 爆掉的直接解法。
 
-## 7. 最終版目標
+## 6. Training / Command Resource Wrapper
 
-最終版希望變成一個可以回答這個問題的工具：
-
-```text
-在這台機器的 RAM / CPU / latency / throughput 限制下，哪個 runtime configuration 最值得用？
-```
-
-理想使用方式：
-
-```bash
-autotuneai profile \
-  --model resnet18 \
-  --backends pytorch onnxruntime \
-  --batch-sizes 1 2 4 8 16 \
-  --threads auto \
-  --memory-budget-gb 22 \
-  --reserve-cores 1
-```
-
-接著：
-
-```bash
-autotuneai recommend \
-  --results results/raw/resnet18_real_sweep.json \
-  --objective throughput \
-  --latency-budget-ms 30 \
-  --memory-budget-gb 22
-```
-
-輸出概念：
-
-```text
-Recommended configuration
-backend: onnxruntime
-batch_size: 4
-threads: 4
-precision: fp32
-graph_optimization: all
-
-Measured performance
-p95 latency: 24.8 ms
-throughput: 162 samples/sec
-peak RSS: 1.2 GB
-CPU affinity: cores 0-6
-safe under memory budget: yes
-
-Reasoning
-- Highest throughput among configs that stayed under effective memory budget.
-- p95 latency satisfied the target.
-- One logical CPU core was reserved for system responsiveness.
-```
-
-## 8. Training wrapper 的方向
-
-你的想法很合理：這個 tool 不只可以做 inference optimization，也可以包住 training entrypoint，當成 resource monitor / limiter。
-
-目前已經有第一版 wrapper：
+這個 wrapper 可以包住任意命令，例如 training：
 
 ```bash
 python scripts/run_with_budget.py \
@@ -348,31 +283,19 @@ python scripts/run_with_budget.py \
   -- python train.py --config configs/train.yaml
 ```
 
-目前會做：
+目前它會：
 
-- 建立 `.autotuneai/runs/<run_id>/`。
-- 記錄 `manifest.json`。
-- 記錄執行前 git 狀態到 `before_status.txt`。
-- 記錄執行前 git diff 到 `before_diff.patch`。
-- 記錄目前 git HEAD 到 `head.txt`。
-- 記錄 Python / platform environment 到 `env.json`。
-- 執行 child command。
-- 監控 child process 與其子 process 的 RSS / CPU。
-- 輸出 `resource_timeline.json`。
-- 輸出 `resource_summary.json`。
-- Ctrl-C 中斷時會 terminate child process 並把 run 標成 `interrupted`。
+- 建立 `.autotuneai/runs/<run_id>/`
+- 記錄 `manifest.json`
+- 記錄 `before_status.txt`
+- 記錄 `before_diff.patch`
+- 記錄 `head.txt`
+- 執行 child command
+- 監控 child process 與子 process RSS / CPU
+- 輸出 `resource_timeline.json`
+- 輸出 `resource_summary.json`
 
-範例：
-
-```bash
-python scripts/run_with_budget.py \
-  --memory-budget-gb 22 \
-  --reserve-cores 1 \
-  --sample-interval-seconds 0.5 \
-  -- python train.py
-```
-
-如果想讓 wrapper 在超過 effective memory budget 時終止 child process：
+如果要讓超過 memory budget 時終止 child process：
 
 ```bash
 python scripts/run_with_budget.py \
@@ -387,163 +310,17 @@ python scripts/run_with_budget.py \
 python scripts/list_runs.py
 ```
 
-回復某個 run 修改過的檔案：
+restore 某個 run 修改過的檔案：
 
 ```bash
 python scripts/restore_run.py --run-id <run_id>
 ```
 
-目前 wrapper 還不會自動修改 source code，所以通常會看到：
+## 7. Reversible Source Tuning
 
-```text
-Run <run_id> has no changed files to restore.
-```
+### 7.1 單次安全 find/replace
 
-這是正常的。`restore_run.py` 是為下一階段 reversible source tuner 先建立的安全入口。
-
-後續可做：
-
-- soft budget warning。
-- `systemd-run --scope -p MemoryMax=22G` hard memory limit。
-- Docker `--memory` / `--cpus`。
-- Linux cgroup v2。
-- WSL `.wslconfig` 檢查與提醒。
-
-短期先做 portable soft guard。hard limit 要依照環境判斷，不一定每台機器都支援。
-
-## 9. Runtime tuning 還能動哪些東西
-
-除了 backend / batch / threads / graph optimization，還可以做更多 runtime-level tuning。
-
-### 9.1 不需要改 source code 的 tuning
-
-- PyTorch:
-  - `torch.set_num_threads`
-  - `torch.set_num_interop_threads`
-  - `torch.inference_mode`
-  - `torch.compile`，視模型和平台而定
-  - `channels_last` memory format，主要對 CNN 有機會有效
-  - AMP / bfloat16 / fp16，視硬體支援而定
-
-- ONNX Runtime:
-  - graph optimization level
-  - intra-op threads
-  - inter-op threads
-  - execution mode
-  - memory arena settings
-  - execution providers
-
-- System/runtime:
-  - CPU affinity
-  - process niceness
-  - environment variables，例如 `OMP_NUM_THREADS`, `MKL_NUM_THREADS`
-  - cgroup CPU / memory limits
-
-### 9.2 需要改 source code 的 tuning
-
-有些 training / inference tuning 需要改使用者程式碼，例如：
-
-- training batch size
-- gradient accumulation steps
-- activation checkpointing
-- dataloader workers
-- dataloader prefetch factor
-- pinned memory
-- mixed precision
-- model eval / no_grad / inference_mode
-- input shape / sequence length
-- save checkpoint frequency
-- logging frequency
-
-這些可以做，但一定要有 transaction / restore 機制。
-
-## 10. 如果要改 source code，必須怎麼保護
-
-這個 project 如果之後支援「自動修改 training source code」，一定要遵守這個流程：
-
-1. 執行前建立 run id。
-
-```text
-.autotuneai/runs/2026-04-29_140000/
-```
-
-2. 記錄 git 狀態。
-
-```bash
-git status --short
-git diff > .autotuneai/runs/<run_id>/before.patch
-git rev-parse HEAD > .autotuneai/runs/<run_id>/head.txt
-```
-
-3. 每次修改前備份原檔。
-
-```text
-.autotuneai/runs/<run_id>/backup/path/to/file.py
-```
-
-4. 修改記錄成 manifest。
-
-```json
-{
-  "run_id": "...",
-  "changed_files": [
-    {
-      "path": "train.py",
-      "backup": ".autotuneai/runs/.../backup/train.py",
-      "reason": "reduce batch size from 64 to 16"
-    }
-  ]
-}
-```
-
-5. 訓練完成後自動 restore。
-
-6. 如果 process 被中斷，也要提供手動 restore script。
-
-```bash
-python scripts/restore_run.py --run-id 2026-04-29_140000
-```
-
-7. 如果 working tree 在執行前不是 clean，要拒絕自動修改，除非使用者明確允許。
-
-這樣可以避免 tool 把你的 source code 改壞、訓練失敗後留下一堆髒狀態。
-
-## 11. 中斷後如何回復的目標設計
-
-未來應該提供：
-
-```bash
-python scripts/list_runs.py
-python scripts/restore_run.py --run-id <run_id>
-python scripts/show_run_diff.py --run-id <run_id>
-```
-
-如果被 Ctrl-C、OOM、kernel kill，下一次可以：
-
-```bash
-python scripts/restore_latest_run.py
-```
-
-restore 應該做：
-
-- 停止殘留 child process。
-- 還原 CPU affinity / niceness。
-- 還原環境變數。
-- 還原被修改的 source files。
-- 輸出本次 restore 做了什麼。
-
-如果專案是 git repo，最好也記錄：
-
-```bash
-git diff
-git status
-```
-
-但 restore 不應該無腦 `git reset --hard`，因為那會刪掉使用者本來的未 commit 修改。
-
-## 10.1 Source-safe tuning 目前怎麼用
-
-目前已經有第一版可回復 source tuning CLI：
+Dry run，不會修改檔案：
 
 ```bash
 python scripts/tune_source.py \
@@ -552,7 +329,7 @@ python scripts/tune_source.py \
   --replace "batch_size = 16"
 ```
 
-預設是 dry run，不會修改檔案。要真的修改，必須明確加 `--apply`：
+真的修改：
 
 ```bash
 python scripts/tune_source.py \
@@ -562,98 +339,121 @@ python scripts/tune_source.py \
   --apply
 ```
 
-套用時會：
+限制：
 
-- 建立 `.autotuneai/runs/<run_id>/`。
-- 修改前備份原檔。
-- 把 changed file 記錄到 `manifest.json`。
-- 記錄 `before_status.txt`、`before_diff.patch`、`head.txt`。
-
-還原：
-
-```bash
-python scripts/restore_run.py --run-id <run_id>
-```
-
-目前限制：
-
-- 只允許明確 find/replace。
 - `find` 文字必須剛好出現一次。
-- 如果出現 0 次或多次，tool 會拒絕修改。
-- 不做 AST refactor。
-- 不會自動猜 training code 裡哪個變數是 batch size。
+- 出現 0 次或多次會拒絕修改。
+- 修改前會備份。
+- manifest 會記錄 changed file。
+- 可以用 `restore_run.py` 還原。
 
-這個設計比較保守，但安全。之後可以在這個 transaction 基礎上加 batch size tuner、dataloader worker tuner、gradient accumulation tuner。
+### 7.2 Source edit + command + auto-restore
 
-## 10.2 Source tuning + training wrapper
+先建立 edits JSON。範例檔已提供：
 
-目前也有第一版把 source tuning 和 workload wrapper 接在一起的 CLI：
-
-```bash
-python scripts/run_tuned_with_budget.py \
-  --edits-file edits.json \
-  --memory-budget-gb 22 \
-  --reserve-cores 1 \
-  -- python train.py
+```text
+examples/source_edits.json
 ```
 
-`edits.json` 格式：
+內容格式：
 
 ```json
 [
   {
-    "file": "train.py",
-    "find": "batch_size = 64",
-    "replace": "batch_size = 16"
+    "file": "examples/train_config.yaml",
+    "find": "batch_size: 64",
+    "replace": "batch_size: 16"
   }
 ]
 ```
 
-這個流程會：
+執行：
 
-- 建立 `.autotuneai/runs/<run_id>/`。
-- 修改前備份 source file。
-- 套用 source edits。
-- 執行 command。
-- 監控 child process resource usage。
-- 寫入 `resource_timeline.json` 和 `resource_summary.json`。
-- command 結束後自動 restore source files。
-- Ctrl-C 或例外時仍會嘗試 restore。
+```bash
+python scripts/run_tuned_with_budget.py \
+  --edits-file examples/source_edits.json \
+  --sample-interval-seconds 0.05 \
+  -- python examples/dummy_train.py
+```
 
-如果你想保留修改結果，可以加：
+流程：
+
+1. 備份 `examples/train_config.yaml`
+2. 改成 `batch_size: 16`
+3. 執行 `examples/dummy_train.py`
+4. 監控 RAM / CPU
+5. 結束後自動還原成 `batch_size: 64`
+
+如果刻意不想還原：
 
 ```bash
 --keep-changes
 ```
 
-但一般 tuning experiment 預設應該自動 restore，避免訓練後留下髒 source code。
+一般不建議使用 `--keep-changes`，除非你明確知道要保留修改。
 
-## 10.3 Batch-size training tuner
+不要同時對同一個檔案跑多個 tuning command。source tuner 會備份與還原檔案，但目前沒有跨 process file lock；兩個 tuner 同時改同一個檔案會造成競態。
 
-目前已有第一版 batch-size training tuner。它會讀 config 檔裡的 `batch_size`，依序嘗試候選值，每次都：
+## 8. Batch-size Training Tuner
 
-- 備份 config。
-- 修改 batch size。
-- 執行 training command。
-- 監控 RAM / CPU。
-- 執行後自動還原 config。
-- 記錄每個 trial 的 run id 和 resource summary。
-- 推薦 memory budget 下最大的 safe batch size。
+這是目前最接近「真的幫 training 調參」的功能。
 
-範例：
+範例 training config：
+
+```text
+examples/train_config.yaml
+```
+
+內容：
+
+```yaml
+batch_size: 64
+dataloader_workers: 4
+```
+
+範例 training command：
+
+```text
+examples/dummy_train.py
+```
+
+跑 batch-size tuner：
 
 ```bash
 python scripts/tune_training_config.py \
-  --file configs/train.yaml \
+  --file examples/train_config.yaml \
+  --batch-size-key batch_size \
+  --values 32 16 8 \
+  --output results/reports/example_training_tuning_summary.json \
+  --sample-interval-seconds 0.05 \
+  -- python examples/dummy_train.py
+```
+
+它會：
+
+1. 讀 `examples/train_config.yaml`
+2. 找到 `batch_size: 64`
+3. 依序測 `32`, `16`, `8`
+4. 每次修改 config 後執行 training command
+5. 每次 trial 結束後自動還原 config
+6. 寫出 summary JSON
+7. 推薦最大的 safe batch size
+
+加入 memory/CPU budget：
+
+```bash
+python scripts/tune_training_config.py \
+  --file examples/train_config.yaml \
   --batch-size-key batch_size \
   --values 64 32 16 8 \
   --memory-budget-gb 22 \
   --reserve-cores 1 \
-  --output results/reports/training_tuning_summary.json \
-  -- python train.py --config configs/train.yaml
+  --cpu-quota-percent 90 \
+  --output results/reports/example_training_tuning_summary.json \
+  -- python examples/dummy_train.py
 ```
 
-目前支援這兩種 config 寫法：
+目前支援的 batch size assignment 格式：
 
 ```yaml
 batch_size: 64
@@ -667,14 +467,49 @@ batch_size = 64
 
 限制：
 
-- `batch_size` assignment 必須只出現一次。
-- 目前只做單一 key 的 numeric replacement。
-- 每個 trial 都會還原 config，所以不會留下 tuned value。
+- `batch_size` 必須只出現一次。
+- 目前只調單一 numeric key。
 - 推薦邏輯目前是 largest safe batch size。
+- 目前不會自動調 gradient accumulation / dataloader workers。
 
-## 12. BIOS / UEFI tuning 的邊界
+## 9. 常見輸出位置
 
-這個 tool 應該主打 runtime-level tuning，不應該自動進 BIOS / UEFI 改設定。
+```text
+results/raw/       benchmark JSON/CSV
+results/reports/   recommender/training tuner summary
+artifacts/onnx/    exported ONNX model
+.autotuneai/runs/  wrapper/tuning run manifests and backups
+```
+
+這些產物大多被 `.gitignore` 排除。
+
+## 10. 如果被中斷怎麼辦
+
+列出 runs：
+
+```bash
+python scripts/list_runs.py
+```
+
+找出 run id 後 restore：
+
+```bash
+python scripts/restore_run.py --run-id <run_id>
+```
+
+這會根據 `.autotuneai/runs/<run_id>/manifest.json` 裡的 backup 還原被改過的檔案。
+
+不會做：
+
+```bash
+git reset --hard
+```
+
+原因是不能刪掉使用者原本未 commit 的改動。
+
+## 11. BIOS / UEFI tuning 邊界
+
+這個 tool 主要做 runtime-level tuning。
 
 可以做：
 
@@ -685,104 +520,28 @@ batch_size = 64
 - thread count
 - CPU affinity
 - process priority
-- cgroup / Docker / systemd resource limits
-- memory and CPU monitoring
-- training source-level reversible tuning
+- memory / CPU monitoring
+- reversible source/config tuning
+- cgroup / Docker / systemd resource limit，未來擴充
 
 不建議自動做：
 
-- 改 BIOS / UEFI
-- 開關 SMT / Hyper-Threading
-- 改 Turbo Boost
-- 改 power limit
-- 改 XMP / EXPO
-- 改 fan curve
-- 改 memory frequency / timing
+- BIOS / UEFI 修改
+- SMT / Hyper-Threading 開關
+- Turbo Boost 設定
+- power limit
+- XMP / EXPO
+- fan curve
+- memory frequency / timing
 
-原因：
+這些需要重開機，硬體差異大，風險高，不適合做成 portable tool 的自動功能。
 
-- 需要 reboot。
-- 不同主機板差異很大。
-- 沒有穩定跨平台 API。
-- 風險高，不適合自動化。
+## 12. 下一步建議
 
-可以做的是 `inspect-system`，列出建議檢查項，但不自動修改。
+下一步最值得做：
 
-## 13. 市面上類似工具
-
-這個 project 不是完全沒有競品。類似方向包括：
-
-- NVIDIA Triton Model Analyzer
-  - 偏 Triton Inference Server ecosystem。
-  - 強在 production serving / GPU deployment。
-
-- ONNX Runtime tuning docs/tools
-  - 提供 thread、graph optimization、execution provider 等 tuning knobs。
-  - 但不是完整 resource-aware recommender。
-
-- OpenVINO benchmark_app
-  - 偏 Intel OpenVINO ecosystem。
-
-- Apache TVM / MetaSchedule
-  - 更底層，做 compiler/operator schedule search。
-  - 強但複雜，跟 local resource guard 不是同一層。
-
-AutoTuneAI-Serve 的差異定位：
-
-```text
-Lightweight local resource-aware optimizer and guard for constrained AI workloads.
-```
-
-重點不是取代 Triton / TVM，而是做一個能在 laptop / WSL / small workstation 上跑、能記錄資源限制、能給出 safe recommendation 的系統。
-
-## 14. 還能再做什麼
-
-除了目前提到的功能，還可以擴展：
-
-- Hardware inspector:
-  - CPU model
-  - logical / physical cores
-  - RAM
-  - WSL memory cap
-  - package versions
-  - ONNX Runtime providers
-
-- Real benchmark mini sweep:
-  - small search space
-  - 先產生第一組真實 PyTorch vs ONNX Runtime 結果
-
-- Recommendation engine:
-  - 從 real JSON/CSV 選 safe best config
-  - 輸出 reasoning summary
-
-- Resource timeline:
-  - 產生 memory / CPU usage time series
-  - 幫助判斷什麼時候卡住
-
-- Training wrapper:
-  - 包住 `python train.py`
-  - 監控並限制 RAM / CPU
-
-- Reversible source tuner:
-  - 自動調 batch size / dataloader workers / gradient accumulation
-  - 每次修改都有 backup / manifest / restore script
-
-- Report generator:
-  - 自動產生 markdown report
-  - 包含 tables、plots、recommended config
-
-- Multi-machine comparison:
-  - 每台機器跑同一份 config
-  - 結果帶 hardware metadata
-  - 可以比較 laptop / WSL / server / cloud VM
-
-## 15. 下一步建議
-
-最合理的下一步是：
-
-1. 實作 real benchmark mini sweep。
-2. 實作 `recommend_config.py`，從實測結果選 safe best configuration。
-3. 接著再做 `run_with_budget.py` training wrapper。
-4. 最後才做 reversible source tuner。
-
-原因是 source tuner 風險比較高，必須先有穩定的 monitoring / manifest / restore infrastructure。
+1. 把 batch-size tuner 的 summary 變成 markdown report。
+2. 加 `dataloader_workers` tuner。
+3. 加 `gradient_accumulation_steps` tuner。
+4. 加 hardware inspector，輸出 CPU/RAM/WSL/package metadata。
+5. 把 real benchmark sweep 結果畫成圖。
