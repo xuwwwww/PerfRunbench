@@ -628,6 +628,50 @@ python scripts/run_tuned_with_budget.py \
 
 但一般 tuning experiment 預設應該自動 restore，避免訓練後留下髒 source code。
 
+## 10.3 Batch-size training tuner
+
+目前已有第一版 batch-size training tuner。它會讀 config 檔裡的 `batch_size`，依序嘗試候選值，每次都：
+
+- 備份 config。
+- 修改 batch size。
+- 執行 training command。
+- 監控 RAM / CPU。
+- 執行後自動還原 config。
+- 記錄每個 trial 的 run id 和 resource summary。
+- 推薦 memory budget 下最大的 safe batch size。
+
+範例：
+
+```bash
+python scripts/tune_training_config.py \
+  --file configs/train.yaml \
+  --batch-size-key batch_size \
+  --values 64 32 16 8 \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  --output results/reports/training_tuning_summary.json \
+  -- python train.py --config configs/train.yaml
+```
+
+目前支援這兩種 config 寫法：
+
+```yaml
+batch_size: 64
+```
+
+或：
+
+```python
+batch_size = 64
+```
+
+限制：
+
+- `batch_size` assignment 必須只出現一次。
+- 目前只做單一 key 的 numeric replacement。
+- 每個 trial 都會還原 config，所以不會留下 tuned value。
+- 推薦邏輯目前是 largest safe batch size。
+
 ## 12. BIOS / UEFI tuning 的邊界
 
 這個 tool 應該主打 runtime-level tuning，不應該自動進 BIOS / UEFI 改設定。
