@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from autotune.resource.run_state import RUNS_DIR, load_manifest
+from autotune.source_tuner.transaction import SourceTuningError, restore_changed_files
 
 
 def main() -> None:
@@ -23,16 +23,13 @@ def main() -> None:
     if not changed_files:
         print(f"Run {args.run_id} has no changed files to restore.")
         return
-    for item in changed_files:
-        path = Path(item["path"])
-        backup = Path(item["backup"])
-        if not backup.exists():
-            raise SystemExit(f"Backup missing for {path}: {backup}")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(backup, path)
-        print(f"Restored {path} from {backup}")
+    try:
+        restored = restore_changed_files(run_dir)
+    except SourceTuningError as exc:
+        raise SystemExit(str(exc)) from exc
+    for path in restored:
+        print(f"Restored {path}")
 
 
 if __name__ == "__main__":
     main()
-

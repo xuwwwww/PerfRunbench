@@ -5,7 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.run_state import RUNS_DIR, RunManifest, create_run, load_manifest, write_json
+from autotune.resource.run_state import RUNS_DIR, RunManifest, create_run, load_manifest, manifest_from_dict, write_json
 
 
 class SourceTuningError(RuntimeError):
@@ -72,18 +72,7 @@ def _create_or_load_tuning_run(run_id: str | None, runs_dir: Path) -> tuple[Path
         write_json(run_dir / "manifest.json", asdict(manifest))
         return run_dir, manifest
     raw = load_manifest(run_dir)
-    manifest = RunManifest(
-        run_id=raw["run_id"],
-        command=raw.get("command", []),
-        budget=raw.get("budget", {}),
-        started_at=raw.get("started_at", "unknown"),
-        status=raw.get("status", "running"),
-        finished_at=raw.get("finished_at"),
-        return_code=raw.get("return_code"),
-        changed_files=raw.get("changed_files", []),
-        notes=raw.get("notes", []),
-    )
-    return run_dir, manifest
+    return run_dir, manifest_from_dict(raw)
 
 
 def _backup_file(path: Path, run_dir: Path) -> Path:
@@ -95,3 +84,18 @@ def _backup_file(path: Path, run_dir: Path) -> Path:
     backup_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(path, backup_path)
     return backup_path
+
+
+def restore_changed_files(run_dir: str | Path) -> list[str]:
+    path = Path(run_dir)
+    manifest = load_manifest(path)
+    restored: list[str] = []
+    for item in reversed(manifest.get("changed_files", [])):
+        target = Path(item["path"])
+        backup = Path(item["backup"])
+        if not backup.exists():
+            raise SourceTuningError(f"backup missing for {target}: {backup}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(backup, target)
+        restored.append(str(target))
+    return restored

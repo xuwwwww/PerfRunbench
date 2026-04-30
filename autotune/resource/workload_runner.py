@@ -25,10 +25,13 @@ def run_with_budget(
     budget: ResourceBudget,
     sample_interval_seconds: float = 0.5,
     hard_kill: bool = False,
+    run_dir: Path | None = None,
+    manifest: RunManifest | None = None,
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
-    run_dir, manifest = create_run(command, budget)
+    if run_dir is None or manifest is None:
+        run_dir, manifest = create_run(command, budget)
     timeline: list[ChildSample] = []
     process = None
     return_code = 1
@@ -143,4 +146,3 @@ def _summarize_timeline(timeline: list[ChildSample], budget: ResourceBudget) -> 
         "effective_memory_budget_mb": round(effective_budget, 3) if effective_budget is not None else None,
         "memory_budget_exceeded": bool(effective_budget is not None and peak_rss > effective_budget),
     }
-

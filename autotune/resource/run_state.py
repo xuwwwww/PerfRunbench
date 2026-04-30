@@ -47,6 +47,11 @@ def create_run(command: list[str], budget: ResourceBudget, runs_dir: Path = RUNS
 
 
 def finish_run(run_dir: Path, manifest: RunManifest, status: str, return_code: int | None) -> None:
+    manifest_path = run_dir / "manifest.json"
+    if manifest_path.exists():
+        current = load_manifest(run_dir)
+        manifest.changed_files = current.get("changed_files", manifest.changed_files)
+        manifest.notes = _merge_notes(current.get("notes", []), manifest.notes)
     manifest.status = status
     manifest.return_code = return_code
     manifest.finished_at = datetime.now().isoformat(timespec="seconds")
@@ -60,6 +65,20 @@ def write_json(path: Path, payload: Any) -> None:
 
 def load_manifest(run_dir: Path) -> dict[str, Any]:
     return json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+
+
+def manifest_from_dict(raw: dict[str, Any]) -> RunManifest:
+    return RunManifest(
+        run_id=raw["run_id"],
+        command=raw.get("command", []),
+        budget=raw.get("budget", {}),
+        started_at=raw.get("started_at", "unknown"),
+        status=raw.get("status", "running"),
+        finished_at=raw.get("finished_at"),
+        return_code=raw.get("return_code"),
+        changed_files=raw.get("changed_files", []),
+        notes=raw.get("notes", []),
+    )
 
 
 def write_git_snapshot(run_dir: Path) -> None:
@@ -106,3 +125,10 @@ def _command_output(command: list[str], check: bool = False) -> str:
         output += result.stderr
     return output
 
+
+def _merge_notes(first: list[str], second: list[str]) -> list[str]:
+    merged = []
+    for note in [*first, *second]:
+        if note not in merged:
+            merged.append(note)
+    return merged

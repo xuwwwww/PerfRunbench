@@ -585,6 +585,49 @@ python scripts/restore_run.py --run-id <run_id>
 
 這個設計比較保守，但安全。之後可以在這個 transaction 基礎上加 batch size tuner、dataloader worker tuner、gradient accumulation tuner。
 
+## 10.2 Source tuning + training wrapper
+
+目前也有第一版把 source tuning 和 workload wrapper 接在一起的 CLI：
+
+```bash
+python scripts/run_tuned_with_budget.py \
+  --edits-file edits.json \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  -- python train.py
+```
+
+`edits.json` 格式：
+
+```json
+[
+  {
+    "file": "train.py",
+    "find": "batch_size = 64",
+    "replace": "batch_size = 16"
+  }
+]
+```
+
+這個流程會：
+
+- 建立 `.autotuneai/runs/<run_id>/`。
+- 修改前備份 source file。
+- 套用 source edits。
+- 執行 command。
+- 監控 child process resource usage。
+- 寫入 `resource_timeline.json` 和 `resource_summary.json`。
+- command 結束後自動 restore source files。
+- Ctrl-C 或例外時仍會嘗試 restore。
+
+如果你想保留修改結果，可以加：
+
+```bash
+--keep-changes
+```
+
+但一般 tuning experiment 預設應該自動 restore，避免訓練後留下髒 source code。
+
 ## 12. BIOS / UEFI tuning 的邊界
 
 這個 tool 應該主打 runtime-level tuning，不應該自動進 BIOS / UEFI 改設定。

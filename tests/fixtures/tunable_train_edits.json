@@ -1,0 +1,7 @@
+[
+  {
+    "file": "tests/fixtures/tunable_train.py",
+    "find": "batch_size = 64",
+    "replace": "batch_size = 16"
+  }
+]
