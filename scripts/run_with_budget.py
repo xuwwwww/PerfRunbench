@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.workload_runner import run_with_budget
+from autotune.system_tuner.runtime import available_profiles
 
 
 def main() -> None:
@@ -27,6 +28,9 @@ def main() -> None:
         action="store_true",
         help="Allow --executor auto to use sudo when capability detection says systemd requires it.",
     )
+    parser.add_argument("--tune-system", choices=available_profiles(), help="Apply a runtime system tuning profile first.")
+    parser.add_argument("--no-restore-system-after", action="store_true")
+    parser.add_argument("--system-tuning-sudo", action="store_true", help="Use sudo for sysctl tuning writes.")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -52,6 +56,9 @@ def main() -> None:
             executor=args.executor,
             use_sudo=args.sudo,
             allow_sudo_auto=args.allow_sudo_auto,
+            tune_system_profile=args.tune_system,
+            restore_system_after=not args.no_restore_system_after,
+            system_tuning_sudo=args.system_tuning_sudo,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc

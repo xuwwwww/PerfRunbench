@@ -12,6 +12,7 @@ from autotune.resource.cgroup_monitor import CgroupStats, read_cgroup_stats, wai
 from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.run_state import RunManifest, create_run, finish_run, write_json
 from autotune.resource.systemd_executor import build_systemd_run_command, make_systemd_scope_name
+from autotune.system_tuner.runtime import apply_system_tuning_to_run, restore_system_tuning
 
 
 @dataclass
@@ -39,6 +40,9 @@ def run_with_budget(
     executor: str = "local",
     use_sudo: bool = False,
     allow_sudo_auto: bool = False,
+    tune_system_profile: str | None = None,
+    restore_system_after: bool = True,
+    system_tuning_sudo: bool = False,
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -49,7 +53,17 @@ def run_with_budget(
     process = None
     return_code = 1
     status = "failed"
+    system_tuning_applied = False
     try:
+        if tune_system_profile:
+            result = apply_system_tuning_to_run(
+                run_dir,
+                manifest,
+                tune_system_profile,
+                use_sudo=system_tuning_sudo,
+            )
+            system_tuning_applied = any(change.get("applied") for change in result.get("changes", []))
+            manifest.notes.append(f"system_tuning_lifecycle_applied={system_tuning_applied}")
         command_to_run = command
         selected_executor, selected_use_sudo, selection_notes = _resolve_executor(
             executor,
@@ -107,6 +121,9 @@ def run_with_budget(
                 process.kill()
         return_code = 130
     finally:
+        if tune_system_profile and restore_system_after:
+            restored = restore_system_tuning(run_dir, use_sudo=system_tuning_sudo)
+            manifest.notes.append(f"system_tuning_lifecycle_restored={len(restored)}")
         write_json(run_dir / "resource_timeline.json", [asdict(sample) for sample in timeline])
         write_json(run_dir / "resource_summary.json", _summarize_timeline(timeline, budget))
         finish_run(run_dir, manifest, status, return_code)

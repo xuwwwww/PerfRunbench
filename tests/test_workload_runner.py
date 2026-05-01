@@ -133,6 +133,25 @@ class WorkloadRunnerTest(unittest.TestCase):
         )
         which.assert_not_called()
 
+    @patch("autotune.resource.workload_runner.restore_system_tuning")
+    @patch("autotune.resource.workload_runner.apply_system_tuning_to_run")
+    def test_run_with_budget_applies_and_restores_system_tuning(self, apply_tuning, restore_tuning) -> None:
+        apply_tuning.return_value = {"changes": [{"applied": True}]}
+        restore_tuning.return_value = [{"key": "vm.swappiness", "return_code": 0}]
+        return_code, run_dir = run_with_budget(
+            ["python", "tests/fixtures/sleep_workload.py"],
+            ResourceBudget(),
+            sample_interval_seconds=0.05,
+            tune_system_profile="linux-training-safe",
+            system_tuning_sudo=True,
+        )
+        self.assertEqual(return_code, 0)
+        apply_tuning.assert_called_once()
+        restore_tuning.assert_called_once()
+        manifest = load_manifest(Path(run_dir))
+        self.assertTrue(any("system_tuning_lifecycle_applied=True" in note for note in manifest["notes"]))
+        self.assertTrue(any("system_tuning_lifecycle_restored=1" in note for note in manifest["notes"]))
+
 
 if __name__ == "__main__":
     unittest.main()

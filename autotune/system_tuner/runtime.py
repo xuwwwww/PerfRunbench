@@ -117,14 +117,40 @@ def apply_system_tuning(
     if platform.system() != "Linux":
         raise SystemTuningError("runtime system tuning is currently implemented only for Linux sysctl settings.")
     runner = runner or _run_command
-    settings = _profile_settings(profile)
     run_dir, manifest = create_run(["tune_system", "--profile", profile], ResourceBudget(), runs_dir=runs_dir)
-    before = snapshot_settings(settings)
-    write_json(run_dir / "system_tuning_plan.json", recommend_system_tuning(profile))
-    write_json(run_dir / "system_tuning_before.json", _snapshots_to_records(before))
-    changes: list[SettingChange] = []
     status = "completed"
     return_code = 0
+    try:
+        result = apply_system_tuning_to_run(run_dir, manifest, profile, use_sudo=use_sudo, runner=runner)
+        if any(change.get("error") for change in result.get("changes", []) if change.get("applied") is False):
+            status = "failed"
+            return_code = 1
+    except Exception:
+        status = "failed"
+        return_code = 1
+        raise
+    finally:
+        finish_run(run_dir, manifest, status, return_code)
+    return run_dir, result
+
+
+def apply_system_tuning_to_run(
+    run_dir: str | Path,
+    manifest,
+    profile: str = "linux-training-safe",
+    *,
+    use_sudo: bool = False,
+    runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    if platform.system() != "Linux":
+        raise SystemTuningError("runtime system tuning is currently implemented only for Linux sysctl settings.")
+    runner = runner or _run_command
+    run_path = Path(run_dir)
+    settings = _profile_settings(profile)
+    before = snapshot_settings(settings)
+    write_json(run_path / "system_tuning_plan.json", recommend_system_tuning(profile))
+    write_json(run_path / "system_tuning_before.json", _snapshots_to_records(before))
+    changes: list[SettingChange] = []
     try:
         for setting in settings:
             snapshot = before[setting.key]
@@ -172,15 +198,13 @@ def apply_system_tuning(
                 )
             )
     except Exception as exc:
-        status = "failed"
-        return_code = 1
         manifest.notes.append(f"system_tuning_error={exc}")
         raise
     finally:
         after = snapshot_settings(settings)
-        write_json(run_dir / "system_tuning_after.json", _snapshots_to_records(after))
+        write_json(run_path / "system_tuning_after.json", _snapshots_to_records(after))
         diff = [_change_to_record(change) for change in changes]
-        write_json(run_dir / "system_tuning_diff.json", diff)
+        write_json(run_path / "system_tuning_diff.json", diff)
         manifest.notes.extend(
             [
                 f"system_tuning_profile={profile}",
@@ -188,8 +212,7 @@ def apply_system_tuning(
                 f"system_tuning_changed={sum(1 for change in changes if change.changed)}",
             ]
         )
-        finish_run(run_dir, manifest, status, return_code)
-    return run_dir, {"profile": profile, "changes": [_change_to_record(change) for change in changes]}
+    return {"profile": profile, "changes": [_change_to_record(change) for change in changes]}
 
 
 def restore_system_tuning(run_dir: str | Path, *, use_sudo: bool = False, runner: CommandRunner | None = None) -> list[dict]:

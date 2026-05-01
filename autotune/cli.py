@@ -48,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     run = subparsers.add_parser("run", help="Run a command with resource monitoring and optional limits.")
     _add_budget_args(run)
     run.add_argument("workload", nargs=argparse.REMAINDER)
+    run.add_argument("--tune-system", choices=available_profiles(), help="Apply a runtime system tuning profile before running.")
+    run.add_argument(
+        "--no-restore-system-after",
+        action="store_true",
+        help="Keep runtime system tuning after the workload instead of restoring the before snapshot.",
+    )
+    run.add_argument("--system-tuning-sudo", action="store_true", help="Use sudo for runtime sysctl tuning writes.")
     run.set_defaults(handler=_cmd_run)
 
     analyze = subparsers.add_parser("analyze", help="Analyze a run's resource guard behavior.")
@@ -127,6 +134,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
             executor=args.executor,
             use_sudo=args.sudo,
             allow_sudo_auto=args.allow_sudo_auto,
+            tune_system_profile=args.tune_system,
+            restore_system_after=not args.no_restore_system_after,
+            system_tuning_sudo=args.system_tuning_sudo,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
