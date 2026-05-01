@@ -29,5 +29,8 @@ dev = [
   "onnxruntime",
 ]
 
+[project.scripts]
+autotuneai = "autotune.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["autotune*"]
