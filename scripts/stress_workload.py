@@ -14,11 +14,11 @@ def main() -> None:
     parser.add_argument("--chunk-mb", type=int, default=64, help="Allocation chunk size used to touch memory gradually.")
     args = parser.parse_args()
 
-    payload = allocate_memory(args.memory_mb, args.chunk_mb)
     stop_at = time.monotonic() + args.duration_seconds
     processes = [mp.Process(target=burn_cpu, args=(stop_at, index)) for index in range(args.workers)]
     for process in processes:
         process.start()
+    payload = allocate_memory(args.memory_mb, args.chunk_mb)
     for process in processes:
         process.join()
 

@@ -6,7 +6,13 @@ from unittest.mock import patch
 
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_state import load_manifest
-from autotune.resource.workload_runner import ChildSample, _resolve_executor, _summarize_timeline, run_with_budget
+from autotune.resource.workload_runner import (
+    ChildSample,
+    _resolve_command_executable,
+    _resolve_executor,
+    _summarize_timeline,
+    run_with_budget,
+)
 
 
 class WorkloadRunnerTest(unittest.TestCase):
@@ -110,6 +116,22 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertEqual(selected, "systemd")
         self.assertTrue(use_sudo)
         self.assertIn("sudo_used=True", notes)
+
+    @patch("autotune.resource.workload_runner.shutil.which")
+    def test_resolve_command_executable_for_systemd_environment(self, which) -> None:
+        which.return_value = "/env/bin/python"
+        self.assertEqual(
+            _resolve_command_executable(["python", "train.py"]),
+            ["/env/bin/python", "train.py"],
+        )
+
+    @patch("autotune.resource.workload_runner.shutil.which")
+    def test_resolve_command_executable_leaves_explicit_paths(self, which) -> None:
+        self.assertEqual(
+            _resolve_command_executable(["/env/bin/python", "train.py"]),
+            ["/env/bin/python", "train.py"],
+        )
+        which.assert_not_called()
 
 
 if __name__ == "__main__":

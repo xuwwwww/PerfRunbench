@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import shutil
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -61,8 +62,11 @@ def run_with_budget(
             manifest.notes.append(f"affinity_context={affinity_context}")
         elif selected_executor == "systemd":
             unit_name = make_systemd_scope_name(manifest.run_id)
+            resolved_command = _resolve_command_executable(command)
+            if resolved_command != command:
+                manifest.notes.append(f"resolved_systemd_command_executable={resolved_command[0]}")
             systemd_command = build_systemd_run_command(
-                command,
+                resolved_command,
                 budget,
                 use_sudo=selected_use_sudo,
                 unit_name=unit_name,
@@ -225,11 +229,11 @@ def _monitor_systemd_scope(
 
 def _sample_child(child, psutil) -> ChildSample:
     children = child.children(recursive=True)
-    rss = child.memory_info().rss
+    rss = _accounted_memory_bytes(child, psutil)
     cpu = child.cpu_percent(interval=None)
     for item in children:
         try:
-            rss += item.memory_info().rss
+            rss += _accounted_memory_bytes(item, psutil)
             cpu += item.cpu_percent(interval=None)
         except psutil.NoSuchProcess:
             pass
@@ -378,3 +382,27 @@ def _visible_cpu_count() -> int | None:
         return psutil.cpu_count(logical=True)
     except Exception:
         return None
+
+
+def _resolve_command_executable(command: list[str]) -> list[str]:
+    if not command:
+        return command
+    executable = command[0]
+    if "/" in executable or "\\" in executable:
+        return command
+    resolved = shutil.which(executable)
+    if not resolved:
+        return command
+    return [resolved, *command[1:]]
+
+
+def _accounted_memory_bytes(process, psutil) -> int:
+    try:
+        full = process.memory_full_info()
+        if hasattr(full, "pss") and full.pss is not None:
+            return int(full.pss)
+        if hasattr(full, "uss") and full.uss is not None:
+            return int(full.uss)
+    except (psutil.AccessDenied, psutil.NoSuchProcess, AttributeError):
+        pass
+    return process.memory_info().rss
