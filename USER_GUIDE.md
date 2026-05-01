@@ -10,6 +10,7 @@
 - PyTorch CPU ResNet18 benchmark。
 - ONNX export + ONNX Runtime CPU benchmark。
 - Resource-aware benchmark monitoring。
+- System inspector，偵測 CPU/RAM/WSL/package/runtime provider。
 - Real mini sweep + safe config recommender。
 - Training / arbitrary command resource wrapper。
 - Reversible source tuning transaction。
@@ -70,7 +71,65 @@ python -m unittest discover -s tests
 OK
 ```
 
-## 2. Inference Benchmark
+## 2. System Inspector
+
+在跑 benchmark 或 training tuning 前，建議先收集目前機器環境：
+
+```bash
+python scripts/inspect_system.py
+```
+
+預設會印出 JSON，並寫到：
+
+```text
+results/reports/system_info.json
+```
+
+如果只想印出，不想寫檔：
+
+```bash
+python scripts/inspect_system.py --no-write
+```
+
+如果要指定輸出位置：
+
+```bash
+python scripts/inspect_system.py --output results/reports/my_system_info.json
+```
+
+目前會偵測：
+
+```text
+system / release / machine / processor
+python_version
+is_wsl
+cpu_count_logical
+cpu_count_physical
+cpu_affinity_supported
+current_cpu_affinity
+total_memory_mb
+available_memory_mb
+cgroup_memory_max_mb
+wsl_config_visible
+torch / torchvision / onnx / onnxruntime / psutil versions
+torch_cuda_available
+torch_num_threads
+torch_num_interop_threads
+onnxruntime_providers
+notes
+```
+
+`notes` 不是寫死的固定說明，而是根據偵測結果產生。例如：
+
+- 如果偵測到 WSL，會列出 WSL 內 Linux 可見 RAM。
+- 如果 cgroup memory limit 小於可見 RAM，會提醒 cgroup limit。
+- 如果 CPU affinity 不支援，會提醒不能用 affinity 保留 core。
+- 如果 PyTorch 或 ONNX Runtime 沒安裝，會提醒相關 real benchmark 不能跑。
+- 如果 ONNX Runtime 沒有 `CPUExecutionProvider`，會提醒 CPU backend 不可用。
+
+這個檔案很重要，因為同一組 benchmark 數字必須和硬體/環境一起看。之後 report 或跨機器比較都應該附上 `system_info.json`。
+
+## 3. Inference Benchmark
 
 ### 2.1 Config 檔在哪
 
@@ -142,7 +201,7 @@ artifacts/onnx/resnet18.onnx
 
 `artifacts/` 和 `results/` 產物已被 `.gitignore` 排除。
 
-## 3. Resource Budget
+## 4. Resource Budget
 
 Resource budget 用 CLI 指定：
 
@@ -181,7 +240,7 @@ cpu_quota_exceeded
 
 注意：WSL 可見 RAM 可能比 Windows 少。如果 Windows 顯示 23.7GB，但 WSL 只暴露 11.8GB，`effective_memory_budget_mb` 會用 WSL 實際可用上限計算。
 
-## 4. Real Mini Sweep + Recommender
+## 5. Real Mini Sweep + Recommender
 
 ### 4.1 跑 mini sweep
 
@@ -241,7 +300,7 @@ python scripts/recommend_config.py \
   --json
 ```
 
-## 5. Scheduler Simulator
+## 6. Scheduler Simulator
 
 ```bash
 python scripts/run_scheduler.py \
@@ -271,7 +330,7 @@ deadline_miss_rate
 
 Dynamic batching 主要是 inference serving 的 throughput/latency trade-off，不是 training RAM 爆掉的直接解法。
 
-## 6. Training / Command Resource Wrapper
+## 7. Training / Command Resource Wrapper
 
 這個 wrapper 可以包住任意命令，例如 training：
 
@@ -316,7 +375,7 @@ restore 某個 run 修改過的檔案：
 python scripts/restore_run.py --run-id <run_id>
 ```
 
-## 7. Reversible Source Tuning
+## 8. Reversible Source Tuning
 
 ### 7.1 單次安全 find/replace
 
@@ -394,7 +453,7 @@ python scripts/run_tuned_with_budget.py \
 
 不要同時對同一個檔案跑多個 tuning command。source tuner 會備份與還原檔案，但目前沒有跨 process file lock；兩個 tuner 同時改同一個檔案會造成競態。
 
-## 8. Batch-size Training Tuner
+## 9. Batch-size Training Tuner
 
 這是目前最接近「真的幫 training 調參」的功能。
 
@@ -472,7 +531,7 @@ batch_size = 64
 - 推薦邏輯目前是 largest safe batch size。
 - 目前不會自動調 gradient accumulation / dataloader workers。
 
-## 9. 常見輸出位置
+## 10. 常見輸出位置
 
 ```text
 results/raw/       benchmark JSON/CSV
@@ -483,7 +542,7 @@ artifacts/onnx/    exported ONNX model
 
 這些產物大多被 `.gitignore` 排除。
 
-## 10. 如果被中斷怎麼辦
+## 11. 如果被中斷怎麼辦
 
 列出 runs：
 
@@ -507,7 +566,7 @@ git reset --hard
 
 原因是不能刪掉使用者原本未 commit 的改動。
 
-## 11. BIOS / UEFI tuning 邊界
+## 12. BIOS / UEFI tuning 邊界
 
 這個 tool 主要做 runtime-level tuning。
 
@@ -536,7 +595,7 @@ git reset --hard
 
 這些需要重開機，硬體差異大，風險高，不適合做成 portable tool 的自動功能。
 
-## 12. 下一步建議
+## 13. 下一步建議
 
 下一步最值得做：
 
