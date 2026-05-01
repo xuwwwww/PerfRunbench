@@ -117,6 +117,24 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertTrue(use_sudo)
         self.assertIn("sudo_used=True", notes)
 
+    @patch("autotune.resource.workload_runner.collect_executor_capabilities")
+    def test_auto_executor_can_select_docker(self, collect_capabilities) -> None:
+        collect_capabilities.return_value = {
+            "platform": "windows",
+            "recommended_executor": "docker",
+            "executors": {"docker": {"available": True, "docker_daemon_available": True}},
+        }
+        selected, use_sudo, notes = _resolve_executor("auto", use_sudo=False, allow_sudo_auto=False)
+        self.assertEqual(selected, "docker")
+        self.assertFalse(use_sudo)
+        self.assertIn("selected_executor=docker", notes)
+
+    def test_resolve_executor_accepts_explicit_docker(self) -> None:
+        selected, use_sudo, notes = _resolve_executor("docker", use_sudo=False, allow_sudo_auto=False)
+        self.assertEqual(selected, "docker")
+        self.assertFalse(use_sudo)
+        self.assertIn("selected_executor=docker", notes)
+
     @patch("autotune.resource.workload_runner.shutil.which")
     def test_resolve_command_executable_for_systemd_environment(self, which) -> None:
         which.return_value = "/env/bin/python"

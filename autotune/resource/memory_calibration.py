@@ -24,6 +24,7 @@ def calibrate_memory(
     hard_kill: bool = False,
     use_sudo: bool = False,
     allow_sudo_auto: bool = False,
+    docker_image: str = "python:3.12-slim",
     runs_dir: Path = RUNS_DIR,
     runner: RunWithBudget = run_with_budget,
 ) -> dict[str, Any]:
@@ -48,6 +49,7 @@ def calibrate_memory(
             executor=executor,
             use_sudo=use_sudo,
             allow_sudo_auto=allow_sudo_auto,
+            docker_image=docker_image,
         )
         analysis = analyze_run(run_dir.name, runs_dir)
         records.append(_record_from_analysis(budget_gb, workload_memory_mb, return_code, run_dir, analysis))
@@ -60,6 +62,7 @@ def calibrate_memory(
         "executor": executor,
         "sample_interval_seconds": sample_interval_seconds,
         "hard_kill": hard_kill,
+        "docker_image": docker_image,
         "records": records,
         "recommendations": _recommend(records),
     }

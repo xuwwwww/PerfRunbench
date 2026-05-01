@@ -116,12 +116,17 @@ def _add_budget_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_budget_executor_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--executor", choices=["auto", "local", "systemd"], default="local")
+    parser.add_argument("--executor", choices=["auto", "local", "systemd", "docker"], default="local")
     parser.add_argument("--sudo", action="store_true", help="Use sudo for privileged executor operations.")
     parser.add_argument(
         "--allow-sudo-auto",
         action="store_true",
         help="Allow --executor auto to use sudo when capability detection says systemd requires it.",
+    )
+    parser.add_argument(
+        "--docker-image",
+        default="python:3.12-slim",
+        help="Docker image to use when --executor docker is selected.",
     )
 
 
@@ -159,6 +164,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             tune_system_profile=args.tune_system,
             restore_system_after=not args.no_restore_system_after,
             system_tuning_sudo=args.system_tuning_sudo,
+            docker_image=args.docker_image,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
@@ -197,6 +203,7 @@ def _cmd_calibrate_memory(args: argparse.Namespace) -> int:
             hard_kill=args.hard_kill,
             use_sudo=args.sudo,
             allow_sudo_auto=args.allow_sudo_auto,
+            docker_image=args.docker_image,
         )
     except (RuntimeError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
@@ -236,6 +243,7 @@ def _cmd_tune_batch(args: argparse.Namespace) -> int:
             executor=args.executor,
             use_sudo=args.sudo,
             allow_sudo_auto=args.allow_sudo_auto,
+            docker_image=args.docker_image,
         )
     except (BatchSizeTuningError, RuntimeError) as exc:
         raise SystemExit(str(exc)) from exc

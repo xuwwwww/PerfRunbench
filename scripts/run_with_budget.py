@@ -21,13 +21,14 @@ def main() -> None:
     parser.add_argument("--cpu-quota-percent", type=float)
     parser.add_argument("--sample-interval-seconds", type=float, default=0.5)
     parser.add_argument("--hard-kill", action="store_true")
-    parser.add_argument("--executor", choices=["auto", "local", "systemd"], default="local")
+    parser.add_argument("--executor", choices=["auto", "local", "systemd", "docker"], default="local")
     parser.add_argument("--sudo", action="store_true", help="Use sudo for systemd-run privileged scopes.")
     parser.add_argument(
         "--allow-sudo-auto",
         action="store_true",
         help="Allow --executor auto to use sudo when capability detection says systemd requires it.",
     )
+    parser.add_argument("--docker-image", default="python:3.12-slim")
     parser.add_argument("--tune-system", choices=available_profiles(), help="Apply a runtime system tuning profile first.")
     parser.add_argument("--no-restore-system-after", action="store_true")
     parser.add_argument("--system-tuning-sudo", action="store_true", help="Use sudo for sysctl tuning writes.")
@@ -59,6 +60,7 @@ def main() -> None:
             tune_system_profile=args.tune_system,
             restore_system_after=not args.no_restore_system_after,
             system_tuning_sudo=args.system_tuning_sudo,
+            docker_image=args.docker_image,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc

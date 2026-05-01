@@ -117,7 +117,7 @@ def _docker_capability(*, probe: bool) -> dict[str, Any]:
     daemon_available = None
     if probe and docker:
         daemon_available = _docker_daemon_available()
-    implemented = False
+    implemented = True
     available = bool(docker and (daemon_available is not False))
     notes = []
     if not docker:
@@ -125,7 +125,7 @@ def _docker_capability(*, probe: bool) -> dict[str, Any]:
     elif daemon_available is False:
         notes.append("docker CLI exists, but the daemon is not reachable.")
     else:
-        notes.append("Docker can provide cross-platform hard limits through containers once implemented.")
+        notes.append("Docker can provide cross-platform hard memory and CPU limits through containers.")
     return {
         "available": available,
         "implemented": implemented,

@@ -61,7 +61,7 @@ class ExecutorCapabilitiesTest(unittest.TestCase):
         self.assertTrue(result["executors"]["systemd"]["cgroup_monitoring"])
         self.assertTrue(result["executors"]["systemd"]["requires_sudo"])
         self.assertFalse(result["executors"]["systemd"]["transient_scope_without_sudo"])
-        self.assertFalse(result["executors"]["docker"]["implemented"])
+        self.assertTrue(result["executors"]["docker"]["implemented"])
 
     @patch("autotune.resource.executor_capabilities.importlib.util.find_spec")
     @patch("autotune.resource.executor_capabilities.is_wsl")

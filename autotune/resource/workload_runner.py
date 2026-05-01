@@ -9,6 +9,7 @@ from pathlib import Path
 from autotune.resource.affinity import apply_cpu_affinity
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.cgroup_monitor import CgroupStats, read_cgroup_stats, wait_for_systemd_control_group
+from autotune.resource.docker_executor import build_docker_run_command
 from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.run_state import RunManifest, create_run, finish_run, write_json
 from autotune.resource.systemd_executor import build_systemd_run_command, make_systemd_scope_name
@@ -43,6 +44,7 @@ def run_with_budget(
     tune_system_profile: str | None = None,
     restore_system_after: bool = True,
     system_tuning_sudo: bool = False,
+    docker_image: str = "python:3.12-slim",
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -88,6 +90,16 @@ def run_with_budget(
             command_to_run = systemd_command.command
             manifest.notes.extend(systemd_command.notes)
             manifest.notes.append("systemd executor applies hard limits and samples the scope cgroup when available.")
+        elif selected_executor == "docker":
+            docker_command = build_docker_run_command(
+                command,
+                budget,
+                image=docker_image,
+                total_cores=_visible_cpu_count(),
+                total_memory_mb=_visible_memory_mb(),
+            )
+            command_to_run = docker_command.command
+            manifest.notes.extend(docker_command.notes)
         else:
             raise ValueError(f"unsupported executor: {selected_executor}")
         process = subprocess.Popen(command_to_run)
@@ -131,16 +143,17 @@ def run_with_budget(
 
 
 def _resolve_executor(executor: str, *, use_sudo: bool, allow_sudo_auto: bool) -> tuple[str, bool, list[str]]:
-    if executor not in {"auto", "local", "systemd"}:
+    if executor not in {"auto", "local", "systemd", "docker"}:
         raise ValueError(f"unsupported executor: {executor}")
     if executor != "auto":
-        return executor, use_sudo, [
+        selected_use_sudo = use_sudo if executor == "systemd" else False
+        return executor, selected_use_sudo, [
             f"requested_executor={executor}",
             f"selected_executor={executor}",
-            f"sudo_used={use_sudo}",
+            f"sudo_used={selected_use_sudo}",
         ]
 
-    capabilities = collect_executor_capabilities(probe_systemd=True, check_sudo_cache=True)
+    capabilities = collect_executor_capabilities(probe_docker=True, probe_systemd=True, check_sudo_cache=True)
     selected = capabilities.get("recommended_executor", "local")
     executors = capabilities.get("executors", {})
     notes = [
@@ -168,6 +181,17 @@ def _resolve_executor(executor: str, *, use_sudo: bool, allow_sudo_auto: bool) -
             ]
         )
         return "systemd", selected_use_sudo, notes
+    if selected == "docker":
+        docker = executors.get("docker", {})
+        if not docker.get("available"):
+            raise RuntimeError("auto executor selected docker, but docker is not available on this machine.")
+        notes.extend(
+            [
+                f"docker_daemon_available={docker.get('docker_daemon_available')}",
+                "sudo_used=False",
+            ]
+        )
+        return "docker", False, notes
 
     notes.append("sudo_used=False")
     return "local", False, notes
