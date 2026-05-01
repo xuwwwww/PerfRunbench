@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from autotune.profiler.hardware_info import collect_hardware_info, write_hardware_info
+from autotune.report.run_report import generate_run_report
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.run_analysis import analyze_run, format_analysis
@@ -61,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--run-id", required=True)
     analyze.add_argument("--json", action="store_true")
     analyze.set_defaults(handler=_cmd_analyze)
+
+    report = subparsers.add_parser("report", help="Generate a Markdown report for a run.")
+    report.add_argument("--run-id", required=True)
+    report.add_argument("--output")
+    report.set_defaults(handler=_cmd_report)
 
     tune_system = subparsers.add_parser("tune-system", help="Recommend or apply reversible runtime system tuning.")
     tune_system.add_argument("--profile", default="linux-training-safe", choices=available_profiles())
@@ -150,6 +156,15 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
         print(json.dumps(analysis, indent=2, sort_keys=True))
     else:
         print(format_analysis(analysis))
+    return 0
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    try:
+        report_path = generate_run_report(args.run_id, args.output)
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(f"Wrote run report to {report_path}")
     return 0
 
 

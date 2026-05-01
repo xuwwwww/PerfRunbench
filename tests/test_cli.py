@@ -35,6 +35,15 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Run run1", output.getvalue())
 
+    def test_report_command_writes_report(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.generate_run_report") as generate, redirect_stdout(output):
+            generate.return_value = "report.md"
+            code = main(["report", "--run-id", "run1"])
+        self.assertEqual(code, 0)
+        generate.assert_called_once_with("run1", None)
+        self.assertIn("Wrote run report", output.getvalue())
+
     def test_run_command_requires_workload(self) -> None:
         with self.assertRaises(SystemExit):
             main(["run"])
