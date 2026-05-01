@@ -8,6 +8,7 @@ from pathlib import Path
 from autotune.resource.affinity import apply_cpu_affinity
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.cgroup_monitor import CgroupStats, read_cgroup_stats, wait_for_systemd_control_group
+from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.run_state import RunManifest, create_run, finish_run, write_json
 from autotune.resource.systemd_executor import build_systemd_run_command, make_systemd_scope_name
 
@@ -36,6 +37,7 @@ def run_with_budget(
     manifest: RunManifest | None = None,
     executor: str = "local",
     use_sudo: bool = False,
+    allow_sudo_auto: bool = False,
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -47,19 +49,30 @@ def run_with_budget(
     status = "failed"
     try:
         command_to_run = command
-        if executor == "local":
+        selected_executor, selected_use_sudo, selection_notes = _resolve_executor(
+            executor,
+            use_sudo=use_sudo,
+            allow_sudo_auto=allow_sudo_auto,
+        )
+        manifest.notes.extend(selection_notes)
+        if selected_executor == "local":
             affinity_context = apply_cpu_affinity(budget)
             manifest.notes.append(f"affinity_context={affinity_context}")
-        elif executor == "systemd":
+        elif selected_executor == "systemd":
             unit_name = make_systemd_scope_name(manifest.run_id)
-            systemd_command = build_systemd_run_command(command, budget, use_sudo=use_sudo, unit_name=unit_name)
+            systemd_command = build_systemd_run_command(
+                command,
+                budget,
+                use_sudo=selected_use_sudo,
+                unit_name=unit_name,
+            )
             command_to_run = systemd_command.command
             manifest.notes.extend(systemd_command.notes)
             manifest.notes.append("systemd executor applies hard limits and samples the scope cgroup when available.")
         else:
-            raise ValueError(f"unsupported executor: {executor}")
+            raise ValueError(f"unsupported executor: {selected_executor}")
         process = subprocess.Popen(command_to_run)
-        if executor == "systemd":
+        if selected_executor == "systemd":
             return_code, control_group = _monitor_systemd_scope(
                 process,
                 unit_name,
@@ -67,7 +80,7 @@ def run_with_budget(
                 timeline,
                 sample_interval_seconds,
                 hard_kill,
-                use_sudo=use_sudo,
+                use_sudo=selected_use_sudo,
             )
             if control_group:
                 manifest.notes.append(f"systemd_control_group={control_group}")
@@ -76,6 +89,9 @@ def run_with_budget(
         else:
             return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill)
         status = "completed" if return_code == 0 else "failed"
+    except RuntimeError as exc:
+        manifest.notes.append(f"runtime_error={exc}")
+        raise
     except KeyboardInterrupt:
         status = "interrupted"
         if process and process.poll() is None:
@@ -90,6 +106,49 @@ def run_with_budget(
         write_json(run_dir / "resource_summary.json", _summarize_timeline(timeline, budget))
         finish_run(run_dir, manifest, status, return_code)
     return return_code, run_dir
+
+
+def _resolve_executor(executor: str, *, use_sudo: bool, allow_sudo_auto: bool) -> tuple[str, bool, list[str]]:
+    if executor not in {"auto", "local", "systemd"}:
+        raise ValueError(f"unsupported executor: {executor}")
+    if executor != "auto":
+        return executor, use_sudo, [
+            f"requested_executor={executor}",
+            f"selected_executor={executor}",
+            f"sudo_used={use_sudo}",
+        ]
+
+    capabilities = collect_executor_capabilities(probe_systemd=True, check_sudo_cache=True)
+    selected = capabilities.get("recommended_executor", "local")
+    executors = capabilities.get("executors", {})
+    notes = [
+        "requested_executor=auto",
+        f"selected_executor={selected}",
+        f"executor_platform={capabilities.get('platform')}",
+    ]
+    if selected == "systemd":
+        systemd = executors.get("systemd", {})
+        requires_sudo = systemd.get("requires_sudo")
+        sudo_available = systemd.get("sudo_available")
+        if requires_sudo and not (allow_sudo_auto or use_sudo):
+            raise RuntimeError(
+                "auto executor selected systemd, but this machine requires sudo for transient scopes. "
+                "Run sudo -v and pass --allow-sudo-auto, or explicitly pass --executor systemd --sudo."
+            )
+        if requires_sudo and not sudo_available:
+            raise RuntimeError("auto executor selected systemd, but sudo is not available on this machine.")
+        selected_use_sudo = bool(use_sudo or (requires_sudo and allow_sudo_auto))
+        notes.extend(
+            [
+                f"systemd_requires_sudo={requires_sudo}",
+                f"sudo_cached={systemd.get('sudo_cached')}",
+                f"sudo_used={selected_use_sudo}",
+            ]
+        )
+        return "systemd", selected_use_sudo, notes
+
+    notes.append("sudo_used=False")
+    return "local", False, notes
 
 
 def _monitor_child(

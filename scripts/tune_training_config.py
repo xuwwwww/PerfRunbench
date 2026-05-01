@@ -23,8 +23,13 @@ def main() -> None:
     parser.add_argument("--cpu-quota-percent", type=float)
     parser.add_argument("--sample-interval-seconds", type=float, default=0.5)
     parser.add_argument("--hard-kill", action="store_true")
-    parser.add_argument("--executor", choices=["local", "systemd"], default="local")
+    parser.add_argument("--executor", choices=["auto", "local", "systemd"], default="local")
     parser.add_argument("--sudo", action="store_true", help="Use sudo for systemd-run privileged scopes.")
+    parser.add_argument(
+        "--allow-sudo-auto",
+        action="store_true",
+        help="Allow --executor auto to use sudo when capability detection says systemd requires it.",
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -53,8 +58,9 @@ def main() -> None:
             hard_kill=args.hard_kill,
             executor=args.executor,
             use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
         )
-    except BatchSizeTuningError as exc:
+    except (BatchSizeTuningError, RuntimeError) as exc:
         raise SystemExit(str(exc)) from exc
 
     print(json.dumps(result, indent=2))

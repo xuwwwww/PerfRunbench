@@ -36,6 +36,7 @@ def tune_batch_size(
     hard_kill: bool = False,
     executor: str = "local",
     use_sudo: bool = False,
+    allow_sudo_auto: bool = False,
 ) -> dict[str, Any]:
     if not values:
         raise BatchSizeTuningError("at least one batch size value is required")
@@ -54,6 +55,7 @@ def tune_batch_size(
             hard_kill=hard_kill,
             executor=executor,
             use_sudo=use_sudo,
+            allow_sudo_auto=allow_sudo_auto,
             auto_restore=True,
         )
         summary = _load_resource_summary(run_dir)

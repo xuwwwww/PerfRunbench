@@ -25,6 +25,7 @@ def run_tuned_with_budget(
     auto_restore: bool = True,
     executor: str = "local",
     use_sudo: bool = False,
+    allow_sudo_auto: bool = False,
 ) -> tuple[int, Path]:
     if not edits:
         raise ValueError("at least one source edit is required")
@@ -51,6 +52,7 @@ def run_tuned_with_budget(
             manifest=manifest,
             executor=executor,
             use_sudo=use_sudo,
+            allow_sudo_auto=allow_sudo_auto,
         )
         completed_by_workload_runner = True
         return return_code, run_dir

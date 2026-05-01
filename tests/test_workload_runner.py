@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_state import load_manifest
-from autotune.resource.workload_runner import ChildSample, _summarize_timeline, run_with_budget
+from autotune.resource.workload_runner import ChildSample, _resolve_executor, _summarize_timeline, run_with_budget
 
 
 class WorkloadRunnerTest(unittest.TestCase):
@@ -61,6 +62,54 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertEqual(summary["average_cgroup_cpu_percent"], 62.5)
         self.assertEqual(summary["peak_cgroup_cpu_percent"], 75)
         self.assertEqual(summary["cgroup_path"], "/sys/fs/cgroup/demo.scope")
+
+    @patch("autotune.resource.workload_runner.collect_executor_capabilities")
+    def test_auto_executor_falls_back_to_local(self, collect_capabilities) -> None:
+        collect_capabilities.return_value = {
+            "platform": "windows",
+            "recommended_executor": "local",
+            "executors": {"local": {"available": True}},
+        }
+        selected, use_sudo, notes = _resolve_executor("auto", use_sudo=False, allow_sudo_auto=False)
+        self.assertEqual(selected, "local")
+        self.assertFalse(use_sudo)
+        self.assertIn("selected_executor=local", notes)
+
+    @patch("autotune.resource.workload_runner.collect_executor_capabilities")
+    def test_auto_executor_requires_explicit_sudo_permission(self, collect_capabilities) -> None:
+        collect_capabilities.return_value = {
+            "platform": "linux-wsl",
+            "recommended_executor": "systemd",
+            "executors": {
+                "systemd": {
+                    "available": True,
+                    "requires_sudo": True,
+                    "sudo_available": True,
+                    "sudo_cached": False,
+                }
+            },
+        }
+        with self.assertRaisesRegex(RuntimeError, "requires sudo"):
+            _resolve_executor("auto", use_sudo=False, allow_sudo_auto=False)
+
+    @patch("autotune.resource.workload_runner.collect_executor_capabilities")
+    def test_auto_executor_can_use_sudo_when_allowed(self, collect_capabilities) -> None:
+        collect_capabilities.return_value = {
+            "platform": "linux-wsl",
+            "recommended_executor": "systemd",
+            "executors": {
+                "systemd": {
+                    "available": True,
+                    "requires_sudo": True,
+                    "sudo_available": True,
+                    "sudo_cached": True,
+                }
+            },
+        }
+        selected, use_sudo, notes = _resolve_executor("auto", use_sudo=False, allow_sudo_auto=True)
+        self.assertEqual(selected, "systemd")
+        self.assertTrue(use_sudo)
+        self.assertIn("sudo_used=True", notes)
 
 
 if __name__ == "__main__":

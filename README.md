@@ -52,7 +52,20 @@ AutoTuneAI can wrap a training command from another environment:
 
 ```bash
 python scripts/run_with_budget.py \
+  --executor auto \
   --memory-budget-gb 22 \
+  -- /path/to/user/env/bin/python train.py
+```
+
+When `--executor auto` selects systemd and the machine requires sudo, it stops with a clear message unless you opt in:
+
+```bash
+sudo -v
+python scripts/run_with_budget.py \
+  --executor auto \
+  --allow-sudo-auto \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
   -- /path/to/user/env/bin/python train.py
 ```
 

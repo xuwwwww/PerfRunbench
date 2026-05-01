@@ -462,6 +462,54 @@ python scripts/run_with_budget.py \
   -- python train.py --config configs/train.yaml
 ```
 
+auto executor 模式會先跑 capability detection，再選目前機器最合適的 executor：
+
+```bash
+python scripts/run_with_budget.py \
+  --executor auto \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py --config configs/train.yaml
+```
+
+行為規則：
+
+```text
+Windows / macOS / no systemd
+  auto 會選 local。
+
+Linux / WSL + systemd 可用，且不需要 sudo
+  auto 會選 systemd。
+
+Linux / WSL + systemd 可用，但 transient scope 需要 sudo
+  auto 會停止並提示你加 --allow-sudo-auto 或改用 --executor systemd --sudo。
+```
+
+如果你允許 auto 模式在需要時使用 sudo：
+
+```bash
+sudo -v
+
+python scripts/run_with_budget.py \
+  --executor auto \
+  --allow-sudo-auto \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py --config configs/train.yaml
+```
+
+`--allow-sudo-auto` 只代表允許 AutoTuneAI 在 auto 選到 systemd 且需要 sudo 時使用 `sudo systemd-run`。它不會把 training script 改成 root 身分執行；workload 仍會盡量以原使用者身份執行。
+
+每次 run 的 `manifest.json` 會記錄實際選擇：
+
+```text
+requested_executor=auto
+selected_executor=systemd
+executor_platform=linux-wsl
+systemd_requires_sudo=True
+sudo_used=True
+```
+
 目前它會：
 
 - 建立 `.autotuneai/runs/<run_id>/`
@@ -757,6 +805,7 @@ python scripts/tune_training_config.py \
   --memory-budget-gb 22 \
   --reserve-cores 1 \
   --cpu-quota-percent 90 \
+  --executor auto \
   --output results/reports/example_training_tuning_summary.json \
   -- python examples/dummy_train.py
 ```
