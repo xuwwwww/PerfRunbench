@@ -20,6 +20,7 @@ Core install for resource guard, system inspector, source-safe tuning, and train
 conda env create -f environment.yml
 conda activate autotuneai
 python scripts/inspect_system.py
+python scripts/inspect_executors.py --probe-systemd --check-sudo-cache
 python scripts/run_with_budget.py -- python examples/dummy_train.py
 python -m unittest discover -s tests
 ```
@@ -31,6 +32,14 @@ In WSL or non-interactive shells, prefer the explicit conda path:
 ```
 
 Replace `/home/louis/miniforge3/bin/conda` with the user's own conda executable path on other machines.
+
+Executor capability detection reports the best available resource backend on the current machine:
+
+```bash
+python scripts/inspect_executors.py --probe-systemd --check-sudo-cache
+```
+
+The current implemented executors are `local` and `systemd`. Docker, Windows Job Object, and macOS-specific execution are detected as planned backends so the tool can grow beyond Linux without changing the user-facing workflow.
 
 Benchmark install for PyTorch / ONNX Runtime experiments:
 

@@ -10,7 +10,7 @@
 - PyTorch CPU ResNet18 benchmark。
 - ONNX export + ONNX Runtime CPU benchmark。
 - Resource-aware benchmark monitoring。
-- System inspector，偵測 CPU/RAM/WSL/package/runtime provider。
+- System inspector，偵測 CPU/RAM/WSL/package/runtime provider/executor capabilities。
 - Real mini sweep + safe config recommender。
 - Training / arbitrary command resource wrapper。
 - systemd/root executor preflight。
@@ -141,6 +141,7 @@ torch_cuda_available
 torch_num_threads
 torch_num_interop_threads
 onnxruntime_providers
+executor_capabilities
 notes
 ```
 
@@ -152,6 +153,77 @@ notes
 - 如果 `systemd-run` 不存在，會提醒 systemd hard-limit executor 不能使用。
 - 如果 PyTorch 或 ONNX Runtime 沒安裝，會提醒相關 real benchmark 不能跑。
 - 如果 ONNX Runtime 沒有 `CPUExecutionProvider`，會提醒 CPU backend 不可用。
+- 如果 systemd 是目前機器最適合的 hard-limit executor，會提醒建議使用 systemd。
+- 如果只能使用 local executor，會提醒 hard memory/CPU limit 可能不可用。
+
+如果只想看 resource executor 能力：
+
+```bash
+python scripts/inspect_executors.py
+```
+
+如果要實測 systemd transient scope 是否需要 sudo：
+
+```bash
+python scripts/inspect_executors.py --probe-systemd --check-sudo-cache
+```
+
+在你的 WSL 環境中，目前預期會看到類似：
+
+```json
+{
+  "platform": "linux-wsl",
+  "recommended_executor": "systemd",
+  "executors": {
+    "local": {
+      "available": true,
+      "hard_memory_limit": false,
+      "process_tree_monitoring": true
+    },
+    "systemd": {
+      "available": true,
+      "requires_sudo": true,
+      "hard_memory_limit": true,
+      "hard_cpu_limit": true,
+      "cgroup_monitoring": true
+    },
+    "docker": {
+      "available": false,
+      "implemented": false
+    },
+    "windows_job": {
+      "available": false,
+      "implemented": false
+    }
+  }
+}
+```
+
+跨平台策略目前是：
+
+```text
+local
+  已實作。
+  Windows / macOS / Linux 都可以作為 fallback。
+  可監控 process tree；hard memory / hard CPU limit 不保證。
+
+systemd
+  已實作。
+  Linux / WSL2 + systemd 可用。
+  支援 cgroup hard memory / CPU limit 和 scope-level cgroup monitoring。
+
+docker
+  已納入 capability detection，但 executor 尚未實作。
+  未來可用 Docker container memory / CPU limit，讓 Windows/macOS/Linux 都能用同一種限制模型。
+
+windows_job
+  已納入 capability detection，但 executor 尚未實作。
+  未來 Windows native 可用 Job Object 限制 process group memory / CPU。
+
+macos
+  已納入 capability detection，但 executor 尚未實作。
+  macOS 原生 hard memory limit 較弱，短期會以 local monitoring 或 Docker executor 為主。
+```
 
 這個檔案很重要，因為同一組 benchmark 數字必須和硬體/環境一起看。之後 report 或跨機器比較都應該附上 `system_info.json`。
 

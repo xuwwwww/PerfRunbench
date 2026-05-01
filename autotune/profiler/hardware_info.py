@@ -11,6 +11,8 @@ from typing import Any
 
 
 def collect_hardware_info() -> dict[str, Any]:
+    from autotune.resource.executor_capabilities import collect_executor_capabilities
+
     info: dict[str, Any] = {
         "system": platform.system(),
         "release": platform.release(),
@@ -23,6 +25,7 @@ def collect_hardware_info() -> dict[str, Any]:
     info["packages"] = collect_package_info()
     info["runtime"] = collect_runtime_info()
     info["limits"] = collect_limit_info()
+    info["executor_capabilities"] = collect_executor_capabilities()
     info["notes"] = generate_notes(info)
     return info
 
@@ -152,6 +155,7 @@ def generate_notes(info: dict[str, Any]) -> list[str]:
     cgroup_memory = info.get("limits", {}).get("cgroup_memory_max_mb")
     packages = info.get("packages", {})
     runtime = info.get("runtime", {})
+    executor_capabilities = info.get("executor_capabilities", {})
 
     if info.get("is_wsl") and total_memory is not None:
         notes.append(f"WSL environment detected; Linux-visible RAM is {total_memory:.1f} MB.")
@@ -170,6 +174,11 @@ def generate_notes(info: dict[str, Any]) -> list[str]:
         notes.append("ONNX Runtime CPUExecutionProvider is not available.")
     if runtime.get("torch_cuda_available") is False:
         notes.append("torch reports CUDA unavailable; GPU benchmarks should be skipped unless another provider is configured.")
+    recommended_executor = executor_capabilities.get("recommended_executor")
+    if recommended_executor == "systemd":
+        notes.append("systemd is the recommended executor for hard memory/CPU limits on this machine.")
+    elif recommended_executor == "local":
+        notes.append("local is the recommended executor; hard memory/CPU limits may be unavailable on this machine.")
     return notes
 
 
