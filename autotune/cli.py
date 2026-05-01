@@ -88,7 +88,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     tune_batch = subparsers.add_parser("tune-batch", help="Tune a numeric batch-size style config key.")
     tune_batch.add_argument("--file", required=True)
-    tune_batch.add_argument("--batch-size-key", default="batch_size")
+    tune_batch.add_argument("--key", default=None, help="Numeric config key to tune, for example batch_size or num_workers.")
+    tune_batch.add_argument("--batch-size-key", default=None, help="Backward-compatible alias for --key.")
     tune_batch.add_argument("--values", nargs="+", type=int, required=True)
     tune_batch.add_argument("--output", default="results/reports/training_tuning_summary.json")
     _add_budget_args(tune_batch)
@@ -230,10 +231,11 @@ def _cmd_tune_system(args: argparse.Namespace) -> int:
 
 def _cmd_tune_batch(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai tune-batch --file CONFIG --values ... -- <command>")
+    key = args.key or args.batch_size_key or "batch_size"
     try:
         result = tune_batch_size(
             args.file,
-            args.batch_size_key,
+            key,
             args.values,
             command,
             _budget_from_args(args),

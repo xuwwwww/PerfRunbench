@@ -14,7 +14,8 @@ from autotune.training_tuner.batch_size import BatchSizeTuningError, tune_batch_
 def main() -> None:
     parser = argparse.ArgumentParser(description="Tune training batch size under a resource budget.")
     parser.add_argument("--file", required=True, help="Training config file to edit reversibly.")
-    parser.add_argument("--batch-size-key", default="batch_size")
+    parser.add_argument("--key", default=None, help="Numeric config key to tune, for example batch_size or num_workers.")
+    parser.add_argument("--batch-size-key", default=None, help="Backward-compatible alias for --key.")
     parser.add_argument("--values", nargs="+", type=int, required=True)
     parser.add_argument("--output", default="results/reports/training_tuning_summary.json")
     parser.add_argument("--memory-budget-gb", type=float)
@@ -48,9 +49,10 @@ def main() -> None:
         enforce=True,
     )
     try:
+        key = args.key or args.batch_size_key or "batch_size"
         result = tune_batch_size(
             args.file,
-            args.batch_size_key,
+            key,
             args.values,
             command,
             budget,

@@ -53,6 +53,15 @@ class CliTest(unittest.TestCase):
         calibrate.assert_called_once()
         self.assertIn("Wrote memory calibration", output.getvalue())
 
+    def test_tune_batch_accepts_generic_key(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.tune_batch_size") as tune, redirect_stdout(output):
+            tune.return_value = {"recommended_value": 2}
+            code = main(["tune-batch", "--file", "train.yaml", "--key", "num_workers", "--values", "0", "2", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(tune.call_args.args[1], "num_workers")
+        self.assertIn("Wrote training tuning summary", output.getvalue())
+
     def test_run_command_requires_workload(self) -> None:
         with self.assertRaises(SystemExit):
             main(["run"])

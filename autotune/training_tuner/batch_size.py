@@ -15,8 +15,9 @@ class BatchSizeTuningError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class BatchSizeTrial:
-    batch_size: int
+class NumericConfigTrial:
+    key: str
+    value: int
     run_id: str
     run_dir: str
     return_code: int
@@ -39,13 +40,45 @@ def tune_batch_size(
     allow_sudo_auto: bool = False,
     docker_image: str = "python:3.12-slim",
 ) -> dict[str, Any]:
+    return tune_numeric_config_key(
+        config_file,
+        key,
+        values,
+        command,
+        budget,
+        output,
+        sample_interval_seconds=sample_interval_seconds,
+        hard_kill=hard_kill,
+        executor=executor,
+        use_sudo=use_sudo,
+        allow_sudo_auto=allow_sudo_auto,
+        docker_image=docker_image,
+        compatibility_batch_fields=True,
+    )
+
+
+def tune_numeric_config_key(
+    config_file: str | Path,
+    key: str,
+    values: list[int],
+    command: list[str],
+    budget: ResourceBudget,
+    output: str | Path,
+    sample_interval_seconds: float = 0.5,
+    hard_kill: bool = False,
+    executor: str = "local",
+    use_sudo: bool = False,
+    allow_sudo_auto: bool = False,
+    docker_image: str = "python:3.12-slim",
+    compatibility_batch_fields: bool = False,
+) -> dict[str, Any]:
     if not values:
-        raise BatchSizeTuningError("at least one batch size value is required")
+        raise BatchSizeTuningError("at least one candidate value is required")
     if not command:
         raise BatchSizeTuningError("command cannot be empty")
     config_path = Path(config_file)
-    current_value, find_text = find_batch_size_assignment(config_path, key)
-    trials: list[BatchSizeTrial] = []
+    current_value, find_text = find_numeric_assignment(config_path, key)
+    trials: list[NumericConfigTrial] = []
     for value in values:
         replace_text = replace_assignment_value(find_text, value)
         return_code, run_dir = run_tuned_with_budget(
@@ -64,8 +97,9 @@ def tune_batch_size(
         safe, reason = _trial_safety(return_code, summary)
         manifest = load_manifest(run_dir)
         trials.append(
-            BatchSizeTrial(
-                batch_size=value,
+            NumericConfigTrial(
+                key=key,
+                value=value,
                 run_id=manifest["run_id"],
                 run_dir=str(run_dir),
                 return_code=return_code,
@@ -75,21 +109,28 @@ def tune_batch_size(
             )
         )
     safe_trials = [trial for trial in trials if trial.safe]
-    recommended = max(safe_trials, key=lambda trial: trial.batch_size) if safe_trials else None
+    recommended = max(safe_trials, key=lambda trial: trial.value) if safe_trials else None
     result = {
         "config_file": str(config_path),
         "key": key,
-        "original_batch_size": current_value,
+        "original_value": current_value,
         "candidate_values": values,
-        "recommended_batch_size": recommended.batch_size if recommended else None,
+        "recommended_value": recommended.value if recommended else None,
         "recommended_run_id": recommended.run_id if recommended else None,
         "trials": [_trial_to_dict(trial) for trial in trials],
     }
+    if compatibility_batch_fields:
+        result.update(
+            {
+                "original_batch_size": current_value,
+                "recommended_batch_size": recommended.value if recommended else None,
+            }
+        )
     write_json(Path(output), result)
     return result
 
 
-def find_batch_size_assignment(config_file: str | Path, key: str) -> tuple[int, str]:
+def find_numeric_assignment(config_file: str | Path, key: str) -> tuple[int, str]:
     path = Path(config_file)
     if not path.exists():
         raise BatchSizeTuningError(f"config file does not exist: {path}")
@@ -102,6 +143,10 @@ def find_batch_size_assignment(config_file: str | Path, key: str) -> tuple[int, 
         raise BatchSizeTuningError(f"found {len(matches)} assignments for key {key!r}; refusing ambiguous edit")
     match = matches[0]
     return int(match.group(2)), match.group(0)
+
+
+def find_batch_size_assignment(config_file: str | Path, key: str) -> tuple[int, str]:
+    return find_numeric_assignment(config_file, key)
 
 
 def replace_assignment_value(assignment_line: str, value: int) -> str:
@@ -129,9 +174,11 @@ def _trial_safety(return_code: int, summary: dict[str, Any]) -> tuple[bool, str]
     return True, "completed within budget"
 
 
-def _trial_to_dict(trial: BatchSizeTrial) -> dict[str, Any]:
+def _trial_to_dict(trial: NumericConfigTrial) -> dict[str, Any]:
     return {
-        "batch_size": trial.batch_size,
+        "key": trial.key,
+        "value": trial.value,
+        "batch_size": trial.value,
         "run_id": trial.run_id,
         "run_dir": trial.run_dir,
         "return_code": trial.return_code,
