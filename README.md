@@ -21,6 +21,7 @@ conda env create -f environment.yml
 conda activate autotuneai
 python scripts/inspect_system.py
 python scripts/inspect_executors.py --probe-systemd --check-sudo-cache
+python scripts/tune_system.py
 python scripts/run_with_budget.py -- python examples/dummy_train.py
 python -m unittest discover -s tests
 ```
@@ -40,6 +41,20 @@ python scripts/inspect_executors.py --probe-systemd --check-sudo-cache
 ```
 
 The current implemented executors are `local` and `systemd`. Docker, Windows Job Object, and macOS-specific execution are detected as planned backends so the tool can grow beyond Linux without changing the user-facing workflow.
+
+Runtime system tuning can be previewed without changing the machine:
+
+```bash
+python scripts/tune_system.py
+```
+
+On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/runs/<run_id>/`:
+
+```bash
+sudo -v
+python scripts/tune_system.py --apply --sudo
+python scripts/restore_run.py --run-id <run_id> --sudo
+```
 
 Benchmark install for PyTorch / ONNX Runtime experiments:
 

@@ -142,6 +142,7 @@ torch_num_threads
 torch_num_interop_threads
 onnxruntime_providers
 executor_capabilities
+system_tuning_recommendations
 notes
 ```
 
@@ -155,6 +156,7 @@ notes
 - 如果 ONNX Runtime 沒有 `CPUExecutionProvider`，會提醒 CPU backend 不可用。
 - 如果 systemd 是目前機器最適合的 hard-limit executor，會提醒建議使用 systemd。
 - 如果只能使用 local executor，會提醒 hard memory/CPU limit 可能不可用。
+- 如果有 runtime system tuning 建議，會提醒看 `system_tuning_recommendations`。
 
 如果只想看 resource executor 能力：
 
@@ -227,9 +229,99 @@ macos
 
 這個檔案很重要，因為同一組 benchmark 數字必須和硬體/環境一起看。之後 report 或跨機器比較都應該附上 `system_info.json`。
 
-## 3. Inference Benchmark
+## 3. Runtime System Tuning
 
-### 2.1 Config 檔在哪
+這一層是 runtime tuning，不是 BIOS / UEFI tuning。它只會考慮白名單內的 Linux runtime sysctl 設定，不會修改 `/etc/sysctl.conf` 這類永久設定檔。
+
+先看推薦，不修改系統：
+
+```bash
+python scripts/tune_system.py
+```
+
+在 Linux / WSL 上，輸出會包含：
+
+```json
+{
+  "profile": "linux-training-safe",
+  "settings": [
+    {
+      "key": "vm.swappiness",
+      "current": "60",
+      "target": "10",
+      "would_change": true
+    }
+  ]
+}
+```
+
+套用 runtime system tuning：
+
+```bash
+sudo -v
+python scripts/tune_system.py --apply --sudo
+```
+
+套用後會建立 run directory：
+
+```text
+.autotuneai/runs/<run_id>/
+```
+
+裡面會有：
+
+```text
+system_tuning_plan.json
+system_tuning_before.json
+system_tuning_after.json
+system_tuning_diff.json
+system_tuning_restore_after.json   # restore 後才會出現
+```
+
+`system_tuning_before.json` 是修改前 snapshot，`system_tuning_after.json` 是修改後 snapshot，`system_tuning_diff.json` 是差異，例如：
+
+```json
+[
+  {
+    "key": "vm.swappiness",
+    "before": "60",
+    "target": "10",
+    "after": "10",
+    "changed": true,
+    "applied": true
+  }
+]
+```
+
+還原 runtime system tuning：
+
+```bash
+python scripts/restore_run.py --run-id <run_id> --sudo
+```
+
+目前內建 profile：
+
+```text
+linux-training-safe
+  vm.swappiness=10
+    減少 swap 壓力，避免 training 把 RAM 撐爆後系統變得非常卡才反應。
+
+  kernel.numa_balancing=0
+    如果這個 setting 存在，降低訓練期間自動 NUMA migration 造成的變動。
+    在很多 WSL 環境中這個 setting 不存在，AutoTuneAI 會自動跳過。
+```
+
+非 Linux 平台：
+
+```text
+Windows / macOS
+  tune_system.py 只會輸出 unsupported，不會套用 sysctl。
+  後續 Windows 應該走 Windows Job Object 或 Docker executor。
+```
+
+## 4. Inference Benchmark
+
+### 4.1 Config 檔在哪
 
 目前 inference benchmark config 放在：
 

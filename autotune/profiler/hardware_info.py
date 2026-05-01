@@ -12,6 +12,7 @@ from typing import Any
 
 def collect_hardware_info() -> dict[str, Any]:
     from autotune.resource.executor_capabilities import collect_executor_capabilities
+    from autotune.system_tuner.runtime import recommend_system_tuning
 
     info: dict[str, Any] = {
         "system": platform.system(),
@@ -26,6 +27,7 @@ def collect_hardware_info() -> dict[str, Any]:
     info["runtime"] = collect_runtime_info()
     info["limits"] = collect_limit_info()
     info["executor_capabilities"] = collect_executor_capabilities()
+    info["system_tuning_recommendations"] = recommend_system_tuning()
     info["notes"] = generate_notes(info)
     return info
 
@@ -156,6 +158,7 @@ def generate_notes(info: dict[str, Any]) -> list[str]:
     packages = info.get("packages", {})
     runtime = info.get("runtime", {})
     executor_capabilities = info.get("executor_capabilities", {})
+    system_tuning = info.get("system_tuning_recommendations", {})
 
     if info.get("is_wsl") and total_memory is not None:
         notes.append(f"WSL environment detected; Linux-visible RAM is {total_memory:.1f} MB.")
@@ -179,6 +182,9 @@ def generate_notes(info: dict[str, Any]) -> list[str]:
         notes.append("systemd is the recommended executor for hard memory/CPU limits on this machine.")
     elif recommended_executor == "local":
         notes.append("local is the recommended executor; hard memory/CPU limits may be unavailable on this machine.")
+    tuning_settings = system_tuning.get("settings", [])
+    if system_tuning.get("supported") and any(setting.get("would_change") for setting in tuning_settings):
+        notes.append("Runtime system tuning recommendations are available; inspect system_tuning_recommendations.")
     return notes
 
 
