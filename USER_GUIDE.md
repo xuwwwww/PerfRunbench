@@ -47,16 +47,28 @@ source /home/louis/miniforge3/etc/profile.d/conda.sh
 conda activate autotuneai
 ```
 
-如果環境不存在：
+如果只要使用 resource guard / system inspector / source-safe tuning，建立 core environment：
 
 ```bash
 /home/louis/miniforge3/bin/conda env create -f environment.yml
 ```
 
-如果環境存在但套件不完整：
+如果環境存在但 core 套件不完整：
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-core.txt
+```
+
+如果你要跑 PyTorch / ONNX Runtime real benchmark，再另外安裝 benchmark 依賴：
+
+```bash
+python -m pip install -r requirements-benchmark.txt
+```
+
+也可以另建 benchmark environment：
+
+```bash
+/home/louis/miniforge3/bin/conda env create -f environment-benchmark.yml
 ```
 
 驗證：
@@ -110,6 +122,8 @@ current_cpu_affinity
 total_memory_mb
 available_memory_mb
 cgroup_memory_max_mb
+systemd_run_available
+systemd_state
 wsl_config_visible
 torch / torchvision / onnx / onnxruntime / psutil versions
 torch_cuda_available
@@ -124,6 +138,7 @@ notes
 - 如果偵測到 WSL，會列出 WSL 內 Linux 可見 RAM。
 - 如果 cgroup memory limit 小於可見 RAM，會提醒 cgroup limit。
 - 如果 CPU affinity 不支援，會提醒不能用 affinity 保留 core。
+- 如果 `systemd-run` 不存在，會提醒 systemd hard-limit executor 不能使用。
 - 如果 PyTorch 或 ONNX Runtime 沒安裝，會提醒相關 real benchmark 不能跑。
 - 如果 ONNX Runtime 沒有 `CPUExecutionProvider`，會提醒 CPU backend 不可用。
 
@@ -332,7 +347,29 @@ Dynamic batching 主要是 inference serving 的 throughput/latency trade-off，
 
 ## 7. Training / Command Resource Wrapper
 
-這個 wrapper 可以包住任意命令，例如 training：
+這個 wrapper 可以包住任意命令，例如 training。AutoTuneAI 可以在自己的 environment 裡執行，training command 可以使用使用者原本的 conda / venv / Python。
+
+推薦做法是直接指定使用者 training environment 的 Python：
+
+```bash
+python scripts/run_with_budget.py \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  -- /path/to/user/env/bin/python train.py --config configs/train.yaml
+```
+
+如果使用 conda，也可以用 `conda run` 包住原本環境：
+
+```bash
+python scripts/run_with_budget.py \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  -- conda run -n user-train-env python train.py --config configs/train.yaml
+```
+
+所以使用者不需要把 training dependencies 裝進 AutoTuneAI 的 environment。
+
+local soft-guard 模式：
 
 ```bash
 python scripts/run_with_budget.py \
@@ -362,6 +399,39 @@ python scripts/run_with_budget.py \
   --hard-kill \
   -- python train.py
 ```
+
+systemd hard-limit 模式：
+
+```bash
+python scripts/run_with_budget.py \
+  --executor systemd \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py
+```
+
+有些 Linux/WSL 環境不允許一般使用者建立 transient systemd scope，這時會看到類似：
+
+```text
+Interactive authentication required.
+```
+
+這代表要改用 `--sudo`，或由系統管理員設定 polkit/systemd 權限。
+
+如果需要 root 權限：
+
+```bash
+python scripts/run_with_budget.py \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py
+```
+
+`--sudo` 會用 `sudo systemd-run` 建立 scope，但會嘗試讓 workload 仍以原使用者身份執行。這樣 hard limit 由 systemd/cgroup 執行，training script 本身不必變成 root。
+
+注意：systemd executor 主要用來套 hard limits；resource timeline 監控的是 `systemd-run` wrapper process，不一定能像 local executor 一樣精準追蹤所有 child RSS。要做詳細 per-process resource timeline，優先用 local executor。
 
 查看歷史 runs：
 

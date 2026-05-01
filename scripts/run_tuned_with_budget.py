@@ -32,6 +32,8 @@ def main() -> None:
     parser.add_argument("--cpu-quota-percent", type=float)
     parser.add_argument("--sample-interval-seconds", type=float, default=0.5)
     parser.add_argument("--hard-kill", action="store_true")
+    parser.add_argument("--executor", choices=["local", "systemd"], default="local")
+    parser.add_argument("--sudo", action="store_true", help="Use sudo for systemd-run privileged scopes.")
     parser.add_argument("--keep-changes", action="store_true", help="Do not auto-restore after command exits.")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -59,6 +61,8 @@ def main() -> None:
         sample_interval_seconds=args.sample_interval_seconds,
         hard_kill=args.hard_kill,
         auto_restore=not args.keep_changes,
+        executor=args.executor,
+        use_sudo=args.sudo,
     )
     print(f"Run directory: {run_dir}")
     raise SystemExit(return_code)

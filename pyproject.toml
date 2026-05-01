@@ -7,7 +7,27 @@ name = "autotuneai-serve"
 version = "0.1.0"
 description = "Cost-model-guided inference optimization and scheduling for resource-constrained AI systems."
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+  "psutil",
+]
+
+[project.optional-dependencies]
+benchmark = [
+  "numpy",
+  "torch",
+  "torchvision",
+  "onnx",
+  "onnxscript",
+  "onnxruntime",
+]
+dev = [
+  "numpy",
+  "torch",
+  "torchvision",
+  "onnx",
+  "onnxscript",
+  "onnxruntime",
+]
 
 [tool.setuptools.packages.find]
 include = ["autotune*"]

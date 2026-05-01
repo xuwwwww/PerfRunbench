@@ -1,0 +1,15 @@
+name: autotuneai-benchmark
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - psutil
+      - numpy
+      - torch
+      - torchvision
+      - onnx
+      - onnxscript
+      - onnxruntime

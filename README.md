@@ -14,13 +14,40 @@ This repository is being built as a reproducible AI systems project. The first v
 
 ## Quick Start
 
+Core install for resource guard, system inspector, source-safe tuning, and training wrapper:
+
 ```bash
 conda env create -f environment.yml
 conda activate autotuneai
-python scripts/run_benchmark.py --config configs/resnet18.yaml
-python scripts/run_autotune.py --config configs/resnet18.yaml --search exhaustive
-python scripts/run_scheduler.py --workload burst --scheduler deadline_aware
+python scripts/inspect_system.py
+python scripts/run_with_budget.py -- python examples/dummy_train.py
 python -m unittest discover -s tests
+```
+
+Benchmark install for PyTorch / ONNX Runtime experiments:
+
+```bash
+python -m pip install -r requirements-benchmark.txt
+python scripts/run_benchmark.py --config configs/resnet18.yaml --mode real --backends pytorch --max-configs 1
+```
+
+AutoTuneAI can wrap a training command from another environment:
+
+```bash
+python scripts/run_with_budget.py \
+  --memory-budget-gb 22 \
+  -- /path/to/user/env/bin/python train.py
+```
+
+For hard memory/CPU limits on Linux systems with systemd:
+
+```bash
+python scripts/run_with_budget.py \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py
 ```
 
 User guide:
@@ -33,7 +60,7 @@ If the environment already exists:
 
 ```bash
 conda activate autotuneai
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-core.txt
 python scripts/run_all_experiments.py
 ```
 

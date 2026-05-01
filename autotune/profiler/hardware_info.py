@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 import json
 import platform
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -89,6 +91,8 @@ def collect_limit_info() -> dict[str, Any]:
     return {
         "cgroup_memory_max_mb": read_cgroup_memory_limit_mb(),
         "wsl_config_visible": Path("/mnt/c/Users/User/.wslconfig").exists() if is_wsl() else False,
+        "systemd_run_available": shutil.which("systemd-run") is not None,
+        "systemd_state": read_systemd_state(),
     }
 
 
@@ -131,6 +135,17 @@ def read_cgroup_memory_limit_mb() -> float | None:
     return None
 
 
+def read_systemd_state() -> str | None:
+    if shutil.which("systemctl") is None:
+        return None
+    try:
+        result = subprocess.run(["systemctl", "is-system-running"], capture_output=True, text=True, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    state = (result.stdout or result.stderr).strip()
+    return state or None
+
+
 def generate_notes(info: dict[str, Any]) -> list[str]:
     notes: list[str] = []
     total_memory = info.get("total_memory_mb")
@@ -142,6 +157,8 @@ def generate_notes(info: dict[str, Any]) -> list[str]:
         notes.append(f"WSL environment detected; Linux-visible RAM is {total_memory:.1f} MB.")
     if cgroup_memory is not None and total_memory is not None and cgroup_memory < total_memory:
         notes.append(f"cgroup memory limit is lower than visible RAM: {cgroup_memory:.1f} MB.")
+    if info.get("limits", {}).get("systemd_run_available") is False:
+        notes.append("systemd-run is not available; systemd hard-limit executor cannot be used.")
     if not info.get("cpu_affinity_supported"):
         notes.append("CPU affinity is not supported in this environment.")
     if packages.get("torch") is None:

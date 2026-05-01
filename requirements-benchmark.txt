@@ -1,0 +1,8 @@
+-r requirements-core.txt
+numpy
+torch
+torchvision
+onnx
+onnxscript
+onnxruntime
+

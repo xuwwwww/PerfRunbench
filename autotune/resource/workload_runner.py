@@ -8,6 +8,7 @@ from pathlib import Path
 from autotune.resource.affinity import apply_cpu_affinity
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_state import RunManifest, create_run, finish_run, write_json
+from autotune.resource.systemd_executor import build_systemd_run_command
 
 
 @dataclass
@@ -27,6 +28,8 @@ def run_with_budget(
     hard_kill: bool = False,
     run_dir: Path | None = None,
     manifest: RunManifest | None = None,
+    executor: str = "local",
+    use_sudo: bool = False,
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -37,9 +40,18 @@ def run_with_budget(
     return_code = 1
     status = "failed"
     try:
-        affinity_context = apply_cpu_affinity(budget)
-        manifest.notes.append(f"affinity_context={affinity_context}")
-        process = subprocess.Popen(command)
+        command_to_run = command
+        if executor == "local":
+            affinity_context = apply_cpu_affinity(budget)
+            manifest.notes.append(f"affinity_context={affinity_context}")
+        elif executor == "systemd":
+            systemd_command = build_systemd_run_command(command, budget, use_sudo=use_sudo)
+            command_to_run = systemd_command.command
+            manifest.notes.extend(systemd_command.notes)
+            manifest.notes.append("systemd executor applies hard limits; resource timeline monitors systemd-run process.")
+        else:
+            raise ValueError(f"unsupported executor: {executor}")
+        process = subprocess.Popen(command_to_run)
         return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill)
         status = "completed" if return_code == 0 else "failed"
     except KeyboardInterrupt:

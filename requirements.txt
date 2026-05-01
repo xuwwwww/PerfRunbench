@@ -1,6 +1,1 @@
-torch
-torchvision
-onnx
-onnxscript
-onnxruntime
-psutil
+-r requirements-core.txt
