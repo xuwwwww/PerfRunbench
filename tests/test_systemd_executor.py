@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.systemd_executor import build_systemd_run_command, preflight_systemd_executor
+from autotune.resource.systemd_executor import build_systemd_run_command, make_systemd_scope_name, preflight_systemd_executor
 
 
 class SystemdExecutorTest(unittest.TestCase):
@@ -14,11 +14,17 @@ class SystemdExecutorTest(unittest.TestCase):
         command = build_systemd_run_command(
             ["python", "train.py"],
             ResourceBudget(memory_budget_gb=2, cpu_quota_percent=90),
+            unit_name="autotuneai-test.scope",
         )
         self.assertEqual(command.command[:3], ["systemd-run", "--scope", "--quiet"])
+        self.assertIn("autotuneai-test.scope", command.command)
         self.assertIn("MemoryMax=2048M", command.command)
         self.assertIn("CPUQuota=90%", command.command)
         self.assertEqual(command.command[-2:], ["python", "train.py"])
+
+    def test_make_systemd_scope_name_sanitizes_run_id(self) -> None:
+        self.assertEqual(make_systemd_scope_name("20260501_120047"), "autotuneai-20260501_120047.scope")
+        self.assertEqual(make_systemd_scope_name("bad run/id"), "autotuneai-bad-run-id.scope")
 
     @patch("autotune.resource.systemd_executor.shutil.which")
     def test_build_systemd_run_command_with_sudo_keeps_user(self, which) -> None:

@@ -504,7 +504,41 @@ python scripts/run_with_budget.py \
   -- /path/to/user/env/bin/python train.py --config configs/train.yaml
 ```
 
-注意：systemd executor 主要用來套 hard limits；resource timeline 監控的是 `systemd-run` wrapper process，不一定能像 local executor 一樣精準追蹤所有 child RSS。要做詳細 per-process resource timeline，優先用 local executor。
+systemd executor 會建立可辨識的 transient scope，名稱類似：
+
+```text
+autotuneai-20260501_120047.scope
+```
+
+啟動後 AutoTuneAI 會用 `systemctl show <scope> -p ControlGroup --value` 找到實際 cgroup，然後讀取：
+
+```text
+memory.current
+memory.peak
+cpu.stat
+```
+
+因此 systemd 模式的 `resource_timeline.json` 會盡量包含整個 training scope 的 cgroup 使用量，而不是只看 `systemd-run` wrapper process。相關欄位包括：
+
+```text
+cgroup_path
+cgroup_memory_current_mb
+cgroup_memory_peak_mb
+cgroup_cpu_percent
+cgroup_cpu_usage_usec
+```
+
+`resource_summary.json` 也會在拿得到 cgroup stats 時輸出：
+
+```text
+peak_cgroup_memory_current_mb
+peak_cgroup_memory_peak_mb
+average_cgroup_cpu_percent
+peak_cgroup_cpu_percent
+cgroup_path
+```
+
+如果目前系統不能查到 ControlGroup，AutoTuneAI 仍會回退到 process-tree monitoring。要做每個 child process 的詳細拆解，仍然優先用 local executor；要做整個 training scope 的硬限制與總量監控，優先用 systemd executor。
 
 查看歷史 runs：
 

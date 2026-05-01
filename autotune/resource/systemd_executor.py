@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import getpass
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -12,6 +13,17 @@ from autotune.resource.budget import ResourceBudget
 class SystemdCommand:
     command: list[str]
     notes: list[str]
+
+
+def make_systemd_scope_name(run_id: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "-", run_id).strip(".-")
+    if not safe:
+        safe = "run"
+    if not safe.startswith("autotuneai-"):
+        safe = f"autotuneai-{safe}"
+    if not safe.endswith(".scope"):
+        safe = f"{safe}.scope"
+    return safe
 
 
 @dataclass(frozen=True)
@@ -88,6 +100,7 @@ def probe_systemd_scope(
     *,
     use_sudo: bool = False,
     run_as_user: str | None = None,
+    unit_name: str | None = None,
     timeout_seconds: float = 10.0,
 ) -> tuple[bool, str]:
     command = build_systemd_run_command(
@@ -95,6 +108,7 @@ def probe_systemd_scope(
         budget,
         use_sudo=use_sudo,
         run_as_user=run_as_user,
+        unit_name=unit_name,
     ).command
     if use_sudo and command and command[0] == "sudo":
         command.insert(1, "-n")
@@ -121,6 +135,7 @@ def preflight_systemd_executor(
     run_as_user: str | None = None,
     check_sudo_cache: bool = False,
     probe: bool = False,
+    unit_name: str | None = None,
 ) -> SystemdPreflight:
     errors: list[str] = []
     warnings: list[str] = []
@@ -152,11 +167,17 @@ def preflight_systemd_executor(
                 budget,
                 use_sudo=use_sudo,
                 run_as_user=user,
+                unit_name=unit_name,
             ).command
         except RuntimeError as exc:
             errors.append(str(exc))
     if probe and not errors:
-        probe_succeeded, probe_output = probe_systemd_scope(budget, use_sudo=use_sudo, run_as_user=user)
+        probe_succeeded, probe_output = probe_systemd_scope(
+            budget,
+            use_sudo=use_sudo,
+            run_as_user=user,
+            unit_name=unit_name,
+        )
         if not probe_succeeded:
             errors.append(f"systemd scope probe failed: {probe_output}")
 
@@ -191,6 +212,7 @@ def build_systemd_run_command(
     *,
     use_sudo: bool = False,
     run_as_user: str | None = None,
+    unit_name: str | None = None,
 ) -> SystemdCommand:
     if not command:
         raise ValueError("command cannot be empty")
@@ -205,6 +227,9 @@ def build_systemd_run_command(
         wrapped.append("sudo")
 
     wrapped.extend(["systemd-run", "--scope", "--quiet"])
+    if unit_name:
+        wrapped.extend(["--unit", unit_name])
+        notes.append(f"systemd unit={unit_name}")
 
     if use_sudo:
         user = run_as_user or getpass.getuser()
