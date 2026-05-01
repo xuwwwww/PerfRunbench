@@ -19,10 +19,11 @@ Core install for resource guard, system inspector, source-safe tuning, and train
 ```bash
 conda env create -f environment.yml
 conda activate autotuneai
-python scripts/inspect_system.py
-python scripts/inspect_executors.py --probe-systemd --check-sudo-cache
-python scripts/tune_system.py
-python scripts/run_with_budget.py -- python examples/dummy_train.py
+python -m pip install -e .
+autotuneai inspect
+autotuneai executors --probe-systemd --probe-docker --check-sudo-cache
+autotuneai tune-system
+autotuneai run -- python examples/dummy_train.py
 python -m unittest discover -s tests
 ```
 
@@ -37,29 +38,29 @@ Replace `/home/louis/miniforge3/bin/conda` with the user's own conda executable 
 Executor capability detection reports the best available resource backend on the current machine:
 
 ```bash
-python scripts/inspect_executors.py --probe-systemd --check-sudo-cache
+autotuneai executors --probe-systemd --probe-docker --check-sudo-cache
 ```
 
-The current implemented executors are `local` and `systemd`. Docker, Windows Job Object, and macOS-specific execution are detected as planned backends so the tool can grow beyond Linux without changing the user-facing workflow.
+The current implemented executors are `local`, `systemd`, and `docker`. Windows Job Object and macOS-specific native execution are detected as planned backends so the tool can grow beyond Linux without changing the user-facing workflow.
 
 Runtime system tuning can be previewed without changing the machine:
 
 ```bash
-python scripts/tune_system.py
+autotuneai tune-system
 ```
 
 On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/runs/<run_id>/`:
 
 ```bash
 sudo -v
-python scripts/tune_system.py --apply --sudo
-python scripts/restore_run.py --run-id <run_id> --sudo
+autotuneai tune-system --apply --sudo
+autotuneai restore --run-id <run_id> --sudo
 ```
 
 Resource guard smoke test with CPU and memory load:
 
 ```bash
-python scripts/run_with_budget.py \
+autotuneai run \
   --executor local \
   --memory-budget-gb -1 \
   --reserve-cores 1 \
@@ -73,7 +74,8 @@ python scripts/run_with_budget.py \
 Analyze a run after testing:
 
 ```bash
-python scripts/analyze_run.py --run-id <run_id>
+autotuneai analyze --run-id <run_id>
+autotuneai report --run-id <run_id>
 ```
 
 The analyzer reports selected executor, affinity cores, expected CPU cap, observed peak CPU, effective memory budget, observed memory headroom, and cgroup stats when available.
@@ -88,7 +90,7 @@ python scripts/run_benchmark.py --config configs/resnet18.yaml --mode real --bac
 AutoTuneAI can wrap a training command from another environment:
 
 ```bash
-python scripts/run_with_budget.py \
+autotuneai run \
   --executor auto \
   --memory-budget-gb 22 \
   -- /path/to/user/env/bin/python train.py
@@ -98,7 +100,7 @@ When `--executor auto` selects systemd and the machine requires sudo, it stops w
 
 ```bash
 sudo -v
-python scripts/run_with_budget.py \
+autotuneai run \
   --executor auto \
   --allow-sudo-auto \
   --memory-budget-gb 22 \
@@ -119,7 +121,7 @@ python scripts/check_system_executor.py \
   --cpu-quota-percent 90 \
   -- /path/to/user/env/bin/python train.py
 
-python scripts/run_with_budget.py \
+autotuneai run \
   --executor systemd \
   --sudo \
   --memory-budget-gb 22 \
@@ -135,6 +137,25 @@ User guide:
 
 ```text
 USER_GUIDE.md
+```
+
+Memory budget calibration is available when you need to measure how a machine behaves with negative reserve-to-full budgets:
+
+```bash
+autotuneai calibrate-memory \
+  --budget-gb -5 -3 1 \
+  --workload-memory-mb 2048 \
+  --duration-seconds 10
+```
+
+Generic training config tuning can edit any single integer key and restore the file after each trial:
+
+```bash
+autotuneai tune-batch \
+  --file configs/train.yaml \
+  --key num_workers \
+  --values 0 2 4 8 \
+  -- python train.py --config configs/train.yaml
 ```
 
 If the environment already exists:
