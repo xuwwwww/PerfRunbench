@@ -8,6 +8,7 @@ from autotune.profiler.hardware_info import collect_hardware_info, write_hardwar
 from autotune.report.run_report import generate_run_report
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.executor_capabilities import collect_executor_capabilities
+from autotune.resource.memory_calibration import calibrate_memory
 from autotune.resource.run_analysis import analyze_run, format_analysis
 from autotune.resource.run_state import RUNS_DIR, list_runs, load_manifest
 from autotune.resource.workload_runner import run_with_budget
@@ -68,6 +69,17 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--output")
     report.set_defaults(handler=_cmd_report)
 
+    calibrate = subparsers.add_parser("calibrate-memory", help="Measure memory budget behavior on this machine.")
+    calibrate.add_argument("--budget-gb", nargs="+", type=float, required=True)
+    calibrate.add_argument("--workload-memory-mb", type=int, default=1024)
+    calibrate.add_argument("--duration-seconds", type=float, default=5.0)
+    calibrate.add_argument("--workers", type=int, default=2)
+    calibrate.add_argument("--output", default="results/reports/memory_calibration.json")
+    _add_budget_executor_args(calibrate)
+    calibrate.add_argument("--sample-interval-seconds", type=float, default=0.1)
+    calibrate.add_argument("--hard-kill", action="store_true")
+    calibrate.set_defaults(handler=_cmd_calibrate_memory)
+
     tune_system = subparsers.add_parser("tune-system", help="Recommend or apply reversible runtime system tuning.")
     tune_system.add_argument("--profile", default="linux-training-safe", choices=available_profiles())
     tune_system.add_argument("--apply", action="store_true")
@@ -100,6 +112,10 @@ def _add_budget_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--cpu-quota-percent", type=float)
     parser.add_argument("--sample-interval-seconds", type=float, default=0.5)
     parser.add_argument("--hard-kill", action="store_true")
+    _add_budget_executor_args(parser)
+
+
+def _add_budget_executor_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--executor", choices=["auto", "local", "systemd"], default="local")
     parser.add_argument("--sudo", action="store_true", help="Use sudo for privileged executor operations.")
     parser.add_argument(
@@ -165,6 +181,27 @@ def _cmd_report(args: argparse.Namespace) -> int:
     except FileNotFoundError as exc:
         raise SystemExit(str(exc)) from exc
     print(f"Wrote run report to {report_path}")
+    return 0
+
+
+def _cmd_calibrate_memory(args: argparse.Namespace) -> int:
+    try:
+        result = calibrate_memory(
+            args.budget_gb,
+            workload_memory_mb=args.workload_memory_mb,
+            duration_seconds=args.duration_seconds,
+            workers=args.workers,
+            output=args.output,
+            executor=args.executor,
+            sample_interval_seconds=args.sample_interval_seconds,
+            hard_kill=args.hard_kill,
+            use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"Wrote memory calibration to {args.output}")
     return 0
 
 

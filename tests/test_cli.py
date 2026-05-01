@@ -44,6 +44,15 @@ class CliTest(unittest.TestCase):
         generate.assert_called_once_with("run1", None)
         self.assertIn("Wrote run report", output.getvalue())
 
+    def test_calibrate_memory_command_writes_summary(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.calibrate_memory") as calibrate, redirect_stdout(output):
+            calibrate.return_value = {"records": [], "recommendations": []}
+            code = main(["calibrate-memory", "--budget-gb", "-5", "--workload-memory-mb", "256"])
+        self.assertEqual(code, 0)
+        calibrate.assert_called_once()
+        self.assertIn("Wrote memory calibration", output.getvalue())
+
     def test_run_command_requires_workload(self) -> None:
         with self.assertRaises(SystemExit):
             main(["run"])
