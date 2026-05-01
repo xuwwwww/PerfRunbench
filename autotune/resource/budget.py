@@ -40,8 +40,16 @@ class ResourceBudget:
             return None
         return self.memory_budget_gb * 1024.0
 
+    @property
+    def memory_budget_mode(self) -> str:
+        if self.memory_budget_gb is None:
+            return "none"
+        if self.memory_budget_gb < 0:
+            return "reserve_to_full"
+        return "absolute"
+
     def effective_memory_budget_mb(self, total_memory_mb: float | None) -> float | None:
-        explicit_budget = self.memory_budget_mb
+        explicit_budget = self._explicit_memory_budget_mb(total_memory_mb)
         system_budget = None
         if total_memory_mb is not None:
             system_budget = max(0.0, total_memory_mb - self.reserve_memory_gb * 1024.0)
@@ -65,6 +73,8 @@ class ResourceBudget:
     def to_record(self, total_cores: int | None = None, total_memory_mb: float | None = None) -> dict:
         effective_memory_budget = self.effective_memory_budget_mb(total_memory_mb)
         return {
+            "memory_budget_gb": self.memory_budget_gb,
+            "memory_budget_mode": self.memory_budget_mode,
             "memory_budget_mb": round(self.memory_budget_mb, 3) if self.memory_budget_mb is not None else None,
             "effective_memory_budget_mb": round(effective_memory_budget, 3)
             if effective_memory_budget is not None
@@ -75,6 +85,16 @@ class ResourceBudget:
             "allowed_threads": self.allowed_threads(total_cores),
             "resource_budget_enforced": self.enforce,
         }
+
+    def _explicit_memory_budget_mb(self, total_memory_mb: float | None) -> float | None:
+        if self.memory_budget_gb is None:
+            return None
+        requested_mb = self.memory_budget_gb * 1024.0
+        if requested_mb >= 0:
+            return requested_mb
+        if total_memory_mb is None:
+            return None
+        return max(0.0, total_memory_mb - abs(requested_mb))
 
 
 def _optional_float(value: object) -> float | None:

@@ -56,6 +56,20 @@ python scripts/tune_system.py --apply --sudo
 python scripts/restore_run.py --run-id <run_id> --sudo
 ```
 
+Resource guard smoke test with CPU and memory load:
+
+```bash
+python scripts/run_with_budget.py \
+  --executor local \
+  --memory-budget-gb -1 \
+  --reserve-cores 1 \
+  --cpu-quota-percent 50 \
+  --sample-interval-seconds 0.1 \
+  -- python scripts/stress_workload.py --workers 4 --duration-seconds 10 --memory-mb 512
+```
+
+`--memory-budget-gb -1` means "cap workload memory at visible RAM minus 1GB"; positive values remain absolute GB targets.
+
 Benchmark install for PyTorch / ONNX Runtime experiments:
 
 ```bash

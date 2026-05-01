@@ -236,7 +236,7 @@ def build_systemd_run_command(
         wrapped.extend(["--uid", user])
         notes.append(f"systemd-run will be invoked through sudo and run workload as user {user}.")
 
-    memory_budget = budget.memory_budget_mb
+    memory_budget = budget.effective_memory_budget_mb(_visible_memory_mb())
     if memory_budget is not None:
         wrapped.extend(["-p", f"MemoryMax={int(memory_budget)}M"])
         notes.append(f"systemd MemoryMax={int(memory_budget)}M")
@@ -247,3 +247,12 @@ def build_systemd_run_command(
 
     wrapped.extend(["--", *command])
     return SystemdCommand(command=wrapped, notes=notes)
+
+
+def _visible_memory_mb() -> float | None:
+    try:
+        import psutil
+
+        return psutil.virtual_memory().total / (1024 * 1024)
+    except Exception:
+        return None

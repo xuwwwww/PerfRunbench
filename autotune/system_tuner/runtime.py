@@ -57,6 +57,21 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             value="0",
             reason="Disable automatic NUMA balancing during a run to reduce runtime migration noise when the setting exists.",
         ),
+        RuntimeSetting(
+            key="vm.dirty_background_ratio",
+            value="5",
+            reason="Start background writeback earlier so checkpoint/log writes are less likely to create large flush spikes.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_ratio",
+            value="20",
+            reason="Keep the maximum dirty page ratio at a conservative value during heavy training workloads.",
+        ),
+        RuntimeSetting(
+            key="vm.zone_reclaim_mode",
+            value="0",
+            reason="Avoid local node reclaim stalls on systems that expose zone reclaim controls.",
+        ),
     ],
 }
 

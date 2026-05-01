@@ -43,6 +43,7 @@ def run_with_budget(
         raise ValueError("command cannot be empty")
     if run_dir is None or manifest is None:
         run_dir, manifest = create_run(command, budget)
+    manifest.budget = budget.to_record(total_cores=_visible_cpu_count(), total_memory_mb=_visible_memory_mb())
     timeline: list[ChildSample] = []
     process = None
     return_code = 1
@@ -359,3 +360,21 @@ def _summarize_timeline(timeline: list[ChildSample], budget: ResourceBudget) -> 
     if cgroup_paths:
         summary["cgroup_path"] = cgroup_paths[-1]
     return summary
+
+
+def _visible_memory_mb() -> float | None:
+    try:
+        import psutil
+
+        return psutil.virtual_memory().total / (1024 * 1024)
+    except Exception:
+        return None
+
+
+def _visible_cpu_count() -> int | None:
+    try:
+        import psutil
+
+        return psutil.cpu_count(logical=True)
+    except Exception:
+        return None

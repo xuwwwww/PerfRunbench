@@ -309,6 +309,15 @@ linux-training-safe
   kernel.numa_balancing=0
     如果這個 setting 存在，降低訓練期間自動 NUMA migration 造成的變動。
     在很多 WSL 環境中這個 setting 不存在，AutoTuneAI 會自動跳過。
+
+  vm.dirty_background_ratio=5
+    讓背景 writeback 更早開始，降低 checkpoint / log 寫入時突然累積大量 dirty pages 的機率。
+
+  vm.dirty_ratio=20
+    保持最大 dirty page ratio 在保守值，避免 heavy training 期間出現過大的 flush spike。
+
+  vm.zone_reclaim_mode=0
+    如果系統有這個 setting，避免 local node reclaim 造成訓練過程 stall。
 ```
 
 非 Linux 平台：
@@ -409,8 +418,17 @@ python scripts/run_benchmark.py \
 參數意思：
 
 - `--memory-budget-gb 22`: process peak RSS 希望不超過 22GB。
+- `--memory-budget-gb -2`: 負數代表「保留距離跑滿還有 2GB」，有效上限會變成 `Linux/WSL 可見總 RAM - 2GB`。
 - `--reserve-cores 1`: 保留 1 個 logical CPU core。
 - `--cpu-quota-percent 90`: 根據 CPU 數量限制可用 thread 數，並記錄 CPU 是否超標。
+
+負數 memory budget 適合跨機器使用。例如某台 WSL 可見 RAM 是 11.8GB：
+
+```text
+--memory-budget-gb -1
+```
+
+代表希望 workload 最多用到約 10.8GB，留下 1GB 給系統。這和 `--reserve-memory-gb` 可以一起用，實際上限會取比較嚴格的一邊。
 
 結果 JSON 裡會出現：
 
@@ -429,6 +447,68 @@ cpu_quota_exceeded
 ```
 
 注意：WSL 可見 RAM 可能比 Windows 少。如果 Windows 顯示 23.7GB，但 WSL 只暴露 11.8GB，`effective_memory_budget_mb` 會用 WSL 實際可用上限計算。
+
+### 4.1 Heavy Load Smoke Test
+
+如果你想測多 core loading、CPU core 限制、memory guard，可以用內建 stress workload：
+
+```bash
+python scripts/stress_workload.py \
+  --workers 4 \
+  --duration-seconds 10 \
+  --memory-mb 512
+```
+
+用 AutoTuneAI 包住它，測 CPU affinity / quota 是否有效：
+
+```bash
+python scripts/run_with_budget.py \
+  --executor local \
+  --reserve-cores 1 \
+  --cpu-quota-percent 50 \
+  --sample-interval-seconds 0.1 \
+  -- python scripts/stress_workload.py --workers 8 --duration-seconds 10 --memory-mb 512
+```
+
+在 8 logical cores 的機器上，`--cpu-quota-percent 50` 會讓 allowed threads 變成 4；加上 `--reserve-cores 1` 後，會取更嚴格的限制。manifest 裡可以看：
+
+```text
+affinity_context
+allowed_threads
+affinity_cores
+```
+
+測 memory guard：
+
+```bash
+python scripts/run_with_budget.py \
+  --executor local \
+  --memory-budget-gb 0.05 \
+  --hard-kill \
+  --sample-interval-seconds 0.05 \
+  -- python scripts/stress_workload.py --workers 1 --duration-seconds 5 --memory-mb 256
+```
+
+如果 guard 生效，`resource_summary.json` 會看到：
+
+```text
+memory_budget_exceeded: true
+return_code: 非 0
+```
+
+用負數 memory budget 測「保留系統空間」：
+
+```bash
+python scripts/run_with_budget.py \
+  --executor local \
+  --memory-budget-gb -1 \
+  --reserve-cores 1 \
+  --cpu-quota-percent 50 \
+  --sample-interval-seconds 0.1 \
+  -- python scripts/stress_workload.py --workers 4 --duration-seconds 10 --memory-mb 512
+```
+
+`resource_summary.json` 會顯示解析後的 `effective_memory_budget_mb`。
 
 ## 5. Real Mini Sweep + Recommender
 

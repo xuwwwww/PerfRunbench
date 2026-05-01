@@ -39,6 +39,17 @@ class SystemdExecutorTest(unittest.TestCase):
         self.assertIn("--uid", command.command)
         self.assertIn("alice", command.command)
 
+    @patch("autotune.resource.systemd_executor._visible_memory_mb")
+    @patch("autotune.resource.systemd_executor.shutil.which")
+    def test_build_systemd_run_command_supports_negative_memory_budget(self, which, visible_memory) -> None:
+        which.side_effect = lambda name: f"/usr/bin/{name}"
+        visible_memory.return_value = 12000.0
+        command = build_systemd_run_command(
+            ["python", "train.py"],
+            ResourceBudget(memory_budget_gb=-2),
+        )
+        self.assertIn("MemoryMax=9952M", command.command)
+
     @patch("autotune.resource.systemd_executor.read_systemd_state")
     @patch("autotune.resource.systemd_executor.shutil.which")
     def test_preflight_reports_missing_systemd_run(self, which, read_state) -> None:

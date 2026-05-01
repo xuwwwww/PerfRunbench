@@ -19,6 +19,22 @@ class ResourceBudgetTest(unittest.TestCase):
         self.assertAlmostEqual(budget.effective_memory_budget_mb(24268.8), 22528.0, places=1)
         self.assertAlmostEqual(budget.effective_memory_budget_mb(12000.0), 10259.2, places=1)
 
+    def test_negative_memory_budget_means_keep_free_memory(self) -> None:
+        budget = ResourceBudget(memory_budget_gb=-2)
+        self.assertEqual(budget.memory_budget_mode, "reserve_to_full")
+        self.assertAlmostEqual(budget.effective_memory_budget_mb(12000.0), 9952.0, places=1)
+        self.assertIsNone(budget.effective_memory_budget_mb(None))
+
+    def test_negative_memory_budget_combines_with_reserve_memory_by_stricter_limit(self) -> None:
+        budget = ResourceBudget(memory_budget_gb=-2, reserve_memory_gb=3)
+        self.assertAlmostEqual(budget.effective_memory_budget_mb(12000.0), 8928.0, places=1)
+
+    def test_to_record_includes_negative_memory_budget_mode(self) -> None:
+        record = ResourceBudget(memory_budget_gb=-1).to_record(total_memory_mb=12000.0)
+        self.assertEqual(record["memory_budget_mode"], "reserve_to_full")
+        self.assertEqual(record["memory_budget_gb"], -1)
+        self.assertAlmostEqual(record["effective_memory_budget_mb"], 10976.0, places=1)
+
     def test_filter_thread_budget_removes_oversized_configs(self) -> None:
         budget = ResourceBudget(reserve_cores=10, cpu_quota_percent=50)
         configs = [
