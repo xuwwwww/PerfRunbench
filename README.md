@@ -42,6 +42,14 @@ python scripts/run_with_budget.py \
 For hard memory/CPU limits on Linux systems with systemd:
 
 ```bash
+python scripts/check_system_executor.py \
+  --sudo \
+  --check-sudo-cache \
+  --probe \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py
+
 python scripts/run_with_budget.py \
   --executor systemd \
   --sudo \

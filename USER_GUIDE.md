@@ -13,6 +13,7 @@
 - System inspector，偵測 CPU/RAM/WSL/package/runtime provider。
 - Real mini sweep + safe config recommender。
 - Training / arbitrary command resource wrapper。
+- systemd/root executor preflight。
 - Reversible source tuning transaction。
 - Source edit + workload wrapper + auto-restore。
 - Batch-size training tuner。
@@ -401,6 +402,38 @@ python scripts/run_with_budget.py \
 ```
 
 systemd hard-limit 模式：
+
+先做 preflight，確認目前機器是否支援 systemd scope、sudo、MemoryMax、CPUQuota：
+
+```bash
+python scripts/check_system_executor.py \
+  --probe \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- python train.py
+```
+
+如果你打算用 root 權限建立 systemd scope：
+
+```bash
+python scripts/check_system_executor.py \
+  --sudo \
+  --check-sudo-cache \
+  --probe \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py
+```
+
+`--probe` 會用 `true` 試跑一個短命 systemd scope，不會執行你的 training command。它可以提前抓到 `Interactive authentication required` 這類權限問題。
+
+`--check-sudo-cache` 不會要求你輸入密碼，只會檢查目前 shell 是否已經通過 `sudo -v`。如果顯示 `sudo credential is not cached`，代表你需要先在終端機手動跑一次：
+
+```bash
+sudo -v
+```
+
+確認後再正式包住訓練入口：
 
 ```bash
 python scripts/run_with_budget.py \

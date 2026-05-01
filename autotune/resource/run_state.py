@@ -117,10 +117,17 @@ def _git_output(command: list[str]) -> str:
 
 def _command_output(command: list[str], check: bool = False) -> str:
     try:
-        result = subprocess.run(command, check=check, capture_output=True, text=True)
+        result = subprocess.run(
+            command,
+            check=check,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
     except FileNotFoundError:
         return ""
-    output = result.stdout
+    output = result.stdout or ""
     if result.stderr:
         output += result.stderr
     return output
