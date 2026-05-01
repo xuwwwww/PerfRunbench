@@ -24,6 +24,14 @@ python scripts/run_with_budget.py -- python examples/dummy_train.py
 python -m unittest discover -s tests
 ```
 
+In WSL or non-interactive shells, prefer the explicit conda path:
+
+```bash
+/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/inspect_system.py
+```
+
+Replace `/home/louis/miniforge3/bin/conda` with the user's own conda executable path on other machines.
+
 Benchmark install for PyTorch / ONNX Runtime experiments:
 
 ```bash
@@ -42,6 +50,8 @@ python scripts/run_with_budget.py \
 For hard memory/CPU limits on Linux systems with systemd:
 
 ```bash
+sudo -v
+
 python scripts/check_system_executor.py \
   --sudo \
   --check-sudo-cache \
@@ -57,6 +67,8 @@ python scripts/run_with_budget.py \
   --cpu-quota-percent 90 \
   -- /path/to/user/env/bin/python train.py
 ```
+
+Use `sudo -v` plus `--sudo`; do not run AutoTuneAI from a `sudo su` root shell. The root shell may not have the user's conda initialization and can point at the wrong conda path. AutoTuneAI should stay in the user environment while systemd/cgroup limits are requested through sudo.
 
 User guide:
 

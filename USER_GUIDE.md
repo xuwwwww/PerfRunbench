@@ -48,6 +48,16 @@ source /home/louis/miniforge3/etc/profile.d/conda.sh
 conda activate autotuneai
 ```
 
+如果是在非互動 shell、script、systemd 或 Codex 這類工具裡執行，建議不要依賴 shell 自動啟用 conda，直接使用完整路徑：
+
+```bash
+/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/inspect_system.py
+```
+
+如果別人的 conda 裝在不同位置，把 `/home/louis/miniforge3/bin/conda` 換成自己的 conda executable，例如 `/home/<user>/miniforge3/bin/conda`、`/home/<user>/miniconda3/bin/conda`，或 `which conda` 顯示的路徑。
+
+不要用 `sudo su` 進 root shell 後再啟用 conda。root shell 通常不會有使用者的 conda 初始化設定，而且可能讀到舊的 conda 路徑，例如 `/home/louis/miniconda3`。需要 root 權限時，讓 AutoTuneAI 保持在使用者 conda environment 裡執行，只在 systemd/cgroup 那一層使用 `--sudo`。
+
 如果只要使用 resource guard / system inspector / source-safe tuning，建立 core environment：
 
 ```bash
@@ -433,6 +443,14 @@ python scripts/check_system_executor.py \
 sudo -v
 ```
 
+在 WSL 中，常見情況是非 sudo 的 `systemd-run --scope` 會失敗：
+
+```text
+Failed to start transient scope unit: Interactive authentication required.
+```
+
+這代表 systemd/polkit 不允許一般使用者建立 transient scope。這時不要改成 `sudo su`，而是先在同一個 WSL shell 執行 `sudo -v`，再讓 AutoTuneAI 用 `--sudo` 呼叫 `sudo systemd-run`。
+
 確認後再正式包住訓練入口：
 
 ```bash
@@ -463,6 +481,28 @@ python scripts/run_with_budget.py \
 ```
 
 `--sudo` 會用 `sudo systemd-run` 建立 scope，但會嘗試讓 workload 仍以原使用者身份執行。這樣 hard limit 由 systemd/cgroup 執行，training script 本身不必變成 root。
+
+如果 AutoTuneAI 自己在 `autotuneai` conda environment，但 training 要跑另一個 conda environment，可以這樣寫：
+
+```bash
+/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_with_budget.py \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /home/louis/miniforge3/bin/conda run -n user-train-env python train.py --config configs/train.yaml
+```
+
+如果 training environment 是 venv 或固定 Python 路徑，也可以直接指定：
+
+```bash
+/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_with_budget.py \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb 22 \
+  --cpu-quota-percent 90 \
+  -- /path/to/user/env/bin/python train.py --config configs/train.yaml
+```
 
 注意：systemd executor 主要用來套 hard limits；resource timeline 監控的是 `systemd-run` wrapper process，不一定能像 local executor 一樣精準追蹤所有 child RSS。要做詳細 per-process resource timeline，優先用 local executor。
 
