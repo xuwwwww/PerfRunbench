@@ -70,6 +70,14 @@ python scripts/run_with_budget.py \
 
 `--memory-budget-gb -1` means "cap workload memory at visible RAM minus 1GB"; positive values remain absolute GB targets.
 
+Analyze a run after testing:
+
+```bash
+python scripts/analyze_run.py --run-id <run_id>
+```
+
+The analyzer reports selected executor, affinity cores, expected CPU cap, observed peak CPU, effective memory budget, observed memory headroom, and cgroup stats when available.
+
 Benchmark install for PyTorch / ONNX Runtime experiments:
 
 ```bash

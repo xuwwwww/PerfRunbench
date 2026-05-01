@@ -1012,7 +1012,122 @@ artifacts/onnx/    exported ONNX model
 
 這些產物大多被 `.gitignore` 排除。
 
-## 11. 如果被中斷怎麼辦
+## 11. 分析 Resource Guard 是否真的有效
+
+跑完任何 `run_with_budget.py` 後，可以用：
+
+```bash
+python scripts/analyze_run.py --run-id <run_id>
+```
+
+它會讀：
+
+```text
+.autotuneai/runs/<run_id>/manifest.json
+.autotuneai/runs/<run_id>/resource_summary.json
+.autotuneai/runs/<run_id>/resource_timeline.json
+```
+
+輸出包含：
+
+```text
+Executor
+  requested / selected / sudo_used
+
+CPU
+  logical_cpu_count
+  requested_reserve_cores
+  allowed_threads
+  affinity_cores
+  expected_max_total_cpu_percent
+  observed_peak_process_cpu_percent
+  observed_peak_system_cpu_percent
+
+Memory
+  memory budget mode
+  requested_memory_gb
+  effective_budget_mb
+  peak_memory_mb
+  observed_min_available_memory_mb
+  memory_budget_exceeded
+
+Cgroup
+  cgroup path
+  cgroup memory / CPU stats, if available
+```
+
+也可以輸出 JSON：
+
+```bash
+python scripts/analyze_run.py --run-id <run_id> --json
+```
+
+### 11.1 如何判讀 CPU reserve
+
+如果你在 8 logical cores 的機器上使用：
+
+```bash
+--reserve-cores 1
+```
+
+AutoTuneAI 預期會把 workload 限在 7 個 logical cores，理論總 CPU 上限約：
+
+```text
+7 / 8 = 87.5%
+```
+
+所以如果 Windows 資源監視器看起來每個 core 都有活動，但 `analyze_run.py` 顯示：
+
+```text
+allowed_threads: 7
+affinity_cores: 0,1,2,3,4,5,6
+observed_peak_process_cpu_percent: 約 90
+```
+
+這代表 Linux process affinity 和總量限制是合理的。WSL / Windows host UI 可能會把 vCPU activity 顯示成分散在所有實體圖上，不等於 affinity 沒生效。
+
+如果你需要「某一顆 core 幾乎完全不跑 workload」，下一步要做的是 cpuset / explicit CPU exclude，而不只是 `reserve_cores`。
+
+### 11.2 如何判讀負數 memory budget
+
+```bash
+--memory-budget-gb -5
+```
+
+代表有效 budget 是：
+
+```text
+Linux/WSL 可見總 RAM - 5GB
+```
+
+它不是保證 Windows 工作管理員一定會顯示剩 5GB。原因包括：
+
+```text
+Linux page cache
+shared memory / PSS / RSS 差異
+Python allocator
+WSL memory reclamation
+Windows host 記憶體統計方式
+```
+
+所以請以 `analyze_run.py` 的這些欄位判斷：
+
+```text
+effective_budget_mb
+peak_memory_mb
+observed_min_available_memory_mb
+memory_budget_exceeded
+```
+
+如果你要的是 hard cap，優先用：
+
+```bash
+--executor systemd --sudo
+```
+
+並看 cgroup 欄位。
+
+## 12. 如果被中斷怎麼辦
 
 列出 runs：
 
