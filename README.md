@@ -192,6 +192,43 @@ autotuneai tune-batch \
   -- python train.py --config configs/train.yaml
 ```
 
+Compare an untuned run against a tuned run with the same command:
+
+```bash
+sudo -v
+autotuneai compare-tuning \
+  --workload-profile memory \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --memory-budget-gb -3 \
+  -- python train.py --config configs/train.yaml
+```
+
+NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:
+
+```bash
+autotuneai tune-gpu
+sudo -v
+autotuneai tune-gpu --apply --sudo --profile nvidia-throughput
+autotuneai restore --run-id <run_id> --gpu-sudo
+```
+
+For a single training run, GPU tuning can be applied and restored as part of the run lifecycle:
+
+```bash
+sudo -v
+autotuneai run \
+  --auto-tune-system \
+  --auto-tune-gpu \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb -3 \
+  -- python train.py
+```
+
 If the environment already exists:
 
 ```bash

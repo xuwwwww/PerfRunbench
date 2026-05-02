@@ -437,6 +437,100 @@ autotuneai run \
   -- python train.py
 ```
 
+如果你想知道調教到底有沒有讓同一個 workload 變好，使用 A/B comparison：
+
+```bash
+sudo -v
+autotuneai compare-tuning \
+  --workload-profile memory \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --memory-budget-gb -3 \
+  --sample-interval-seconds 0.1 \
+  -- python train.py --config configs/train.yaml
+```
+
+這會先跑 baseline，再跑 tuned，最後輸出：
+
+```text
+results/reports/tuning_comparison.json
+```
+
+重要欄位：
+
+```text
+baseline.run_id
+tuned.run_id
+deltas.duration_seconds
+deltas.duration_percent
+deltas.peak_memory_mb
+deltas.peak_memory_percent
+deltas.min_available_memory_mb
+```
+
+負的 `duration_percent` 代表 tuned run 比 baseline 更快；負的 `peak_memory_percent` 代表 tuned run peak memory 更低。
+
+## 10.1 NVIDIA GPU runtime tuning
+
+如果機器有 NVIDIA GPU 且 `nvidia-smi` 在 PATH，可以檢查 GPU tuning plan：
+
+```bash
+autotuneai tune-gpu
+```
+
+目前 profile：
+
+```text
+nvidia-safe
+  開 persistence mode，不主動調 power limit。
+
+nvidia-throughput
+  開 persistence mode，並嘗試把 power limit 設到 nvidia-smi 回報的 max limit。
+```
+
+套用 GPU runtime tuning：
+
+```bash
+sudo -v
+autotuneai tune-gpu --apply --sudo --profile nvidia-throughput
+```
+
+輸出會包含：
+
+```text
+gpu_tuning_before.json
+gpu_tuning_after.json
+gpu_tuning_diff.json
+```
+
+恢復：
+
+```bash
+autotuneai restore --run-id <run_id> --gpu-sudo
+```
+
+也可以把 GPU tuning 包進訓練 lifecycle：
+
+```bash
+sudo -v
+autotuneai run \
+  --auto-tune-system \
+  --auto-tune-gpu \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb -3 \
+  -- python train.py
+```
+
+限制：
+
+- `nvidia-smi` 某些欄位在 laptop GPU 或 WSL 可能是 `[N/A]`，AutoTuneAI 會略過無法套用的 setting。
+- power limit / persistence mode 可能需要 root/admin 權限，也可能被 OEM/driver 鎖住。
+- 目前還沒有自動調 CUDA allocator、MIG、application clocks；那些會是下一層 GPU tuner。
+
 `autotuneai report --run-id <run_id>` 的 `Before / After` 區塊會集中顯示 memory start/end/min、peak memory、system tuning snapshots，以及 source/config change 數量。
 
 如果被中斷，仍可用 run id 做 restore：

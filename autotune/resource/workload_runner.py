@@ -6,6 +6,7 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from autotune.gpu.nvidia_tuner import apply_nvidia_tuning_to_run, restore_nvidia_tuning
 from autotune.resource.affinity import apply_cpu_affinity
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.cgroup_monitor import CgroupStats, cgroup_path, read_cgroup_stats, wait_for_systemd_control_group
@@ -45,6 +46,9 @@ def run_with_budget(
     restore_system_after: bool = True,
     system_tuning_sudo: bool = False,
     docker_image: str = "python:3.12-slim",
+    tune_gpu_profile: str | None = None,
+    restore_gpu_after: bool = True,
+    gpu_tuning_sudo: bool = False,
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -56,6 +60,7 @@ def run_with_budget(
     return_code = 1
     status = "failed"
     system_tuning_applied = False
+    gpu_tuning_applied = False
     try:
         if tune_system_profile:
             result = apply_system_tuning_to_run(
@@ -66,6 +71,14 @@ def run_with_budget(
             )
             system_tuning_applied = any(change.get("applied") for change in result.get("changes", []))
             manifest.notes.append(f"system_tuning_lifecycle_applied={system_tuning_applied}")
+        if tune_gpu_profile:
+            result = apply_nvidia_tuning_to_run(
+                run_dir,
+                tune_gpu_profile,
+                use_sudo=gpu_tuning_sudo,
+            )
+            gpu_tuning_applied = any(change.get("return_code") == 0 for change in result.get("changes", []))
+            manifest.notes.append(f"gpu_tuning_lifecycle_applied={gpu_tuning_applied}")
         command_to_run = command
         selected_executor, selected_use_sudo, selection_notes = _resolve_executor(
             executor,
@@ -136,6 +149,9 @@ def run_with_budget(
         if tune_system_profile and restore_system_after:
             restored = restore_system_tuning(run_dir, use_sudo=system_tuning_sudo)
             manifest.notes.append(f"system_tuning_lifecycle_restored={len(restored)}")
+        if tune_gpu_profile and restore_gpu_after:
+            restored = restore_nvidia_tuning(run_dir, use_sudo=gpu_tuning_sudo)
+            manifest.notes.append(f"gpu_tuning_lifecycle_restored={len(restored)}")
         write_json(run_dir / "resource_timeline.json", [asdict(sample) for sample in timeline])
         write_json(run_dir / "resource_summary.json", _summarize_timeline(timeline, budget))
         finish_run(run_dir, manifest, status, return_code)

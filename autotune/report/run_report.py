@@ -91,6 +91,18 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
                 lines.append(f"  - path: `{item.get('path')}`")
             if item.get("error"):
                 lines.append(f"  - error: {item.get('error')}")
+    gpu_diff = _load_json(run_dir / "gpu_tuning_diff.json", default=None)
+    if gpu_diff is not None:
+        lines.extend(["", "## GPU Tuning Diff", ""])
+        for item in gpu_diff:
+            lines.append(
+                f"- {item.get('key')}: before={item.get('before')} target={item.get('target')} "
+                f"return_code={item.get('return_code')}"
+            )
+            if item.get("command"):
+                lines.append(f"  - command: `{' '.join(str(part) for part in item.get('command'))}`")
+            if item.get("error"):
+                lines.append(f"  - error: {item.get('error')}")
     return "\n".join(lines) + "\n"
 
 

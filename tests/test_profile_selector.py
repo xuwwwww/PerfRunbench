@@ -1,0 +1,24 @@
+from __future__ import annotations
+
+import unittest
+
+from autotune.resource.budget import ResourceBudget
+from autotune.system_tuner.profile_selector import select_system_profile
+
+
+class ProfileSelectorTest(unittest.TestCase):
+    def test_auto_selects_memory_profile_for_memory_budget(self) -> None:
+        selection = select_system_profile(ResourceBudget(memory_budget_gb=-3), workload_profile="auto")
+        self.assertEqual(selection.profile, "linux-memory-conservative")
+
+    def test_auto_selects_low_latency_for_cpu_quota_without_memory_budget(self) -> None:
+        selection = select_system_profile(ResourceBudget(cpu_quota_percent=50), workload_profile="auto")
+        self.assertEqual(selection.profile, "linux-low-latency")
+
+    def test_manual_workload_profile_wins(self) -> None:
+        selection = select_system_profile(ResourceBudget(memory_budget_gb=-3), workload_profile="throughput")
+        self.assertEqual(selection.profile, "linux-throughput")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -6,8 +6,16 @@ import platform
 from pathlib import Path
 
 from autotune.profiler.hardware_info import collect_hardware_info, write_hardware_info
+from autotune.gpu.nvidia_tuner import (
+    NvidiaTuningError,
+    apply_nvidia_tuning,
+    available_nvidia_profiles,
+    recommend_nvidia_tuning,
+    restore_nvidia_tuning,
+)
 from autotune.report.run_report import generate_run_report
 from autotune.resource.budget import ResourceBudget
+from autotune.resource.comparison_runner import compare_tuning
 from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.memory_calibration import calibrate_memory
 from autotune.resource.run_analysis import analyze_run, format_analysis
@@ -21,6 +29,7 @@ from autotune.system_tuner.runtime import (
     recommend_system_tuning,
     restore_system_tuning,
 )
+from autotune.system_tuner.profile_selector import select_system_profile
 from autotune.training_tuner.batch_size import BatchSizeTuningError, tune_batch_size
 
 
@@ -63,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep runtime system tuning after the workload instead of restoring the before snapshot.",
     )
     run.add_argument("--system-tuning-sudo", action="store_true", help="Use sudo for runtime sysctl tuning writes.")
+    run.add_argument("--workload-profile", choices=["auto", "training", "memory", "throughput", "low-latency"], default="auto")
+    run.add_argument("--tune-gpu", choices=available_nvidia_profiles(), help="Apply an NVIDIA runtime tuning profile first.")
+    run.add_argument("--auto-tune-gpu", action="store_true", help="Apply the default NVIDIA throughput runtime profile when nvidia-smi is available.")
+    run.add_argument("--gpu-tuning-sudo", action="store_true", help="Use sudo for NVIDIA runtime tuning writes.")
+    run.add_argument("--no-restore-gpu-after", action="store_true")
     run.set_defaults(handler=_cmd_run)
 
     analyze = subparsers.add_parser("analyze", help="Analyze a run's resource guard behavior.")
@@ -86,11 +100,26 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--hard-kill", action="store_true")
     calibrate.set_defaults(handler=_cmd_calibrate_memory)
 
+    compare = subparsers.add_parser("compare-tuning", help="Run baseline and tuned workloads and compare metrics.")
+    _add_budget_args(compare)
+    compare.add_argument("--profile", choices=available_profiles(), default=None)
+    compare.add_argument("--workload-profile", choices=["auto", "training", "memory", "throughput", "low-latency"], default="auto")
+    compare.add_argument("--system-tuning-sudo", action="store_true")
+    compare.add_argument("--output", default="results/reports/tuning_comparison.json")
+    compare.add_argument("workload", nargs=argparse.REMAINDER)
+    compare.set_defaults(handler=_cmd_compare_tuning)
+
     tune_system = subparsers.add_parser("tune-system", help="Recommend or apply reversible runtime system tuning.")
     tune_system.add_argument("--profile", default="linux-training-safe", choices=available_profiles())
     tune_system.add_argument("--apply", action="store_true")
     tune_system.add_argument("--sudo", action="store_true")
     tune_system.set_defaults(handler=_cmd_tune_system)
+
+    tune_gpu = subparsers.add_parser("tune-gpu", help="Recommend or apply reversible NVIDIA runtime tuning.")
+    tune_gpu.add_argument("--profile", default="nvidia-throughput", choices=available_nvidia_profiles())
+    tune_gpu.add_argument("--apply", action="store_true")
+    tune_gpu.add_argument("--sudo", action="store_true")
+    tune_gpu.set_defaults(handler=_cmd_tune_gpu)
 
     tune_batch = subparsers.add_parser("tune-batch", help="Tune a numeric batch-size style config key.")
     tune_batch.add_argument("--file", required=True)
@@ -108,6 +137,7 @@ def build_parser() -> argparse.ArgumentParser:
     restore = subparsers.add_parser("restore", help="Restore files and runtime system settings changed by a run.")
     restore.add_argument("--run-id", required=True)
     restore.add_argument("--sudo", action="store_true")
+    restore.add_argument("--gpu-sudo", action="store_true")
     restore.set_defaults(handler=_cmd_restore)
     return parser
 
@@ -160,6 +190,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai run [budget args] -- <command>")
     budget = _budget_from_args(args)
     tune_system_profile = _resolve_system_tuning_profile(args)
+    tune_gpu_profile = _resolve_gpu_tuning_profile(args)
     try:
         return_code, run_dir = run_with_budget(
             command,
@@ -173,6 +204,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
             restore_system_after=not args.no_restore_system_after,
             system_tuning_sudo=args.system_tuning_sudo,
             docker_image=args.docker_image,
+            tune_gpu_profile=tune_gpu_profile,
+            restore_gpu_after=not args.no_restore_gpu_after,
+            gpu_tuning_sudo=args.gpu_tuning_sudo,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
@@ -220,6 +254,33 @@ def _cmd_calibrate_memory(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_compare_tuning(args: argparse.Namespace) -> int:
+    command = _command_after_separator(args.workload, "Usage: autotuneai compare-tuning [budget args] -- <command>")
+    if platform.system() != "Linux":
+        raise SystemExit("compare-tuning currently compares Linux runtime system profiles and must run on Linux/WSL.")
+    budget = _budget_from_args(args)
+    profile = args.profile or select_system_profile(budget, workload_profile=args.workload_profile).profile
+    try:
+        result = compare_tuning(
+            command,
+            budget,
+            tuned_profile=profile,
+            output=args.output,
+            sample_interval_seconds=args.sample_interval_seconds,
+            hard_kill=args.hard_kill,
+            executor=args.executor,
+            use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
+            system_tuning_sudo=args.system_tuning_sudo,
+            docker_image=args.docker_image,
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"Wrote tuning comparison to {args.output}")
+    return 0
+
+
 def _cmd_tune_system(args: argparse.Namespace) -> int:
     try:
         if not args.apply:
@@ -233,6 +294,22 @@ def _cmd_tune_system(args: argparse.Namespace) -> int:
     print(f"Before snapshot: {run_dir / 'system_tuning_before.json'}")
     print(f"After snapshot: {run_dir / 'system_tuning_after.json'}")
     print(f"Diff: {run_dir / 'system_tuning_diff.json'}")
+    return 0
+
+
+def _cmd_tune_gpu(args: argparse.Namespace) -> int:
+    try:
+        if not args.apply:
+            print(json.dumps(recommend_nvidia_tuning(args.profile), indent=2, sort_keys=True))
+            return 0
+        run_dir, result = apply_nvidia_tuning(args.profile, use_sudo=args.sudo)
+    except NvidiaTuningError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"Run directory: {run_dir}")
+    print(f"Before snapshot: {run_dir / 'gpu_tuning_before.json'}")
+    print(f"After snapshot: {run_dir / 'gpu_tuning_after.json'}")
+    print(f"Diff: {run_dir / 'gpu_tuning_diff.json'}")
     return 0
 
 
@@ -295,6 +372,12 @@ def _cmd_restore(args: argparse.Namespace) -> int:
         else:
             print(f"Failed to restore system setting {item['key']}: {item['error']}")
         restored_any = True
+    for item in restore_nvidia_tuning(run_dir, use_sudo=args.gpu_sudo):
+        if item["return_code"] == 0:
+            print(f"Restored NVIDIA setting with command: {' '.join(item['command'])}")
+        else:
+            print(f"Failed to restore NVIDIA setting: {item['error']}")
+        restored_any = True
     if not restored_any:
         print(f"Run {args.run_id} has no changed files or system settings to restore.")
     return 0
@@ -319,9 +402,19 @@ def _resolve_system_tuning_profile(args: argparse.Namespace) -> str | None:
         return None
     if platform.system() != "Linux":
         return None
-    if args.memory_budget_gb is not None or args.reserve_memory_gb > 0:
-        return "linux-memory-conservative"
-    return "linux-training-safe"
+    return select_system_profile(_budget_from_args(args), workload_profile=args.workload_profile).profile
+
+
+def _resolve_gpu_tuning_profile(args: argparse.Namespace) -> str | None:
+    if args.tune_gpu and args.auto_tune_gpu:
+        raise SystemExit("--tune-gpu and --auto-tune-gpu cannot be used together")
+    if args.tune_gpu:
+        return args.tune_gpu
+    if args.auto_tune_gpu:
+        if not recommend_nvidia_tuning("nvidia-throughput").get("supported"):
+            return None
+        return "nvidia-throughput"
+    return None
 
 
 def _command_after_separator(command: list[str], usage: str) -> list[str]:

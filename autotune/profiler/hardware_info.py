@@ -13,6 +13,7 @@ from typing import Any
 def collect_hardware_info() -> dict[str, Any]:
     from autotune.resource.executor_capabilities import collect_executor_capabilities
     from autotune.system_tuner.runtime import recommend_system_tuning
+    from autotune.gpu.nvidia_tuner import recommend_nvidia_tuning
 
     info: dict[str, Any] = {
         "system": platform.system(),
@@ -28,6 +29,7 @@ def collect_hardware_info() -> dict[str, Any]:
     info["limits"] = collect_limit_info()
     info["executor_capabilities"] = collect_executor_capabilities()
     info["system_tuning_recommendations"] = recommend_system_tuning()
+    info["gpu_tuning_recommendations"] = recommend_nvidia_tuning()
     info["notes"] = generate_notes(info)
     return info
 
@@ -159,6 +161,7 @@ def generate_notes(info: dict[str, Any]) -> list[str]:
     runtime = info.get("runtime", {})
     executor_capabilities = info.get("executor_capabilities", {})
     system_tuning = info.get("system_tuning_recommendations", {})
+    gpu_tuning = info.get("gpu_tuning_recommendations", {})
 
     if info.get("is_wsl") and total_memory is not None:
         notes.append(f"WSL environment detected; Linux-visible RAM is {total_memory:.1f} MB.")
@@ -185,6 +188,8 @@ def generate_notes(info: dict[str, Any]) -> list[str]:
     tuning_settings = system_tuning.get("settings", [])
     if system_tuning.get("supported") and any(setting.get("would_change") for setting in tuning_settings):
         notes.append("Runtime system tuning recommendations are available; inspect system_tuning_recommendations.")
+    if gpu_tuning.get("supported"):
+        notes.append("NVIDIA runtime tuning is available; inspect gpu_tuning_recommendations.")
     return notes
 
 

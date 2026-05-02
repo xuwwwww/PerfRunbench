@@ -63,6 +63,30 @@ class CliTest(unittest.TestCase):
         self.assertIn("Wrote training tuning summary", output.getvalue())
 
     @patch("autotune.cli.platform.system", return_value="Linux")
+    def test_compare_tuning_command_runs_comparison(self, _system) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.compare_tuning") as compare, redirect_stdout(output):
+            compare.return_value = {"deltas": {}}
+            code = main(["compare-tuning", "--profile", "linux-throughput", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(compare.call_args.kwargs["tuned_profile"], "linux-throughput")
+        self.assertIn("Wrote tuning comparison", output.getvalue())
+
+    @patch("autotune.cli.platform.system", return_value="Windows")
+    def test_compare_tuning_rejects_non_linux(self, _system) -> None:
+        with self.assertRaises(SystemExit):
+            main(["compare-tuning", "--profile", "linux-throughput", "--", "python", "train.py"])
+
+    def test_tune_gpu_command_prints_recommendations(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.recommend_nvidia_tuning") as recommend, redirect_stdout(output):
+            recommend.return_value = {"supported": False}
+            code = main(["tune-gpu"])
+        self.assertEqual(code, 0)
+        recommend.assert_called_once_with("nvidia-throughput")
+        self.assertIn("supported", output.getvalue())
+
+    @patch("autotune.cli.platform.system", return_value="Linux")
     @patch("autotune.cli.run_with_budget")
     def test_run_command_auto_tunes_system_on_linux(self, run_with_budget, _system) -> None:
         run_with_budget.return_value = (0, ".autotuneai/runs/run1")
@@ -81,6 +105,16 @@ class CliTest(unittest.TestCase):
             code = main(["run", "--auto-tune-system", "--memory-budget-gb", "-3", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "linux-memory-conservative")
+
+    @patch("autotune.cli.recommend_nvidia_tuning")
+    @patch("autotune.cli.run_with_budget")
+    def test_run_command_auto_tunes_gpu(self, run_with_budget, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": True}
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        with redirect_stdout(io.StringIO()):
+            code = main(["run", "--auto-tune-gpu", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_gpu_profile"], "nvidia-throughput")
 
     def test_run_command_rejects_conflicting_system_tuning_options(self) -> None:
         with self.assertRaises(SystemExit):
