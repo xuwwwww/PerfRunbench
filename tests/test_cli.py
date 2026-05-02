@@ -62,6 +62,21 @@ class CliTest(unittest.TestCase):
         self.assertEqual(tune.call_args.args[1], "num_workers")
         self.assertIn("Wrote training tuning summary", output.getvalue())
 
+    @patch("autotune.cli.platform.system", return_value="Linux")
+    @patch("autotune.cli.run_with_budget")
+    def test_run_command_auto_tunes_system_on_linux(self, run_with_budget, _system) -> None:
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["run", "--auto-tune-system", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "linux-training-safe")
+        self.assertIn("Run directory", output.getvalue())
+
+    def test_run_command_rejects_conflicting_system_tuning_options(self) -> None:
+        with self.assertRaises(SystemExit):
+            main(["run", "--auto-tune-system", "--tune-system", "linux-training-safe", "--", "python", "train.py"])
+
     def test_run_command_requires_workload(self) -> None:
         with self.assertRaises(SystemExit):
             main(["run"])

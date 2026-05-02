@@ -28,6 +28,16 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Command: `{_shell_join(analysis.get('command', []))}`",
         f"- Run directory: `{run_dir}`",
         "",
+        "## Before / After",
+        "",
+        f"- Available memory at start MB: {analysis['memory'].get('available_memory_start_mb')}",
+        f"- Available memory at end MB: {analysis['memory'].get('available_memory_end_mb')}",
+        f"- Minimum available memory MB: {analysis['memory'].get('observed_min_available_memory_mb')}",
+        f"- Workload peak memory MB: {analysis['memory'].get('peak_memory_mb')}",
+        f"- Memory budget exceeded: {analysis['memory'].get('memory_budget_exceeded')}",
+        f"- System tuning snapshots: {_system_tuning_snapshot_status(run_dir)}",
+        f"- Source/config changes recorded: {_changed_file_count(run_dir)}",
+        "",
         "## Executor",
         "",
         f"- Requested: {analysis['executor'].get('requested')}",
@@ -83,6 +93,23 @@ def _load_json(path: Path, default: Any = None) -> Any:
     if not path.exists():
         return default
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _system_tuning_snapshot_status(run_dir: Path) -> str:
+    required = [
+        "system_tuning_before.json",
+        "system_tuning_after.json",
+        "system_tuning_diff.json",
+    ]
+    present = [name for name in required if (run_dir / name).exists()]
+    if not present:
+        return "none"
+    return ", ".join(present)
+
+
+def _changed_file_count(run_dir: Path) -> int:
+    manifest = _load_json(run_dir / "manifest.json", default={})
+    return len(manifest.get("changed_files", []))
 
 
 def _shell_join(command: list[str]) -> str:

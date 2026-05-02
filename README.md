@@ -57,6 +57,21 @@ autotuneai tune-system --apply --sudo
 autotuneai restore --run-id <run_id> --sudo
 ```
 
+You can also let a workload automatically apply the recommended runtime tuning profile before it starts and restore the previous values afterward:
+
+```bash
+sudo -v
+autotuneai run \
+  --auto-tune-system \
+  --system-tuning-sudo \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb 22 \
+  -- /path/to/user/env/bin/python train.py
+```
+
+Runs that apply runtime tuning write `system_tuning_before.json`, `system_tuning_after.json`, and `system_tuning_diff.json` under `.autotuneai/runs/<run_id>/`.
+
 Resource guard smoke test with CPU and memory load:
 
 ```bash

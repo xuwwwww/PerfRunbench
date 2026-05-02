@@ -40,6 +40,8 @@ class RunReportTest(unittest.TestCase):
             self.assertEqual(report_path, run_dir / "report.md")
             report = report_path.read_text(encoding="utf-8")
             self.assertIn("AutoTuneAI Run Report: run1", report)
+            self.assertIn("## Before / After", report)
+            self.assertIn("Available memory at start", report)
             self.assertIn("## CPU", report)
             self.assertIn("## Memory", report)
             self.assertIn("## Diagnostics", report)

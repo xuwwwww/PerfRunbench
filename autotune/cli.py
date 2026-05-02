@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 from pathlib import Path
 
 from autotune.profiler.hardware_info import collect_hardware_info, write_hardware_info
@@ -51,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_budget_args(run)
     run.add_argument("workload", nargs=argparse.REMAINDER)
     run.add_argument("--tune-system", choices=available_profiles(), help="Apply a runtime system tuning profile before running.")
+    run.add_argument(
+        "--auto-tune-system",
+        action="store_true",
+        help="Automatically apply the recommended runtime system tuning profile when supported.",
+    )
     run.add_argument(
         "--no-restore-system-after",
         action="store_true",
@@ -153,6 +159,7 @@ def _cmd_executors(args: argparse.Namespace) -> int:
 def _cmd_run(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai run [budget args] -- <command>")
     budget = _budget_from_args(args)
+    tune_system_profile = _resolve_system_tuning_profile(args)
     try:
         return_code, run_dir = run_with_budget(
             command,
@@ -162,7 +169,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             executor=args.executor,
             use_sudo=args.sudo,
             allow_sudo_auto=args.allow_sudo_auto,
-            tune_system_profile=args.tune_system,
+            tune_system_profile=tune_system_profile,
             restore_system_after=not args.no_restore_system_after,
             system_tuning_sudo=args.system_tuning_sudo,
             docker_image=args.docker_image,
@@ -301,6 +308,18 @@ def _budget_from_args(args: argparse.Namespace) -> ResourceBudget:
         cpu_quota_percent=args.cpu_quota_percent,
         enforce=True,
     )
+
+
+def _resolve_system_tuning_profile(args: argparse.Namespace) -> str | None:
+    if args.tune_system and args.auto_tune_system:
+        raise SystemExit("--tune-system and --auto-tune-system cannot be used together")
+    if args.tune_system:
+        return args.tune_system
+    if not args.auto_tune_system:
+        return None
+    if platform.system() != "Linux":
+        return None
+    return "linux-training-safe"
 
 
 def _command_after_separator(command: list[str], usage: str) -> list[str]:

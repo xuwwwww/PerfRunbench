@@ -372,6 +372,30 @@ autotuneai run \
   -- python train.py
 ```
 
+也可以改用自動模式，讓 AutoTuneAI 在 Linux/WSL 上選目前建議的 runtime system tuning profile：
+
+```bash
+sudo -v
+autotuneai run \
+  --auto-tune-system \
+  --system-tuning-sudo \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb 22 \
+  -- python train.py
+```
+
+只要 run 有套用 system tuning，run directory 會包含：
+
+```text
+system_tuning_before.json
+system_tuning_after.json
+system_tuning_diff.json
+system_tuning_restore_after.json
+```
+
+`autotuneai report --run-id <run_id>` 的 `Before / After` 區塊會集中顯示 memory start/end/min、peak memory、system tuning snapshots，以及 source/config change 數量。
+
 如果被中斷，仍可用 run id 做 restore：
 
 ```bash
