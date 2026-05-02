@@ -49,8 +49,9 @@ class MemoryCalibrationTest(unittest.TestCase):
 
             self.assertTrue(output.exists())
             self.assertEqual(result["records"][0]["requested_budget_mode"], "reserve_to_full")
+            self.assertEqual(result["records"][0]["budget_utilization"], 0.0512)
             self.assertEqual(result["records"][0]["reserve_error_gb"], -1.0)
-            self.assertTrue(result["recommendations"])
+            self.assertTrue(any("did not approach" in item for item in result["recommendations"]))
 
 
 if __name__ == "__main__":

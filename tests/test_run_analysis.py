@@ -81,6 +81,37 @@ class RunAnalysisTest(unittest.TestCase):
         self.assertIn("Memory", output)
         self.assertIn("Diagnostics", output)
 
+    def test_analyze_run_reports_discovered_systemd_control_group_without_stats(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runs_dir = Path(temp_dir)
+            run_dir = runs_dir / "run1"
+            run_dir.mkdir()
+            write_json(
+                run_dir / "manifest.json",
+                {
+                    "run_id": "run1",
+                    "status": "failed",
+                    "return_code": -2,
+                    "command": ["python", "train.py"],
+                    "budget": {"memory_budget_gb": 0.5, "memory_budget_mode": "absolute"},
+                    "notes": [
+                        "selected_executor=systemd",
+                        "systemd_control_group=/system.slice/autotuneai-run1.scope",
+                    ],
+                },
+            )
+            write_json(run_dir / "resource_summary.json", {"peak_rss_mb": 512})
+            write_json(
+                run_dir / "resource_timeline.json",
+                [{"cgroup_path": "/sys/fs/cgroup/system.slice/autotuneai-run1.scope"}],
+            )
+
+            analysis = analyze_run("run1", runs_dir)
+
+        self.assertEqual(analysis["cgroup"]["control_group"], "/system.slice/autotuneai-run1.scope")
+        self.assertEqual(analysis["cgroup"]["path"], "/sys/fs/cgroup/system.slice/autotuneai-run1.scope")
+        self.assertTrue(any("not readable" in item for item in analysis["diagnostics"]))
+
 
 if __name__ == "__main__":
     unittest.main()

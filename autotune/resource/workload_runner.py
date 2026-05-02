@@ -8,7 +8,7 @@ from pathlib import Path
 
 from autotune.resource.affinity import apply_cpu_affinity
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.cgroup_monitor import CgroupStats, read_cgroup_stats, wait_for_systemd_control_group
+from autotune.resource.cgroup_monitor import CgroupStats, cgroup_path, read_cgroup_stats, wait_for_systemd_control_group
 from autotune.resource.docker_executor import build_docker_run_command
 from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.run_state import RunManifest, create_run, finish_run, write_json
@@ -257,7 +257,7 @@ def _monitor_systemd_scope(
     previous_stats: CgroupStats | None = None
     while process.poll() is None:
         stats = read_cgroup_stats(control_group) if control_group else None
-        sample = _sample_systemd_scope(child, psutil, stats, previous_stats)
+        sample = _sample_systemd_scope(child, psutil, stats, previous_stats, control_group=control_group)
         timeline.append(sample)
         if stats is not None:
             previous_stats = stats
@@ -289,7 +289,14 @@ def _sample_child(child, psutil) -> ChildSample:
     )
 
 
-def _sample_systemd_scope(child, psutil, stats: CgroupStats | None, previous_stats: CgroupStats | None) -> ChildSample:
+def _sample_systemd_scope(
+    child,
+    psutil,
+    stats: CgroupStats | None,
+    previous_stats: CgroupStats | None,
+    *,
+    control_group: str | None = None,
+) -> ChildSample:
     process_rss_mb = 0.0
     process_cpu_percent = 0.0
     system_cpu_percent = 0.0
@@ -313,12 +320,18 @@ def _sample_systemd_scope(child, psutil, stats: CgroupStats | None, previous_sta
         available_memory_mb=available_memory_mb,
         child_cpu_percent=process_cpu_percent,
         system_cpu_percent=system_cpu_percent,
-        cgroup_path=stats.cgroup_path if stats is not None else None,
+        cgroup_path=stats.cgroup_path if stats is not None else _attempted_cgroup_path(control_group),
         cgroup_memory_current_mb=cgroup_memory_mb,
         cgroup_memory_peak_mb=stats.memory_peak_mb if stats is not None else None,
         cgroup_cpu_percent=_cgroup_cpu_percent(stats, previous_stats),
         cgroup_cpu_usage_usec=stats.cpu_usage_usec if stats is not None else None,
     )
+
+
+def _attempted_cgroup_path(control_group: str | None) -> str | None:
+    if not control_group:
+        return None
+    return cgroup_path(control_group).as_posix()
 
 
 def _cgroup_cpu_percent(stats: CgroupStats | None, previous_stats: CgroupStats | None) -> float | None:

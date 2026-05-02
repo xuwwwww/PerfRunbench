@@ -10,6 +10,7 @@ from autotune.resource.workload_runner import (
     ChildSample,
     _resolve_command_executable,
     _resolve_executor,
+    _sample_systemd_scope,
     _summarize_timeline,
     run_with_budget,
 )
@@ -68,6 +69,16 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertEqual(summary["average_cgroup_cpu_percent"], 62.5)
         self.assertEqual(summary["peak_cgroup_cpu_percent"], 75)
         self.assertEqual(summary["cgroup_path"], "/sys/fs/cgroup/demo.scope")
+
+    def test_systemd_sample_records_attempted_cgroup_path_when_stats_are_missing(self) -> None:
+        sample = _sample_systemd_scope(
+            child=None,
+            psutil=None,
+            stats=None,
+            previous_stats=None,
+            control_group="/system.slice/demo.scope",
+        )
+        self.assertEqual(sample.cgroup_path, "/sys/fs/cgroup/system.slice/demo.scope")
 
     @patch("autotune.resource.workload_runner.collect_executor_capabilities")
     def test_auto_executor_falls_back_to_local(self, collect_capabilities) -> None:

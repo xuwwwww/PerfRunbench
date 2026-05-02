@@ -105,6 +105,7 @@ def _record_from_analysis(
         "workload_memory_mb": workload_memory_mb,
         "effective_budget_mb": memory.get("effective_budget_mb"),
         "peak_memory_mb": memory.get("peak_memory_mb"),
+        "budget_utilization": _budget_utilization(memory.get("peak_memory_mb"), memory.get("effective_budget_mb")),
         "observed_min_available_memory_gb": observed_min_available_gb,
         "memory_budget_exceeded": memory.get("memory_budget_exceeded"),
         "reserve_error_gb": reserve_error_gb,
@@ -113,6 +114,20 @@ def _record_from_analysis(
 
 def _recommend(records: list[dict[str, Any]]) -> list[str]:
     recommendations = []
+    under_stressed = [
+        record
+        for record in records
+        if record.get("effective_budget_mb")
+        and record.get("peak_memory_mb")
+        and record.get("budget_utilization") is not None
+        and record["budget_utilization"] < 0.8
+        and not record.get("memory_budget_exceeded")
+    ]
+    if under_stressed:
+        recommendations.append(
+            "Some calibration runs did not approach their effective memory budget. Increase --workload-memory-mb "
+            "or add larger stress values before treating reserve-to-full drift as precise."
+        )
     reserve_errors = [
         record["reserve_error_gb"]
         for record in records
@@ -132,3 +147,11 @@ def _recommend(records: list[dict[str, Any]]) -> list[str]:
     if not recommendations:
         recommendations.append("No memory calibration drift was detected from the collected records.")
     return recommendations
+
+
+def _budget_utilization(peak_memory_mb: Any, effective_budget_mb: Any) -> float | None:
+    if not isinstance(peak_memory_mb, (int, float)) or not isinstance(effective_budget_mb, (int, float)):
+        return None
+    if effective_budget_mb <= 0:
+        return None
+    return round(peak_memory_mb / effective_budget_mb, 4)

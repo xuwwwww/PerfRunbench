@@ -161,15 +161,22 @@ def _analyze_memory(budget: dict[str, Any], summary: dict[str, Any], timeline: l
 
 def _analyze_cgroup(summary: dict[str, Any], timeline: list[dict[str, Any]], notes: list[str]) -> dict[str, Any]:
     cgroup_paths = [sample.get("cgroup_path") for sample in timeline if sample.get("cgroup_path")]
+    control_group = _note_value(notes, "systemd_control_group=")
     path = summary.get("cgroup_path") or (cgroup_paths[-1] if cgroup_paths else None)
+    if path is None and control_group:
+        path = _control_group_path(control_group)
     diagnostics = []
     if path:
-        diagnostics.append("Cgroup stats were captured; prefer cgroup memory for systemd runs.")
+        if summary.get("peak_cgroup_memory_current_mb") is not None or summary.get("peak_cgroup_cpu_percent") is not None:
+            diagnostics.append("Cgroup stats were captured; prefer cgroup memory for systemd runs.")
+        else:
+            diagnostics.append("Systemd control group was discovered, but cgroup stat files were not readable during sampling.")
     elif any("selected_executor=systemd" in note for note in notes):
         diagnostics.append("Systemd executor was selected, but cgroup stats were not captured for this run.")
     return {
         "available": bool(path),
         "path": path,
+        "control_group": control_group,
         "peak_memory_mb": summary.get("peak_cgroup_memory_current_mb") or summary.get("peak_cgroup_memory_peak_mb"),
         "peak_cpu_percent": summary.get("peak_cgroup_cpu_percent"),
         "diagnostics": diagnostics,
@@ -189,6 +196,17 @@ def _parse_executor(notes: list[str]) -> dict[str, Any]:
                 value = note[len(key) :]
                 result[output_key] = _parse_value(value)
     return result
+
+
+def _note_value(notes: list[str], prefix: str) -> str | None:
+    for note in notes:
+        if note.startswith(prefix):
+            return note[len(prefix) :]
+    return None
+
+
+def _control_group_path(control_group: str) -> str:
+    return f"/sys/fs/cgroup/{control_group.lstrip('/')}"
 
 
 def _parse_affinity_context(notes: list[str]) -> dict[str, Any]:
