@@ -7,8 +7,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from autotune.system_tuner.runtime import (
+    RuntimeSetting,
     SettingSnapshot,
     apply_system_tuning,
+    available_profiles,
     recommend_system_tuning,
     restore_system_tuning,
 )
@@ -26,15 +28,25 @@ class SystemTunerTest(unittest.TestCase):
     @patch("autotune.system_tuner.runtime.read_setting")
     def test_apply_system_tuning_writes_before_after_and_diff(self, read_setting, system) -> None:
         system.return_value = "Linux"
-        values = {"vm.swappiness": "60", "kernel.numa_balancing": "1"}
+        values = {
+            "vm.swappiness": "60",
+            "kernel.numa_balancing": "1",
+            "vm.dirty_background_ratio": "10",
+            "vm.dirty_ratio": "20",
+            "vm.zone_reclaim_mode": "0",
+        }
 
-        def fake_read(key: str) -> SettingSnapshot:
-            return SettingSnapshot(key=key, value=values.get(key), exists=key in values)
+        def fake_read(setting: RuntimeSetting | str) -> SettingSnapshot:
+            key = setting.key if isinstance(setting, RuntimeSetting) else setting
+            source = setting.source if isinstance(setting, RuntimeSetting) else "sysctl"
+            path = setting.path if isinstance(setting, RuntimeSetting) else None
+            return SettingSnapshot(key=key, value=values.get(key), exists=key in values, source=source, path=path)
 
         def fake_runner(command: list[str]) -> subprocess.CompletedProcess[str]:
-            assignment = command[-1]
-            key, value = assignment.split("=", 1)
-            values[key] = value
+            if "sysctl" in command:
+                assignment = command[-1]
+                key, value = assignment.split("=", 1)
+                values[key] = value
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
         read_setting.side_effect = fake_read
@@ -58,7 +70,8 @@ class SystemTunerTest(unittest.TestCase):
     def test_restore_system_tuning_reapplies_before_values(self, read_setting) -> None:
         values = {"vm.swappiness": "10"}
 
-        def fake_read(key: str) -> SettingSnapshot:
+        def fake_read(setting: RuntimeSetting | str) -> SettingSnapshot:
+            key = setting.key if isinstance(setting, RuntimeSetting) else setting
             return SettingSnapshot(key=key, value=values.get(key), exists=key in values)
 
         def fake_runner(command: list[str]) -> subprocess.CompletedProcess[str]:
@@ -77,6 +90,31 @@ class SystemTunerTest(unittest.TestCase):
 
         self.assertEqual(restored[0]["key"], "vm.swappiness")
         self.assertEqual(values["vm.swappiness"], "60")
+
+    def test_multiple_system_tuning_profiles_are_available(self) -> None:
+        profiles = available_profiles()
+        self.assertIn("linux-training-safe", profiles)
+        self.assertIn("linux-memory-conservative", profiles)
+        self.assertIn("linux-throughput", profiles)
+        self.assertIn("linux-low-latency", profiles)
+
+    @patch("autotune.system_tuner.runtime.platform.system")
+    @patch("autotune.system_tuner.runtime.read_setting")
+    def test_recommend_system_tuning_includes_sources_and_paths(self, read_setting, system) -> None:
+        system.return_value = "Linux"
+
+        def fake_read(setting: RuntimeSetting | str) -> SettingSnapshot:
+            key = setting.key if isinstance(setting, RuntimeSetting) else setting
+            source = setting.source if isinstance(setting, RuntimeSetting) else "sysctl"
+            path = setting.path if isinstance(setting, RuntimeSetting) else None
+            return SettingSnapshot(key=key, value="0", exists=True, source=source, path=path)
+
+        read_setting.side_effect = fake_read
+        result = recommend_system_tuning("linux-low-latency")
+
+        self.assertTrue(all("source" in item for item in result["settings"]))
+        self.assertTrue(all("path" in item for item in result["settings"]))
+        self.assertTrue(any(item["source"] == "file" for item in result["settings"]))
 
 
 if __name__ == "__main__":

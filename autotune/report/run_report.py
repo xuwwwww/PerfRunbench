@@ -82,10 +82,15 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
     if system_diff is not None:
         lines.extend(["", "## System Tuning Diff", ""])
         for item in system_diff:
+            source = item.get("source") or "sysctl"
             lines.append(
-                f"- {item.get('key')}: before={item.get('before')} target={item.get('target')} "
+                f"- {item.get('key')} ({source}): before={item.get('before')} target={item.get('target')} "
                 f"after={item.get('after')} changed={item.get('changed')} applied={item.get('applied')}"
             )
+            if item.get("path"):
+                lines.append(f"  - path: `{item.get('path')}`")
+            if item.get("error"):
+                lines.append(f"  - error: {item.get('error')}")
     return "\n".join(lines) + "\n"
 
 

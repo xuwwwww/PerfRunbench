@@ -319,6 +319,8 @@ def _resolve_system_tuning_profile(args: argparse.Namespace) -> str | None:
         return None
     if platform.system() != "Linux":
         return None
+    if args.memory_budget_gb is not None or args.reserve_memory_gb > 0:
+        return "linux-memory-conservative"
     return "linux-training-safe"
 
 

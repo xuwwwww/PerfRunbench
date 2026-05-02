@@ -394,6 +394,49 @@ system_tuning_diff.json
 system_tuning_restore_after.json
 ```
 
+目前可用 profile：
+
+```text
+linux-training-safe
+  一般訓練用的保守 profile。
+  包含 swappiness、dirty page ratio、zone reclaim、NUMA balancing、Transparent Huge Pages madvise。
+
+linux-memory-conservative
+  RAM 緊張時使用，會更積極保留訓練記憶體空間。
+  包含 swappiness=1、vfs_cache_pressure=200、page-cluster=0、較低 dirty ratio、THP madvise。
+
+linux-throughput
+  資料讀取或 checkpoint throughput 優先時使用。
+  包含較高 dirty ratio、較低 vfs_cache_pressure、THP madvise。
+
+linux-low-latency
+  想降低 flush/THP latency spike 時使用。
+  包含較低 dirty ratio、較頻繁 writeback、THP never。
+```
+
+自動選擇規則：
+
+```text
+--auto-tune-system + 有 memory budget / reserve memory
+  -> linux-memory-conservative
+
+--auto-tune-system + 沒有 memory budget
+  -> linux-training-safe
+```
+
+手動指定更激進的 profile：
+
+```bash
+sudo -v
+autotuneai run \
+  --tune-system linux-low-latency \
+  --system-tuning-sudo \
+  --executor systemd \
+  --sudo \
+  --memory-budget-gb -3 \
+  -- python train.py
+```
+
 `autotuneai report --run-id <run_id>` 的 `Before / After` 區塊會集中顯示 memory start/end/min、peak memory、system tuning snapshots，以及 source/config change 數量。
 
 如果被中斷，仍可用 run id 做 restore：

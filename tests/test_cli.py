@@ -73,6 +73,15 @@ class CliTest(unittest.TestCase):
         self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "linux-training-safe")
         self.assertIn("Run directory", output.getvalue())
 
+    @patch("autotune.cli.platform.system", return_value="Linux")
+    @patch("autotune.cli.run_with_budget")
+    def test_run_command_auto_tunes_memory_profile_when_budgeted(self, run_with_budget, _system) -> None:
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        with redirect_stdout(io.StringIO()):
+            code = main(["run", "--auto-tune-system", "--memory-budget-gb", "-3", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "linux-memory-conservative")
+
     def test_run_command_rejects_conflicting_system_tuning_options(self) -> None:
         with self.assertRaises(SystemExit):
             main(["run", "--auto-tune-system", "--tune-system", "linux-training-safe", "--", "python", "train.py"])

@@ -20,6 +20,8 @@ class RuntimeSetting:
     value: str
     reason: str
     require_existing: bool = True
+    source: str = "sysctl"
+    path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -28,6 +30,8 @@ class SettingSnapshot:
     value: str | None
     exists: bool
     error: str | None = None
+    source: str = "sysctl"
+    path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,8 @@ class SettingChange:
     applied: bool
     reason: str
     error: str | None = None
+    source: str = "sysctl"
+    path: str | None = None
 
 
 CommandRunner = Callable[[list[str]], subprocess.CompletedProcess[str]]
@@ -72,6 +78,122 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             value="0",
             reason="Avoid local node reclaim stalls on systems that expose zone reclaim controls.",
         ),
+        RuntimeSetting(
+            key="transparent_hugepage.enabled",
+            value="madvise",
+            reason="Use transparent huge pages only when runtimes explicitly request them, reducing surprise compaction stalls.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/enabled",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.defrag",
+            value="madvise",
+            reason="Limit transparent huge page defrag work to madvise regions when the kernel exposes the control.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/defrag",
+        ),
+    ],
+    "linux-memory-conservative": [
+        RuntimeSetting(
+            key="vm.swappiness",
+            value="1",
+            reason="Avoid swap for memory-bound training until pressure is severe.",
+        ),
+        RuntimeSetting(
+            key="vm.vfs_cache_pressure",
+            value="200",
+            reason="Reclaim inode/dentry cache more aggressively so training memory has more room.",
+        ),
+        RuntimeSetting(
+            key="vm.page-cluster",
+            value="0",
+            reason="Reduce swap readahead burst size if swap is used under pressure.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_background_ratio",
+            value="3",
+            reason="Start background writeback earlier to avoid large checkpoint-induced dirty page buildup.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_ratio",
+            value="10",
+            reason="Cap dirty page accumulation more tightly for memory headroom.",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.enabled",
+            value="madvise",
+            reason="Avoid unconditional transparent huge pages for memory-constrained training runs.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/enabled",
+        ),
+    ],
+    "linux-throughput": [
+        RuntimeSetting(
+            key="vm.swappiness",
+            value="10",
+            reason="Keep swap pressure low while allowing the kernel some flexibility.",
+        ),
+        RuntimeSetting(
+            key="vm.vfs_cache_pressure",
+            value="50",
+            reason="Keep filesystem metadata cache warmer for dataset-heavy throughput runs.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_background_ratio",
+            value="10",
+            reason="Allow more buffered writeback for throughput-oriented workloads.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_ratio",
+            value="30",
+            reason="Allow larger dirty page bursts when throughput is preferred over latency.",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.enabled",
+            value="madvise",
+            reason="Allow runtimes to opt into transparent huge pages without forcing them globally.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/enabled",
+        ),
+    ],
+    "linux-low-latency": [
+        RuntimeSetting(
+            key="vm.swappiness",
+            value="1",
+            reason="Avoid swap-induced latency spikes during interactive or latency-sensitive runs.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_background_ratio",
+            value="3",
+            reason="Begin writeback early to reduce latency spikes from dirty page flushing.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_ratio",
+            value="10",
+            reason="Keep maximum dirty pages low for more predictable latency.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_expire_centisecs",
+            value="500",
+            reason="Expire dirty pages sooner so writeback work is spread out.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_writeback_centisecs",
+            value="100",
+            reason="Run periodic writeback more frequently for smoother IO latency.",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.enabled",
+            value="never",
+            reason="Disable transparent huge pages to avoid allocation and compaction latency spikes.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/enabled",
+        ),
     ],
 }
 
@@ -85,10 +207,12 @@ def recommend_system_tuning(profile: str = "linux-training-safe") -> dict[str, A
     supported = platform.system() == "Linux"
     recommendations = []
     for setting in settings:
-        snapshot = read_setting(setting.key)
+        snapshot = read_setting(setting)
         recommendations.append(
             {
                 "key": setting.key,
+                "source": setting.source,
+                "path": _setting_path(setting).as_posix(),
                 "current": snapshot.value,
                 "target": setting.value,
                 "exists": snapshot.exists,
@@ -115,7 +239,7 @@ def apply_system_tuning(
     runs_dir: Path = RUNS_DIR,
 ) -> tuple[Path, dict[str, Any]]:
     if platform.system() != "Linux":
-        raise SystemTuningError("runtime system tuning is currently implemented only for Linux sysctl settings.")
+        raise SystemTuningError("runtime system tuning is currently implemented only for Linux runtime settings.")
     runner = runner or _run_command
     run_dir, manifest = create_run(["tune_system", "--profile", profile], ResourceBudget(), runs_dir=runs_dir)
     status = "completed"
@@ -143,7 +267,7 @@ def apply_system_tuning_to_run(
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
     if platform.system() != "Linux":
-        raise SystemTuningError("runtime system tuning is currently implemented only for Linux sysctl settings.")
+        raise SystemTuningError("runtime system tuning is currently implemented only for Linux runtime settings.")
     runner = runner or _run_command
     run_path = Path(run_dir)
     settings = _profile_settings(profile)
@@ -154,7 +278,7 @@ def apply_system_tuning_to_run(
     try:
         for setting in settings:
             snapshot = before[setting.key]
-            if setting.require_existing and not snapshot.exists:
+            if not snapshot.exists:
                 changes.append(
                     SettingChange(
                         key=setting.key,
@@ -164,11 +288,13 @@ def apply_system_tuning_to_run(
                         changed=False,
                         applied=False,
                         reason=setting.reason,
-                        error=snapshot.error or "setting does not exist",
+                        error=(snapshot.error or "setting does not exist") if setting.require_existing else None,
+                        source=setting.source,
+                        path=_setting_path(setting).as_posix(),
                     )
                 )
                 continue
-            result = runner(_sysctl_write_command(setting.key, setting.value, use_sudo=use_sudo))
+            result = runner(_write_command(setting, setting.value, use_sudo=use_sudo))
             if result.returncode != 0:
                 status = "failed"
                 return_code = result.returncode
@@ -177,15 +303,17 @@ def apply_system_tuning_to_run(
                         key=setting.key,
                         before=snapshot.value,
                         target=setting.value,
-                        after=read_setting(setting.key).value,
+                        after=read_setting(setting).value,
                         changed=False,
                         applied=False,
                         reason=setting.reason,
                         error=(result.stderr or result.stdout or "").strip(),
+                        source=setting.source,
+                        path=_setting_path(setting).as_posix(),
                     )
                 )
                 break
-            after_value = read_setting(setting.key).value
+            after_value = read_setting(setting).value
             changes.append(
                 SettingChange(
                     key=setting.key,
@@ -195,6 +323,8 @@ def apply_system_tuning_to_run(
                     changed=snapshot.value != after_value,
                     applied=True,
                     reason=setting.reason,
+                    source=setting.source,
+                    path=_setting_path(setting).as_posix(),
                 )
             )
     except Exception as exc:
@@ -228,8 +358,9 @@ def restore_system_tuning(run_dir: str | Path, *, use_sudo: bool = False, runner
         value = record.get("value")
         if value is None:
             continue
-        result = runner(_sysctl_write_command(key, value, use_sudo=use_sudo))
-        after = read_setting(key).value
+        setting = _setting_from_record(record)
+        result = runner(_write_command(setting, value, use_sudo=use_sudo))
+        after = read_setting(setting).value
         restored.append(
             {
                 "key": key,
@@ -244,17 +375,39 @@ def restore_system_tuning(run_dir: str | Path, *, use_sudo: bool = False, runner
 
 
 def snapshot_settings(settings: list[RuntimeSetting]) -> dict[str, SettingSnapshot]:
-    return {setting.key: read_setting(setting.key) for setting in settings}
+    return {setting.key: read_setting(setting) for setting in settings}
 
 
-def read_setting(key: str) -> SettingSnapshot:
-    path = _sysctl_path(key)
+def read_setting(setting: RuntimeSetting | str) -> SettingSnapshot:
+    if isinstance(setting, str):
+        setting = RuntimeSetting(key=setting, value="")
+    path = _setting_path(setting)
     if not path.exists():
-        return SettingSnapshot(key=key, value=None, exists=False, error=f"{path} does not exist")
+        return SettingSnapshot(
+            key=setting.key,
+            value=None,
+            exists=False,
+            error=f"{path.as_posix()} does not exist",
+            source=setting.source,
+            path=path.as_posix(),
+        )
     try:
-        return SettingSnapshot(key=key, value=path.read_text(encoding="utf-8").strip(), exists=True)
+        return SettingSnapshot(
+            key=setting.key,
+            value=path.read_text(encoding="utf-8").strip(),
+            exists=True,
+            source=setting.source,
+            path=path.as_posix(),
+        )
     except OSError as exc:
-        return SettingSnapshot(key=key, value=None, exists=True, error=str(exc))
+        return SettingSnapshot(
+            key=setting.key,
+            value=None,
+            exists=True,
+            error=str(exc),
+            source=setting.source,
+            path=path.as_posix(),
+        )
 
 
 def load_json(path: Path) -> Any:
@@ -272,6 +425,41 @@ def _profile_settings(profile: str) -> list[RuntimeSetting]:
 
 def _sysctl_path(key: str) -> Path:
     return Path("/proc/sys") / Path(*key.split("."))
+
+
+def _setting_path(setting: RuntimeSetting) -> Path:
+    if setting.source == "sysctl":
+        return _sysctl_path(setting.key)
+    if setting.source == "file":
+        if not setting.path:
+            raise SystemTuningError(f"file setting {setting.key} is missing a path")
+        return Path(setting.path)
+    raise SystemTuningError(f"unsupported runtime setting source: {setting.source}")
+
+
+def _write_command(setting: RuntimeSetting, value: str, *, use_sudo: bool) -> list[str]:
+    if setting.source == "sysctl":
+        command = ["sysctl", "-w", f"{setting.key}={value}"]
+        if use_sudo:
+            return ["sudo", *command]
+        return command
+    if setting.source == "file":
+        path = _setting_path(setting).as_posix()
+        command = ["sh", "-c", 'printf "%s\\n" "$1" > "$2"', "sh", value, path]
+        if use_sudo:
+            return ["sudo", *command]
+        return command
+    raise SystemTuningError(f"unsupported runtime setting source: {setting.source}")
+
+
+def _setting_from_record(record: dict[str, Any]) -> RuntimeSetting:
+    return RuntimeSetting(
+        key=record["key"],
+        value=str(record.get("value") or ""),
+        reason="restore previous runtime setting value",
+        source=record.get("source", "sysctl"),
+        path=record.get("path"),
+    )
 
 
 def _sysctl_write_command(key: str, value: str, *, use_sudo: bool) -> list[str]:
@@ -297,7 +485,7 @@ def _plan_notes(supported: bool) -> list[str]:
     if not supported:
         return ["Runtime sysctl tuning is Linux-only; no system settings will be applied on this platform."]
     return [
-        "Only runtime sysctl values from an allowlist are considered.",
+        "Only runtime sysctl/sysfs values from an allowlist are considered.",
         "Persistent files such as /etc/sysctl.conf are not modified.",
         "Use restore_run.py with the run id to restore the before snapshot.",
     ]

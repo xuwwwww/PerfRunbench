@@ -47,6 +47,9 @@ Runtime system tuning can be previewed without changing the machine:
 
 ```bash
 autotuneai tune-system
+autotuneai tune-system --profile linux-memory-conservative
+autotuneai tune-system --profile linux-throughput
+autotuneai tune-system --profile linux-low-latency
 ```
 
 On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/runs/<run_id>/`:
@@ -71,6 +74,22 @@ autotuneai run \
 ```
 
 Runs that apply runtime tuning write `system_tuning_before.json`, `system_tuning_after.json`, and `system_tuning_diff.json` under `.autotuneai/runs/<run_id>/`.
+
+Available runtime tuning profiles:
+
+```text
+linux-training-safe
+  General conservative training profile.
+
+linux-memory-conservative
+  More aggressive memory headroom profile for RAM-constrained training.
+
+linux-throughput
+  Throughput-oriented profile for dataset/checkpoint-heavy runs.
+
+linux-low-latency
+  Lower dirty-page and THP settings for smoother latency.
+```
 
 Resource guard smoke test with CPU and memory load:
 
