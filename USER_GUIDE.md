@@ -27,6 +27,20 @@ autotuneai --help
 python -m autotune.cli --help
 ```
 
+直接驗證 repo 內建 demo：
+
+```bash
+autotuneai demo
+autotuneai demo --scenario tune-batch
+```
+
+跑 repo 內建真實訓練 workload：
+
+```bash
+autotuneai run -- python examples/iris_train.py --config examples/iris_train_config.yaml
+autotuneai run --memory-budget-gb 1.5 --hard-kill -- python examples/stress_train.py --config examples/stress_train_config.yaml
+```
+
 跑完整測試：
 
 ```bash
@@ -328,14 +342,14 @@ autotuneai run \
 autotuneai tune-system
 ```
 
-套用 Linux training-safe profile：
+套用 Linux/WSL training-safe profile：
 
 ```bash
 sudo -v
 autotuneai tune-system --apply --sudo
 ```
 
-目前 profile 會嘗試調整 Linux runtime sysctl，例如：
+Linux/WSL profile 會嘗試調整 runtime sysctl/sysfs，例如：
 
 ```text
 vm.swappiness
@@ -372,7 +386,15 @@ autotuneai run \
   -- python train.py
 ```
 
-也可以改用自動模式，讓 AutoTuneAI 在 Linux/WSL 上選目前建議的 runtime system tuning profile：
+Windows profile 目前走保守可還原的 `powercfg` active power scheme 調整。套用時會先記錄目前電源方案 GUID，tuned run 結束後用 snapshot 還原：
+
+```powershell
+autotuneai tune-system --profile windows-throughput
+autotuneai tune-system --profile windows-throughput --apply
+autotuneai restore --run-id <run_id>
+```
+
+也可以改用自動模式，讓 AutoTuneAI 依目前平台選建議的 runtime system tuning profile：
 
 ```bash
 sudo -v
@@ -412,16 +434,30 @@ linux-throughput
 linux-low-latency
   想降低 flush/THP latency spike 時使用。
   包含較低 dirty ratio、較頻繁 writeback、THP never。
+
+windows-training-safe
+  Windows 一般訓練 profile，暫時切到 High performance power scheme，結束後還原。
+
+windows-memory-conservative
+  Windows 沒有 Linux sysctl 類型的安全記憶體 runtime knob；目前搭配 AutoTuneAI memory budget 監控與 High performance power scheme。
+
+windows-throughput
+  Windows throughput profile，降低 CPU downclocking 對訓練吞吐的干擾。
+
+windows-low-latency
+  Windows latency profile，降低 CPU frequency ramp-up 延遲。
 ```
 
 自動選擇規則：
 
 ```text
 --auto-tune-system + 有 memory budget / reserve memory
-  -> linux-memory-conservative
+  -> Linux/WSL: linux-memory-conservative
+  -> Windows: windows-memory-conservative
 
 --auto-tune-system + 沒有 memory budget
-  -> linux-training-safe
+  -> Linux/WSL: linux-training-safe
+  -> Windows: windows-training-safe
 ```
 
 手動指定更激進的 profile：
@@ -439,6 +475,8 @@ autotuneai run \
 
 如果你想知道調教到底有沒有讓同一個 workload 變好，使用 A/B comparison：
 
+如果你只是先驗證這個 repo，請直接用內建的 `examples/dummy_train.py`。`train.py` 和 `configs/train.yaml` 在這裡代表你自己的訓練程式與設定檔，不是 repo 內建檔案。
+
 ```bash
 sudo -v
 autotuneai compare-tuning \
@@ -448,7 +486,34 @@ autotuneai compare-tuning \
   --system-tuning-sudo \
   --memory-budget-gb -3 \
   --sample-interval-seconds 0.1 \
-  -- python train.py --config configs/train.yaml
+  --repeat 3 \
+  -- python examples/dummy_train.py
+```
+
+要看 system tuning 是否真的對訓練有效，不建議用太短的 dummy workload。請優先用較長的 stress workload：
+
+```bash
+sudo -v
+autotuneai compare-tuning \
+  --workload-profile memory \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --memory-budget-gb -3 \
+  --sample-interval-seconds 0.1 \
+  --repeat 3 \
+  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
+```
+
+Windows 上不使用 `systemd` / `sudo`，直接用 local executor；tuned run 會套用 Windows profile，結束後還原 power scheme：
+
+```powershell
+autotuneai compare-tuning `
+  --workload-profile throughput `
+  --executor local `
+  --sample-interval-seconds 0.1 `
+  --repeat 3 `
+  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
 ```
 
 這會先跑 baseline，再跑 tuned，最後輸出：
@@ -462,14 +527,27 @@ results/reports/tuning_comparison.json
 ```text
 baseline.run_id
 tuned.run_id
-deltas.duration_seconds
-deltas.duration_percent
+deltas.lifecycle_duration_seconds
+deltas.lifecycle_duration_percent
+deltas.workload_duration_seconds
+deltas.workload_duration_percent
+deltas.system_tuning_overhead_seconds
+deltas.workload.samples_per_second.percent
+deltas.workload.final_accuracy.absolute
 deltas.peak_memory_mb
 deltas.peak_memory_percent
 deltas.min_available_memory_mb
 ```
 
-負的 `duration_percent` 代表 tuned run 比 baseline 更快；負的 `peak_memory_percent` 代表 tuned run peak memory 更低。
+判讀時要分清楚：
+
+- `lifecycle_duration_*` 是整段 AutoTuneAI run 時間，包含 system tuning apply/restore。
+- `workload_duration_*` 是 workload 自己寫出的訓練時間，較適合判斷訓練 loop 是否變快。
+- `system_tuning_overhead_seconds` 是 lifecycle 扣掉 workload 後的額外成本。
+- `deltas.workload.samples_per_second.percent` 是訓練吞吐變化，正值代表 tuned workload 更快。
+- `peak_memory_percent` 負值代表 tuned run peak memory 更低。
+
+短 workload 很容易被 system tuning apply/restore overhead 或排程雜訊蓋掉，所以正式比較請用 `--repeat 3` 以上，並看 aggregate median。
 
 ## 10.1 NVIDIA GPU runtime tuning
 
@@ -603,24 +681,36 @@ gradient_accumulation_steps: 1
 
 ```bash
 autotuneai tune-batch \
-  --file configs/train.yaml \
+  --file examples/train_config.yaml \
   --key batch_size \
   --values 128 64 32 16 \
   --memory-budget-gb 22 \
   --executor auto \
-  -- python train.py --config configs/train.yaml
+  -- python examples/dummy_train.py
+```
+
+如果你要一次調多個 numeric training knobs，用 `tune-training`：
+
+```bash
+autotuneai tune-training \
+  --file examples/iris_train_config.yaml \
+  --knob batch_size=8,16,32 \
+  --knob gradient_accumulation_steps=1,2,4 \
+  --knob preload_copies=4,8,12 \
+  --objective throughput \
+  -- python examples/iris_train.py --config examples/iris_train_config.yaml
 ```
 
 調 dataloader workers：
 
 ```bash
 autotuneai tune-batch \
-  --file configs/train.yaml \
-  --key num_workers \
+  --file examples/train_config.yaml \
+  --key dataloader_workers \
   --values 0 2 4 8 \
   --memory-budget-gb 22 \
   --reserve-cores 1 \
-  -- python train.py --config configs/train.yaml
+  -- python examples/dummy_train.py
 ```
 
 調 gradient accumulation：

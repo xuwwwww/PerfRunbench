@@ -22,7 +22,11 @@ def analyze_run(run_id: str, runs_dir: Path = RUNS_DIR) -> dict[str, Any]:
     memory = _analyze_memory(budget, summary, timeline)
     cpu = _analyze_cpu(budget, summary, timeline, affinity)
     cgroup = _analyze_cgroup(summary, timeline, notes)
-    diagnostics = [*cpu["diagnostics"], *memory["diagnostics"], *cgroup["diagnostics"]]
+    system_tuning = _analyze_system_tuning(run_dir, notes)
+    workload = _load_json(run_dir / "training_metrics.json", default={})
+    diagnostics = [*cpu["diagnostics"], *memory["diagnostics"], *cgroup["diagnostics"], *system_tuning["diagnostics"]]
+    if workload:
+        diagnostics.append("Workload wrote training metrics to training_metrics.json.")
     return {
         "run_id": run_id,
         "status": manifest.get("status"),
@@ -32,12 +36,17 @@ def analyze_run(run_id: str, runs_dir: Path = RUNS_DIR) -> dict[str, Any]:
         "cpu": cpu,
         "memory": memory,
         "cgroup": cgroup,
+        "system_tuning": system_tuning,
+        "workload": workload,
         "diagnostics": diagnostics,
         "paths": {
             "run_dir": str(run_dir),
             "manifest": str(run_dir / "manifest.json"),
             "resource_summary": str(run_dir / "resource_summary.json"),
             "resource_timeline": str(run_dir / "resource_timeline.json"),
+            "system_tuning_diff": str(run_dir / "system_tuning_diff.json"),
+            "system_tuning_restore_after": str(run_dir / "system_tuning_restore_after.json"),
+            "training_metrics": str(run_dir / "training_metrics.json"),
         },
     }
 
@@ -78,8 +87,21 @@ def format_analysis(analysis: dict[str, Any]) -> str:
         f"  peak_cgroup_memory_mb: {analysis['cgroup'].get('peak_memory_mb')}",
         f"  peak_cgroup_cpu_percent: {analysis['cgroup'].get('peak_cpu_percent')}",
         "",
+        "System Tuning",
+        f"  profile: {analysis.get('system_tuning', {}).get('profile')}",
+        f"  changed_settings: {analysis.get('system_tuning', {}).get('changed_settings')}",
+        f"  restored_settings: {analysis.get('system_tuning', {}).get('restored_settings')}",
+        "",
+        "Workload",
+        "",
         "Diagnostics",
     ]
+    workload = analysis.get("workload", {})
+    if workload:
+        for key in sorted(workload):
+            lines.insert(-2, f"  {key}: {workload.get(key)}")
+    else:
+        lines.insert(-2, "  no training metrics")
     for item in analysis.get("diagnostics", []):
         lines.append(f"  - {item}")
     return "\n".join(lines)
@@ -179,6 +201,35 @@ def _analyze_cgroup(summary: dict[str, Any], timeline: list[dict[str, Any]], not
         "control_group": control_group,
         "peak_memory_mb": summary.get("peak_cgroup_memory_current_mb") or summary.get("peak_cgroup_memory_peak_mb"),
         "peak_cpu_percent": summary.get("peak_cgroup_cpu_percent"),
+        "diagnostics": diagnostics,
+    }
+
+
+def _analyze_system_tuning(run_dir: Path, notes: list[str]) -> dict[str, Any]:
+    diff = _load_json(run_dir / "system_tuning_diff.json", default=[])
+    restored = _load_json(run_dir / "system_tuning_restore_after.json", default=[])
+    profile = _note_value(notes, "system_tuning_profile=")
+    changed = [item for item in diff if item.get("changed")]
+    applied = [item for item in diff if item.get("applied")]
+    failed = [item for item in diff if item.get("error")]
+    diagnostics = []
+    if profile:
+        diagnostics.append(f"System tuning profile {profile} was selected for this run.")
+    if applied:
+        diagnostics.append(f"System tuning applied {len(applied)} setting(s), with {len(changed)} effective change(s).")
+    if restored:
+        failed_restores = [item for item in restored if item.get("return_code") != 0]
+        diagnostics.append(f"System tuning restored {len(restored) - len(failed_restores)}/{len(restored)} setting(s).")
+    if failed:
+        diagnostics.append(f"System tuning had {len(failed)} setting error(s); inspect system_tuning_diff.json.")
+    return {
+        "profile": profile,
+        "settings": diff,
+        "restore": restored,
+        "changed_settings": len(changed),
+        "applied_settings": len(applied),
+        "restored_settings": len(restored),
+        "failed_settings": len(failed),
         "diagnostics": diagnostics,
     }
 

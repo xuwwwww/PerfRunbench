@@ -55,6 +55,18 @@ class RunAnalysisTest(unittest.TestCase):
                     {"available_memory_mb": 4900, "system_cpu_percent": 85},
                 ],
             )
+            write_json(
+                run_dir / "training_metrics.json",
+                {"samples_per_second": 100.0, "final_accuracy": 0.9},
+            )
+            write_json(
+                run_dir / "system_tuning_diff.json",
+                [{"key": "power.active_scheme", "changed": True, "applied": True, "error": None}],
+            )
+            write_json(
+                run_dir / "system_tuning_restore_after.json",
+                [{"key": "power.active_scheme", "return_code": 0}],
+            )
 
             analysis = analyze_run("run1", runs_dir)
 
@@ -62,7 +74,10 @@ class RunAnalysisTest(unittest.TestCase):
         self.assertEqual(analysis["cpu"]["affinity_cores"], "0,1,2,3,4,5,6")
         self.assertEqual(analysis["memory"]["requested_reserve_to_full_gb"], 5)
         self.assertFalse(analysis["memory"]["memory_budget_exceeded"])
+        self.assertEqual(analysis["workload"]["samples_per_second"], 100.0)
+        self.assertEqual(analysis["system_tuning"]["changed_settings"], 1)
         self.assertTrue(any("WSL" in item or "Linux" in item for item in analysis["diagnostics"]))
+        self.assertTrue(any("System tuning applied" in item for item in analysis["diagnostics"]))
 
     def test_format_analysis_includes_main_sections(self) -> None:
         analysis = {
@@ -79,6 +94,7 @@ class RunAnalysisTest(unittest.TestCase):
         self.assertIn("Executor", output)
         self.assertIn("CPU", output)
         self.assertIn("Memory", output)
+        self.assertIn("System Tuning", output)
         self.assertIn("Diagnostics", output)
 
     def test_analyze_run_reports_discovered_systemd_control_group_without_stats(self) -> None:

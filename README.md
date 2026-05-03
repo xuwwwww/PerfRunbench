@@ -27,6 +27,36 @@ autotuneai run -- python examples/dummy_train.py
 python -m unittest discover -s tests
 ```
 
+Built-in repo demo workflows:
+
+```bash
+autotuneai demo
+autotuneai demo --scenario tune-batch
+autotuneai demo --scenario compare-tuning --executor systemd --sudo --system-tuning-sudo --memory-budget-gb -3
+```
+
+Real training workloads bundled in the repo:
+
+```bash
+autotuneai run -- python examples/iris_train.py --config examples/iris_train_config.yaml
+autotuneai run --memory-budget-gb 1.5 --hard-kill -- python examples/stress_train.py --config examples/stress_train_config.yaml
+autotuneai tune-training \
+  --file examples/iris_train_config.yaml \
+  --knob batch_size=8,16,32 \
+  --knob gradient_accumulation_steps=1,2,4 \
+  --knob preload_copies=4,8,12 \
+  -- python examples/iris_train.py --config examples/iris_train_config.yaml
+sudo -v
+autotuneai compare-tuning \
+  --workload-profile memory \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --memory-budget-gb -3 \
+  --repeat 3 \
+  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
+```
+
 In WSL or non-interactive shells, prefer the explicit conda path:
 
 ```bash
@@ -50,6 +80,7 @@ autotuneai tune-system
 autotuneai tune-system --profile linux-memory-conservative
 autotuneai tune-system --profile linux-throughput
 autotuneai tune-system --profile linux-low-latency
+autotuneai tune-system --profile windows-throughput
 ```
 
 On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/runs/<run_id>/`:
@@ -58,6 +89,13 @@ On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/run
 sudo -v
 autotuneai tune-system --apply --sudo
 autotuneai restore --run-id <run_id> --sudo
+```
+
+On Windows, runtime system tuning currently uses reversible `powercfg` active power scheme changes:
+
+```powershell
+autotuneai tune-system --profile windows-throughput --apply
+autotuneai restore --run-id <run_id>
 ```
 
 You can also let a workload automatically apply the recommended runtime tuning profile before it starts and restore the previous values afterward:
@@ -89,6 +127,18 @@ linux-throughput
 
 linux-low-latency
   Lower dirty-page and THP settings for smoother latency.
+
+windows-training-safe
+  General Windows training profile using a temporary high performance power scheme.
+
+windows-memory-conservative
+  Windows memory-budget profile; memory guard stays in AutoTuneAI, while CPU frequency scaling noise is reduced.
+
+windows-throughput
+  Throughput-oriented Windows profile using a temporary high performance power scheme.
+
+windows-low-latency
+  Latency-oriented Windows profile using a temporary high performance power scheme.
 ```
 
 Resource guard smoke test with CPU and memory load:
@@ -186,13 +236,15 @@ Generic training config tuning can edit any single integer key and restore the f
 
 ```bash
 autotuneai tune-batch \
-  --file configs/train.yaml \
-  --key num_workers \
+  --file examples/train_config.yaml \
+  --key dataloader_workers \
   --values 0 2 4 8 \
-  -- python train.py --config configs/train.yaml
+  -- python examples/dummy_train.py
 ```
 
 Compare an untuned run against a tuned run with the same command:
+
+For a repo-local smoke test, use the bundled dummy workload instead of `train.py`:
 
 ```bash
 sudo -v
@@ -202,7 +254,19 @@ autotuneai compare-tuning \
   --sudo \
   --system-tuning-sudo \
   --memory-budget-gb -3 \
-  -- python train.py --config configs/train.yaml
+  --sample-interval-seconds 0.1 \
+  -- python examples/dummy_train.py
+```
+
+On Windows, use the local executor and a Windows runtime profile:
+
+```powershell
+autotuneai compare-tuning `
+  --workload-profile throughput `
+  --executor local `
+  --sample-interval-seconds 0.1 `
+  --repeat 3 `
+  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
 ```
 
 NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:

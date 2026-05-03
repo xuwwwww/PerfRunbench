@@ -213,6 +213,7 @@ def build_systemd_run_command(
     use_sudo: bool = False,
     run_as_user: str | None = None,
     unit_name: str | None = None,
+    environment: dict[str, str] | None = None,
 ) -> SystemdCommand:
     if not command:
         raise ValueError("command cannot be empty")
@@ -230,6 +231,10 @@ def build_systemd_run_command(
     if unit_name:
         wrapped.extend(["--unit", unit_name])
         notes.append(f"systemd unit={unit_name}")
+
+    for key, value in sorted((environment or {}).items()):
+        wrapped.extend(["--setenv", f"{key}={value}"])
+        notes.append(f"systemd environment {key}=set")
 
     if use_sudo:
         user = run_as_user or getpass.getuser()

@@ -62,20 +62,97 @@ class CliTest(unittest.TestCase):
         self.assertEqual(tune.call_args.args[1], "num_workers")
         self.assertIn("Wrote training tuning summary", output.getvalue())
 
-    @patch("autotune.cli.platform.system", return_value="Linux")
-    def test_compare_tuning_command_runs_comparison(self, _system) -> None:
+    def test_tune_training_accepts_multiple_knobs(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.tune_training_knobs") as tune, redirect_stdout(output):
+            tune.return_value = {"final_recommendation": {"batch_size": 32}}
+            code = main([
+                "tune-training",
+                "--file",
+                "train.yaml",
+                "--knob",
+                "batch_size=16,32",
+                "--knob",
+                "dataloader_workers=0,2",
+                "--min-final-accuracy",
+                "0.9",
+                "--",
+                "python",
+                "train.py",
+            ])
+        self.assertEqual(code, 0)
+        self.assertEqual(tune.call_args.args[1], {"batch_size": [16, 32], "dataloader_workers": [0, 2]})
+        self.assertEqual(tune.call_args.kwargs["min_final_accuracy"], 0.9)
+        self.assertIn("Wrote training plan summary", output.getvalue())
+
+    def test_compare_tuning_command_runs_comparison(self) -> None:
         output = io.StringIO()
         with patch("autotune.cli.compare_tuning") as compare, redirect_stdout(output):
             compare.return_value = {"deltas": {}}
-            code = main(["compare-tuning", "--profile", "linux-throughput", "--", "python", "train.py"])
+            code = main(["compare-tuning", "--profile", "linux-throughput", "--repeat", "3", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(compare.call_args.kwargs["tuned_profile"], "linux-throughput")
+        self.assertEqual(compare.call_args.kwargs["repeat"], 3)
         self.assertIn("Wrote tuning comparison", output.getvalue())
 
-    @patch("autotune.cli.platform.system", return_value="Windows")
-    def test_compare_tuning_rejects_non_linux(self, _system) -> None:
-        with self.assertRaises(SystemExit):
-            main(["compare-tuning", "--profile", "linux-throughput", "--", "python", "train.py"])
+    @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Windows")
+    def test_compare_tuning_auto_selects_windows_profile(self, _system) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.compare_tuning") as compare, redirect_stdout(output):
+            compare.return_value = {"deltas": {}}
+            code = main(["compare-tuning", "--workload-profile", "throughput", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(compare.call_args.kwargs["tuned_profile"], "windows-throughput")
+
+    def test_compare_runs_writes_output(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.resource.comparison_runner.build_comparison_result") as compare, redirect_stdout(output):
+            compare.return_value = {"baseline": {}, "tuned": {}, "deltas": {}}
+            code = main(["compare-runs", "--baseline-run-id", "run1", "--tuned-run-id", "run2"])
+        self.assertEqual(code, 0)
+        self.assertIn("Wrote run comparison", output.getvalue())
+
+    @patch("autotune.cli.run_with_budget")
+    def test_demo_run_executes_builtin_workload(self, run_with_budget) -> None:
+        run_with_budget.return_value = (0, ".autotuneai/runs/demo1")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["demo"])
+        self.assertEqual(code, 0)
+        self.assertEqual(run_with_budget.call_args.args[0], ["python", "examples/dummy_train.py"])
+        self.assertIn('"scenario": "run"', output.getvalue())
+
+    @patch("autotune.cli.tune_batch_size")
+    def test_demo_tune_batch_uses_builtin_config(self, tune_batch_size) -> None:
+        tune_batch_size.return_value = {"recommended_value": 64}
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["demo", "--scenario", "tune-batch"])
+        self.assertEqual(code, 0)
+        self.assertEqual(tune_batch_size.call_args.args[0], "examples/train_config.yaml")
+        self.assertEqual(tune_batch_size.call_args.args[3], ["python", "examples/dummy_train.py"])
+        self.assertIn('"recommended_value": 64', output.getvalue())
+
+    @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Linux")
+    @patch("autotune.cli.compare_tuning")
+    def test_demo_compare_tuning_runs_on_linux(self, compare_tuning, _system) -> None:
+        compare_tuning.return_value = {"tuned_profile": "linux-training-safe"}
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["demo", "--scenario", "compare-tuning"])
+        self.assertEqual(code, 0)
+        self.assertEqual(compare_tuning.call_args.args[0], ["python", "examples/dummy_train.py"])
+        self.assertIn('"tuned_profile": "linux-training-safe"', output.getvalue())
+
+    @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Windows")
+    @patch("autotune.cli.compare_tuning")
+    def test_demo_compare_tuning_runs_on_windows(self, compare_tuning, _system) -> None:
+        compare_tuning.return_value = {"tuned_profile": "windows-training-safe"}
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["demo", "--scenario", "compare-tuning"])
+        self.assertEqual(code, 0)
+        self.assertEqual(compare_tuning.call_args.kwargs["tuned_profile"], "windows-training-safe")
 
     def test_tune_gpu_command_prints_recommendations(self) -> None:
         output = io.StringIO()
@@ -86,7 +163,16 @@ class CliTest(unittest.TestCase):
         recommend.assert_called_once_with("nvidia-throughput")
         self.assertIn("supported", output.getvalue())
 
-    @patch("autotune.cli.platform.system", return_value="Linux")
+    @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Windows")
+    def test_tune_system_defaults_to_platform_profile(self, _system) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.recommend_system_tuning") as recommend, redirect_stdout(output):
+            recommend.return_value = {"profile": "windows-training-safe"}
+            code = main(["tune-system"])
+        self.assertEqual(code, 0)
+        recommend.assert_called_once_with("windows-training-safe")
+
+    @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Linux")
     @patch("autotune.cli.run_with_budget")
     def test_run_command_auto_tunes_system_on_linux(self, run_with_budget, _system) -> None:
         run_with_budget.return_value = (0, ".autotuneai/runs/run1")
@@ -97,7 +183,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "linux-training-safe")
         self.assertIn("Run directory", output.getvalue())
 
-    @patch("autotune.cli.platform.system", return_value="Linux")
+    @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Linux")
     @patch("autotune.cli.run_with_budget")
     def test_run_command_auto_tunes_memory_profile_when_budgeted(self, run_with_budget, _system) -> None:
         run_with_budget.return_value = (0, ".autotuneai/runs/run1")
@@ -105,6 +191,15 @@ class CliTest(unittest.TestCase):
             code = main(["run", "--auto-tune-system", "--memory-budget-gb", "-3", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "linux-memory-conservative")
+
+    @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Windows")
+    @patch("autotune.cli.run_with_budget")
+    def test_run_command_auto_tunes_system_on_windows(self, run_with_budget, _system) -> None:
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        with redirect_stdout(io.StringIO()):
+            code = main(["run", "--auto-tune-system", "--workload-profile", "throughput", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "windows-throughput")
 
     @patch("autotune.cli.recommend_nvidia_tuning")
     @patch("autotune.cli.run_with_budget")

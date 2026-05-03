@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 from pathlib import Path
 
 from autotune.profiler.hardware_info import collect_hardware_info, write_hardware_info
@@ -31,6 +30,10 @@ from autotune.system_tuner.runtime import (
 )
 from autotune.system_tuner.profile_selector import select_system_profile
 from autotune.training_tuner.batch_size import BatchSizeTuningError, tune_batch_size
+from autotune.training_tuner.multi_knob import parse_knob_specs, tune_training_knobs
+
+DEMO_WORKLOAD = ["python", "examples/dummy_train.py"]
+DEMO_CONFIG = "examples/train_config.yaml"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -105,12 +108,33 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--profile", choices=available_profiles(), default=None)
     compare.add_argument("--workload-profile", choices=["auto", "training", "memory", "throughput", "low-latency"], default="auto")
     compare.add_argument("--system-tuning-sudo", action="store_true")
+    compare.add_argument("--repeat", type=int, default=1, help="Run baseline/tuned pairs multiple times and report medians.")
     compare.add_argument("--output", default="results/reports/tuning_comparison.json")
     compare.add_argument("workload", nargs=argparse.REMAINDER)
     compare.set_defaults(handler=_cmd_compare_tuning)
 
+    compare_runs = subparsers.add_parser("compare-runs", help="Compare two existing runs by run id.")
+    compare_runs.add_argument("--baseline-run-id", required=True)
+    compare_runs.add_argument("--tuned-run-id", required=True)
+    compare_runs.add_argument("--profile", default="manual")
+    compare_runs.add_argument("--output", default="results/reports/run_comparison.json")
+    compare_runs.set_defaults(handler=_cmd_compare_runs)
+
+    demo = subparsers.add_parser("demo", help="Run built-in repo demo workflows against the dummy workload.")
+    _add_budget_args(demo)
+    demo.add_argument(
+        "--scenario",
+        choices=["run", "tune-batch", "compare-tuning", "all"],
+        default="run",
+    )
+    demo.add_argument("--workload-profile", choices=["auto", "training", "memory", "throughput", "low-latency"], default="auto")
+    demo.add_argument("--system-tuning-sudo", action="store_true")
+    demo.add_argument("--batch-values", nargs="+", type=int, default=[128, 64, 32])
+    demo.add_argument("--output-dir", default="results/reports")
+    demo.set_defaults(handler=_cmd_demo)
+
     tune_system = subparsers.add_parser("tune-system", help="Recommend or apply reversible runtime system tuning.")
-    tune_system.add_argument("--profile", default="linux-training-safe", choices=available_profiles())
+    tune_system.add_argument("--profile", default=None, choices=available_profiles())
     tune_system.add_argument("--apply", action="store_true")
     tune_system.add_argument("--sudo", action="store_true")
     tune_system.set_defaults(handler=_cmd_tune_system)
@@ -130,6 +154,16 @@ def build_parser() -> argparse.ArgumentParser:
     _add_budget_args(tune_batch)
     tune_batch.add_argument("workload", nargs=argparse.REMAINDER)
     tune_batch.set_defaults(handler=_cmd_tune_batch)
+
+    tune_training = subparsers.add_parser("tune-training", help="Tune multiple numeric training knobs sequentially.")
+    tune_training.add_argument("--file", required=True)
+    tune_training.add_argument("--knob", action="append", required=True, help="Key and candidate values, for example batch_size=128,64,32")
+    tune_training.add_argument("--objective", choices=["throughput", "duration", "memory"], default="throughput")
+    tune_training.add_argument("--min-final-accuracy", type=float, default=None)
+    tune_training.add_argument("--output", default="results/reports/training_plan_summary.json")
+    _add_budget_args(tune_training)
+    tune_training.add_argument("workload", nargs=argparse.REMAINDER)
+    tune_training.set_defaults(handler=_cmd_tune_training)
 
     list_parser = subparsers.add_parser("list-runs", help="List AutoTuneAI runs.")
     list_parser.set_defaults(handler=_cmd_list_runs)
@@ -256,8 +290,6 @@ def _cmd_calibrate_memory(args: argparse.Namespace) -> int:
 
 def _cmd_compare_tuning(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai compare-tuning [budget args] -- <command>")
-    if platform.system() != "Linux":
-        raise SystemExit("compare-tuning currently compares Linux runtime system profiles and must run on Linux/WSL.")
     budget = _budget_from_args(args)
     profile = args.profile or select_system_profile(budget, workload_profile=args.workload_profile).profile
     try:
@@ -273,6 +305,7 @@ def _cmd_compare_tuning(args: argparse.Namespace) -> int:
             allow_sudo_auto=args.allow_sudo_auto,
             system_tuning_sudo=args.system_tuning_sudo,
             docker_image=args.docker_image,
+            repeat=args.repeat,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
@@ -281,12 +314,101 @@ def _cmd_compare_tuning(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_compare_runs(args: argparse.Namespace) -> int:
+    from autotune.resource.comparison_runner import build_comparison_result
+
+    result = build_comparison_result(
+        args.baseline_run_id,
+        args.tuned_run_id,
+        tuned_profile=args.profile,
+    )
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.output).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"Wrote run comparison to {args.output}")
+    return 0
+
+
+def _cmd_demo(args: argparse.Namespace) -> int:
+    budget = _budget_from_args(args)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scenarios = ["run", "tune-batch", "compare-tuning"] if args.scenario == "all" else [args.scenario]
+    results: dict[str, object] = {}
+
+    if "run" in scenarios:
+        try:
+            return_code, run_dir = run_with_budget(
+                DEMO_WORKLOAD,
+                budget,
+                sample_interval_seconds=args.sample_interval_seconds,
+                hard_kill=args.hard_kill,
+                executor=args.executor,
+                use_sudo=args.sudo,
+                allow_sudo_auto=args.allow_sudo_auto,
+                docker_image=args.docker_image,
+            )
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+        results["run"] = {"return_code": return_code, "run_dir": str(run_dir)}
+
+    if "tune-batch" in scenarios:
+        try:
+            summary = tune_batch_size(
+                DEMO_CONFIG,
+                "batch_size",
+                args.batch_values,
+                DEMO_WORKLOAD,
+                budget,
+                output_dir / "demo_tune_batch_summary.json",
+                sample_interval_seconds=args.sample_interval_seconds,
+                hard_kill=args.hard_kill,
+                executor=args.executor,
+                use_sudo=args.sudo,
+                allow_sudo_auto=args.allow_sudo_auto,
+                docker_image=args.docker_image,
+            )
+        except (BatchSizeTuningError, RuntimeError) as exc:
+            raise SystemExit(str(exc)) from exc
+        results["tune_batch"] = {
+            "recommended_value": summary.get("recommended_value"),
+            "output": str(output_dir / "demo_tune_batch_summary.json"),
+        }
+
+    if "compare-tuning" in scenarios:
+        profile = select_system_profile(budget, workload_profile=args.workload_profile).profile
+        try:
+            comparison = compare_tuning(
+                DEMO_WORKLOAD,
+                budget,
+                tuned_profile=profile,
+                output=output_dir / "demo_tuning_comparison.json",
+                sample_interval_seconds=args.sample_interval_seconds,
+                hard_kill=args.hard_kill,
+                executor=args.executor,
+                use_sudo=args.sudo,
+                allow_sudo_auto=args.allow_sudo_auto,
+                system_tuning_sudo=args.system_tuning_sudo,
+                docker_image=args.docker_image,
+            )
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+        results["compare_tuning"] = {
+            "tuned_profile": comparison.get("tuned_profile"),
+            "output": str(output_dir / "demo_tuning_comparison.json"),
+        }
+
+    print(json.dumps({"kind": "demo", "scenario": args.scenario, "results": results}, indent=2, sort_keys=True))
+    return 0
+
+
 def _cmd_tune_system(args: argparse.Namespace) -> int:
+    profile = args.profile or select_system_profile(ResourceBudget()).profile
     try:
         if not args.apply:
-            print(json.dumps(recommend_system_tuning(args.profile), indent=2, sort_keys=True))
+            print(json.dumps(recommend_system_tuning(profile), indent=2, sort_keys=True))
             return 0
-        run_dir, result = apply_system_tuning(args.profile, use_sudo=args.sudo)
+        run_dir, result = apply_system_tuning(profile, use_sudo=args.sudo)
     except SystemTuningError as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
@@ -335,6 +457,31 @@ def _cmd_tune_batch(args: argparse.Namespace) -> int:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2))
     print(f"Wrote training tuning summary to {args.output}")
+    return 0
+
+
+def _cmd_tune_training(args: argparse.Namespace) -> int:
+    command = _command_after_separator(args.workload, "Usage: autotuneai tune-training --file CONFIG --knob key=v1,v2 -- <command>")
+    try:
+        result = tune_training_knobs(
+            args.file,
+            parse_knob_specs(args.knob),
+            command,
+            _budget_from_args(args),
+            args.output,
+            objective=args.objective,
+            min_final_accuracy=args.min_final_accuracy,
+            sample_interval_seconds=args.sample_interval_seconds,
+            hard_kill=args.hard_kill,
+            executor=args.executor,
+            use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
+            docker_image=args.docker_image,
+        )
+    except (BatchSizeTuningError, RuntimeError) as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(result, indent=2))
+    print(f"Wrote training plan summary to {args.output}")
     return 0
 
 
@@ -399,8 +546,6 @@ def _resolve_system_tuning_profile(args: argparse.Namespace) -> str | None:
     if args.tune_system:
         return args.tune_system
     if not args.auto_tune_system:
-        return None
-    if platform.system() != "Linux":
         return None
     return select_system_profile(_budget_from_args(args), workload_profile=args.workload_profile).profile
 

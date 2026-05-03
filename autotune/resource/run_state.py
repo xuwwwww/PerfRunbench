@@ -27,13 +27,16 @@ class RunManifest:
 
 
 def create_run(command: list[str], budget: ResourceBudget, runs_dir: Path = RUNS_DIR) -> tuple[Path, RunManifest]:
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = runs_dir / run_id
-    suffix = 1
-    while run_dir.exists():
-        run_dir = runs_dir / f"{run_id}_{suffix}"
-        suffix += 1
-    run_dir.mkdir(parents=True, exist_ok=False)
+    base_run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    suffix = 0
+    while True:
+        run_id = base_run_id if suffix == 0 else f"{base_run_id}_{suffix}"
+        run_dir = runs_dir / run_id
+        try:
+            run_dir.mkdir(parents=True, exist_ok=False)
+            break
+        except FileExistsError:
+            suffix += 1
     manifest = RunManifest(
         run_id=run_dir.name,
         command=command,

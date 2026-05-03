@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import shutil
 import time
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -52,9 +53,18 @@ def run_with_budget(
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
+    selected_executor, selected_use_sudo, selection_notes = _resolve_executor(
+        executor,
+        use_sudo=use_sudo,
+        allow_sudo_auto=allow_sudo_auto,
+    )
+    validate_workload_command(command, executor=selected_executor)
     if run_dir is None or manifest is None:
         run_dir, manifest = create_run(command, budget)
     manifest.budget = budget.to_record(total_cores=_visible_cpu_count(), total_memory_mb=_visible_memory_mb())
+    child_env = os.environ.copy()
+    child_env["AUTOTUNEAI_RUN_DIR"] = str(run_dir.resolve())
+    child_env["AUTOTUNEAI_RUN_ID"] = manifest.run_id
     timeline: list[ChildSample] = []
     process = None
     return_code = 1
@@ -80,11 +90,6 @@ def run_with_budget(
             gpu_tuning_applied = any(change.get("return_code") == 0 for change in result.get("changes", []))
             manifest.notes.append(f"gpu_tuning_lifecycle_applied={gpu_tuning_applied}")
         command_to_run = command
-        selected_executor, selected_use_sudo, selection_notes = _resolve_executor(
-            executor,
-            use_sudo=use_sudo,
-            allow_sudo_auto=allow_sudo_auto,
-        )
         manifest.notes.extend(selection_notes)
         if selected_executor == "local":
             affinity_context = apply_cpu_affinity(budget)
@@ -99,6 +104,10 @@ def run_with_budget(
                 budget,
                 use_sudo=selected_use_sudo,
                 unit_name=unit_name,
+                environment={
+                    "AUTOTUNEAI_RUN_DIR": child_env["AUTOTUNEAI_RUN_DIR"],
+                    "AUTOTUNEAI_RUN_ID": child_env["AUTOTUNEAI_RUN_ID"],
+                },
             )
             command_to_run = systemd_command.command
             manifest.notes.extend(systemd_command.notes)
@@ -115,7 +124,7 @@ def run_with_budget(
             manifest.notes.extend(docker_command.notes)
         else:
             raise ValueError(f"unsupported executor: {selected_executor}")
-        process = subprocess.Popen(command_to_run)
+        process = subprocess.Popen(command_to_run, env=child_env)
         if selected_executor == "systemd":
             return_code, control_group = _monitor_systemd_scope(
                 process,
@@ -464,6 +473,97 @@ def _resolve_command_executable(command: list[str]) -> list[str]:
     if not resolved:
         return command
     return [resolved, *command[1:]]
+
+
+def validate_workload_command(command: list[str], *, executor: str = "local") -> None:
+    effective = _unwrap_command_for_validation(command)
+    if not effective:
+        raise RuntimeError("workload command is empty after wrapper resolution")
+    if executor != "docker":
+        _validate_command_executable(effective)
+    _validate_python_script(effective)
+    _validate_input_paths(effective)
+
+
+def _validate_command_executable(command: list[str]) -> None:
+    executable = command[0]
+    if "/" in executable or "\\" in executable:
+        if not Path(executable).exists():
+            raise RuntimeError(f"workload executable does not exist: {executable}")
+        return
+    if shutil.which(executable):
+        return
+    raise RuntimeError(f"workload executable was not found on PATH: {executable}")
+
+
+def _validate_python_script(command: list[str]) -> None:
+    if len(command) < 2:
+        return
+    executable_name = Path(command[0]).name.lower()
+    if "python" not in executable_name:
+        return
+    script = command[1]
+    if script.startswith("-"):
+        return
+    if Path(script).exists():
+        return
+    raise RuntimeError(
+        f"workload script does not exist: {script}.{_missing_path_hint(script)}"
+    )
+
+
+def _validate_input_paths(command: list[str]) -> None:
+    for index, token in enumerate(command):
+        if token.startswith("--config=") or token.startswith("--config-file=") or token.startswith("--input=") or token.startswith("--input-file="):
+            _, value = token.split("=", 1)
+            _validate_existing_path(value, option=token.split("=", 1)[0])
+            continue
+        if token in {"--config", "--config-file", "--input", "--input-file"} and index + 1 < len(command):
+            _validate_existing_path(command[index + 1], option=token)
+
+
+def _validate_existing_path(value: str, *, option: str) -> None:
+    if value.startswith("-"):
+        raise RuntimeError(f"{option} expects a path, but got another flag: {value}")
+    if Path(value).exists():
+        return
+    raise RuntimeError(f"{option} path does not exist: {value}.{_missing_path_hint(value)}")
+
+
+def _missing_path_hint(path_text: str) -> str:
+    normalized = path_text.replace("\\", "/")
+    if normalized.endswith("train.py"):
+        return " For a repo-local smoke test, try `python examples/dummy_train.py`."
+    if normalized.endswith("configs/train.yaml"):
+        return " For a repo-local smoke test, try `examples/train_config.yaml`."
+    return ""
+
+
+def _unwrap_command_for_validation(command: list[str]) -> list[str]:
+    if len(command) >= 2 and command[0] == "conda" and command[1] == "run":
+        nested = _strip_conda_run_prefix(command)
+        return nested if nested else command
+    return command
+
+
+def _strip_conda_run_prefix(command: list[str]) -> list[str]:
+    index = 2
+    options_with_values = {"-n", "--name", "-p", "--prefix", "--cwd"}
+    while index < len(command):
+        token = command[index]
+        if token == "--":
+            return command[index + 1 :]
+        if token in options_with_values:
+            index += 2
+            continue
+        if token.startswith("--name=") or token.startswith("--prefix=") or token.startswith("--cwd="):
+            index += 1
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        return command[index:]
+    return []
 
 
 def _accounted_memory_bytes(process, psutil) -> int:

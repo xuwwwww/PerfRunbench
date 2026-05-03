@@ -18,11 +18,49 @@ from autotune.system_tuner.runtime import (
 
 class SystemTunerTest(unittest.TestCase):
     @patch("autotune.system_tuner.runtime.platform.system")
-    def test_recommend_system_tuning_reports_non_linux_unsupported(self, system) -> None:
+    def test_recommend_system_tuning_reports_unsupported_profile_platform(self, system) -> None:
         system.return_value = "Windows"
         result = recommend_system_tuning("linux-training-safe")
         self.assertFalse(result["supported"])
-        self.assertTrue(any("Linux-only" in note for note in result["notes"]))
+        self.assertTrue(any("not supported on Windows" in note for note in result["notes"]))
+
+    @patch("autotune.system_tuner.runtime.platform.system")
+    @patch("autotune.system_tuner.runtime.read_setting")
+    def test_recommend_system_tuning_supports_windows_profiles(self, read_setting, system) -> None:
+        system.return_value = "Windows"
+        read_setting.return_value = SettingSnapshot(
+            key="power.active_scheme",
+            value="381b4222-f694-41f0-9685-ff5bb260df2e",
+            exists=True,
+            source="powercfg",
+            path="powercfg://active-scheme",
+        )
+        result = recommend_system_tuning("windows-throughput")
+        self.assertTrue(result["supported"])
+        self.assertEqual(result["settings"][0]["source"], "powercfg")
+        self.assertEqual(result["settings"][0]["target"], "SCHEME_MIN")
+
+    @patch("autotune.system_tuner.runtime._run_command")
+    def test_read_windows_power_scheme_parses_powercfg_output(self, run_command) -> None:
+        from autotune.system_tuner.runtime import read_setting
+
+        run_command.return_value = subprocess.CompletedProcess(
+            ["powercfg", "/getactivescheme"],
+            0,
+            stdout="Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)\n",
+            stderr="",
+        )
+        snapshot = read_setting(
+            RuntimeSetting(
+                key="power.active_scheme",
+                value="SCHEME_MIN",
+                reason="test",
+                source="powercfg",
+                path="powercfg://active-scheme",
+            )
+        )
+        self.assertTrue(snapshot.exists)
+        self.assertEqual(snapshot.value, "381b4222-f694-41f0-9685-ff5bb260df2e")
 
     @patch("autotune.system_tuner.runtime.platform.system")
     @patch("autotune.system_tuner.runtime.read_setting")
@@ -66,6 +104,34 @@ class SystemTunerTest(unittest.TestCase):
         self.assertEqual(result["changes"][0]["before"], "60")
         self.assertEqual(result["changes"][0]["after"], "10")
 
+    @patch("autotune.system_tuner.runtime.platform.system")
+    @patch("autotune.system_tuner.runtime.read_setting")
+    def test_apply_windows_system_tuning_uses_powercfg(self, read_setting, system) -> None:
+        system.return_value = "Windows"
+        values = {"power.active_scheme": "381b4222-f694-41f0-9685-ff5bb260df2e"}
+
+        def fake_read(setting: RuntimeSetting | str) -> SettingSnapshot:
+            key = setting.key if isinstance(setting, RuntimeSetting) else setting
+            source = setting.source if isinstance(setting, RuntimeSetting) else "powercfg"
+            path = setting.path if isinstance(setting, RuntimeSetting) else "powercfg://active-scheme"
+            return SettingSnapshot(key=key, value=values.get(key), exists=True, source=source, path=path)
+
+        def fake_runner(command: list[str]) -> subprocess.CompletedProcess[str]:
+            self.assertEqual(command[:2], ["powercfg", "/setactive"])
+            values["power.active_scheme"] = command[2]
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        read_setting.side_effect = fake_read
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _run_dir, result = apply_system_tuning(
+                "windows-throughput",
+                runner=fake_runner,
+                runs_dir=Path(temp_dir),
+            )
+
+        self.assertEqual(result["changes"][0]["before"], "381b4222-f694-41f0-9685-ff5bb260df2e")
+        self.assertEqual(result["changes"][0]["after"], "SCHEME_MIN")
+
     @patch("autotune.system_tuner.runtime.read_setting")
     def test_restore_system_tuning_reapplies_before_values(self, read_setting) -> None:
         values = {"vm.swappiness": "10"}
@@ -97,6 +163,10 @@ class SystemTunerTest(unittest.TestCase):
         self.assertIn("linux-memory-conservative", profiles)
         self.assertIn("linux-throughput", profiles)
         self.assertIn("linux-low-latency", profiles)
+        self.assertIn("windows-training-safe", profiles)
+        self.assertIn("windows-memory-conservative", profiles)
+        self.assertIn("windows-throughput", profiles)
+        self.assertIn("windows-low-latency", profiles)
 
     @patch("autotune.system_tuner.runtime.platform.system")
     @patch("autotune.system_tuner.runtime.read_setting")

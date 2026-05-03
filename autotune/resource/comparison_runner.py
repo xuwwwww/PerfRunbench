@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -23,40 +24,73 @@ def compare_tuning(
     allow_sudo_auto: bool = False,
     system_tuning_sudo: bool = False,
     docker_image: str = "python:3.12-slim",
+    repeat: int = 1,
 ) -> dict[str, Any]:
     if not command:
         raise ValueError("command cannot be empty")
-    baseline_code, baseline_dir = run_with_budget(
-        command,
-        budget,
-        sample_interval_seconds=sample_interval_seconds,
-        hard_kill=hard_kill,
-        executor=executor,
-        use_sudo=use_sudo,
-        allow_sudo_auto=allow_sudo_auto,
-        docker_image=docker_image,
-    )
-    tuned_code, tuned_dir = run_with_budget(
-        command,
-        budget,
-        sample_interval_seconds=sample_interval_seconds,
-        hard_kill=hard_kill,
-        executor=executor,
-        use_sudo=use_sudo,
-        allow_sudo_auto=allow_sudo_auto,
-        tune_system_profile=tuned_profile,
-        restore_system_after=True,
-        system_tuning_sudo=system_tuning_sudo,
-        docker_image=docker_image,
-    )
+    if repeat < 1:
+        raise ValueError("repeat must be >= 1")
+    runs = []
+    for _index in range(repeat):
+        baseline_code, baseline_dir = run_with_budget(
+            command,
+            budget,
+            sample_interval_seconds=sample_interval_seconds,
+            hard_kill=hard_kill,
+            executor=executor,
+            use_sudo=use_sudo,
+            allow_sudo_auto=allow_sudo_auto,
+            docker_image=docker_image,
+        )
+        tuned_code, tuned_dir = run_with_budget(
+            command,
+            budget,
+            sample_interval_seconds=sample_interval_seconds,
+            hard_kill=hard_kill,
+            executor=executor,
+            use_sudo=use_sudo,
+            allow_sudo_auto=allow_sudo_auto,
+            tune_system_profile=tuned_profile,
+            restore_system_after=True,
+            system_tuning_sudo=system_tuning_sudo,
+            docker_image=docker_image,
+        )
+        runs.append((baseline_code, baseline_dir, tuned_code, tuned_dir))
+
+    baseline_code, baseline_dir, tuned_code, tuned_dir = runs[-1]
     result = build_comparison_result(
         baseline_dir.name,
         tuned_dir.name,
         tuned_profile=tuned_profile,
         baseline_return_code=baseline_code,
         tuned_return_code=tuned_code,
+        runs_dir=RUNS_DIR,
     )
+    if repeat > 1:
+        result["repeat"] = repeat
+        result["trials"] = [
+            build_comparison_result(
+                baseline_dir.name,
+                tuned_dir.name,
+                tuned_profile=tuned_profile,
+                baseline_return_code=baseline_code,
+                tuned_return_code=tuned_code,
+                runs_dir=RUNS_DIR,
+            )
+            for baseline_code, baseline_dir, tuned_code, tuned_dir in runs
+        ]
+        result["aggregate"] = _aggregate_trials(result["trials"])
     write_json(Path(output), result)
+    failures = _failed_runs(result)
+    if failures:
+        details = ", ".join(
+            f"{item['label']}(run_id={item['run_id']}, return_code={item['return_code']}, status={item['status']})"
+            for item in failures
+        )
+        raise RuntimeError(
+            "compare-tuning workload failed; tuning comparison is not valid. "
+            f"Failed run(s): {details}"
+        )
     return result
 
 
@@ -94,11 +128,16 @@ def _run_metrics(run_id: str, runs_dir: Path) -> dict[str, Any]:
         "status": manifest.get("status"),
         "return_code": manifest.get("return_code"),
         "duration_seconds": _duration_seconds(manifest),
+        "lifecycle_duration_seconds": _duration_seconds(manifest),
+        "workload_duration_seconds": _workload_duration_seconds(analysis.get("workload", {})),
+        "system_tuning_overhead_seconds": _system_tuning_overhead_seconds(manifest, analysis.get("workload", {})),
         "peak_memory_mb": analysis["memory"].get("peak_memory_mb"),
         "min_available_memory_mb": analysis["memory"].get("observed_min_available_memory_mb"),
         "memory_budget_exceeded": analysis["memory"].get("memory_budget_exceeded"),
         "peak_process_cpu_percent": analysis["cpu"].get("observed_peak_process_cpu_percent"),
         "peak_system_cpu_percent": analysis["cpu"].get("observed_peak_system_cpu_percent"),
+        "system_tuning": analysis.get("system_tuning", {}),
+        "workload": analysis.get("workload", {}),
         "diagnostics": analysis.get("diagnostics", []),
     }
 
@@ -116,10 +155,43 @@ def _duration_seconds(manifest: dict[str, Any]) -> float | None:
     return round((finish_dt - start_dt).total_seconds(), 3)
 
 
+def _workload_duration_seconds(workload: dict[str, Any]) -> float | None:
+    value = workload.get("duration_seconds")
+    return round(value, 6) if isinstance(value, (int, float)) else None
+
+
+def _system_tuning_overhead_seconds(manifest: dict[str, Any], workload: dict[str, Any]) -> float | None:
+    lifecycle = _duration_seconds(manifest)
+    workload_duration = _workload_duration_seconds(workload)
+    if lifecycle is None or workload_duration is None:
+        return None
+    return round(max(0.0, lifecycle - workload_duration), 6)
+
+
 def _deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[str, Any]:
     return {
         "duration_seconds": _delta(tuned.get("duration_seconds"), baseline.get("duration_seconds")),
         "duration_percent": _percent_delta(tuned.get("duration_seconds"), baseline.get("duration_seconds")),
+        "lifecycle_duration_seconds": _delta(
+            tuned.get("lifecycle_duration_seconds"),
+            baseline.get("lifecycle_duration_seconds"),
+        ),
+        "lifecycle_duration_percent": _percent_delta(
+            tuned.get("lifecycle_duration_seconds"),
+            baseline.get("lifecycle_duration_seconds"),
+        ),
+        "workload_duration_seconds": _delta(
+            tuned.get("workload_duration_seconds"),
+            baseline.get("workload_duration_seconds"),
+        ),
+        "workload_duration_percent": _percent_delta(
+            tuned.get("workload_duration_seconds"),
+            baseline.get("workload_duration_seconds"),
+        ),
+        "system_tuning_overhead_seconds": _delta(
+            tuned.get("system_tuning_overhead_seconds"),
+            baseline.get("system_tuning_overhead_seconds"),
+        ),
         "peak_memory_mb": _delta(tuned.get("peak_memory_mb"), baseline.get("peak_memory_mb")),
         "peak_memory_percent": _percent_delta(tuned.get("peak_memory_mb"), baseline.get("peak_memory_mb")),
         "min_available_memory_mb": _delta(
@@ -130,7 +202,92 @@ def _deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[str, Any]:
             tuned.get("peak_process_cpu_percent"),
             baseline.get("peak_process_cpu_percent"),
         ),
+        "workload": _workload_deltas(
+            baseline.get("workload", {}),
+            tuned.get("workload", {}),
+        ),
     }
+
+
+def _failed_runs(result: dict[str, Any]) -> list[dict[str, Any]]:
+    failures: list[dict[str, Any]] = []
+    comparisons = result.get("trials") if isinstance(result.get("trials"), list) else [result]
+    for index, comparison in enumerate(comparisons, start=1):
+        for label in ("baseline", "tuned"):
+            run = comparison.get(label, {})
+            if run.get("return_code") != 0 or run.get("status") != "completed":
+                failures.append(
+                    {
+                        "label": f"trial{index}.{label}" if len(comparisons) > 1 else label,
+                        "run_id": run.get("run_id"),
+                        "return_code": run.get("return_code"),
+                        "status": run.get("status"),
+                    }
+                )
+    return failures
+
+
+def _workload_deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[str, Any]:
+    keys = [
+        "duration_seconds",
+        "epoch_time_mean_seconds",
+        "step_time_mean_seconds",
+        "samples_per_second",
+        "final_accuracy",
+        "final_loss",
+        "peak_batch_payload_mb",
+    ]
+    deltas: dict[str, Any] = {}
+    for key in keys:
+        deltas[key] = {
+            "absolute": _delta(tuned.get(key), baseline.get(key)),
+            "percent": _percent_delta(tuned.get(key), baseline.get(key)),
+        }
+    return deltas
+
+
+def _aggregate_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    baseline_runs = [trial["baseline"] for trial in trials]
+    tuned_runs = [trial["tuned"] for trial in trials]
+    return {
+        "baseline": _aggregate_runs(baseline_runs),
+        "tuned": _aggregate_runs(tuned_runs),
+        "deltas": _deltas(_aggregate_runs(baseline_runs), _aggregate_runs(tuned_runs)),
+    }
+
+
+def _aggregate_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    workload = [_run.get("workload", {}) for _run in runs]
+    return {
+        "run_ids": [run.get("run_id") for run in runs],
+        "status": "completed" if all(run.get("status") == "completed" for run in runs) else "mixed",
+        "return_code": 0 if all(run.get("return_code") == 0 for run in runs) else None,
+        "duration_seconds": _median_value(runs, "duration_seconds"),
+        "lifecycle_duration_seconds": _median_value(runs, "lifecycle_duration_seconds"),
+        "workload_duration_seconds": _median_value(runs, "workload_duration_seconds"),
+        "system_tuning_overhead_seconds": _median_value(runs, "system_tuning_overhead_seconds"),
+        "peak_memory_mb": _median_value(runs, "peak_memory_mb"),
+        "min_available_memory_mb": _median_value(runs, "min_available_memory_mb"),
+        "memory_budget_exceeded": any(run.get("memory_budget_exceeded") for run in runs),
+        "peak_process_cpu_percent": _median_value(runs, "peak_process_cpu_percent"),
+        "peak_system_cpu_percent": _median_value(runs, "peak_system_cpu_percent"),
+        "workload": {
+            "duration_seconds": _median_value(workload, "duration_seconds"),
+            "epoch_time_mean_seconds": _median_value(workload, "epoch_time_mean_seconds"),
+            "step_time_mean_seconds": _median_value(workload, "step_time_mean_seconds"),
+            "samples_per_second": _median_value(workload, "samples_per_second"),
+            "final_accuracy": _median_value(workload, "final_accuracy"),
+            "final_loss": _median_value(workload, "final_loss"),
+            "peak_batch_payload_mb": _median_value(workload, "peak_batch_payload_mb"),
+        },
+    }
+
+
+def _median_value(items: list[dict[str, Any]], key: str) -> float | None:
+    values = [item.get(key) for item in items if isinstance(item.get(key), (int, float))]
+    if not values:
+        return None
+    return round(float(statistics.median(values)), 6)
 
 
 def _delta(tuned: Any, baseline: Any) -> float | None:

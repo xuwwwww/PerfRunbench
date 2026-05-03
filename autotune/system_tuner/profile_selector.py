@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 from dataclasses import dataclass
 
 from autotune.resource.budget import ResourceBudget
@@ -15,25 +16,27 @@ def select_system_profile(
     budget: ResourceBudget,
     *,
     workload_profile: str = "auto",
+    runtime_platform: str | None = None,
 ) -> ProfileSelection:
     if workload_profile not in {"auto", "training", "memory", "throughput", "low-latency"}:
         raise ValueError(f"unknown workload profile: {workload_profile}")
+    prefix = "windows" if (runtime_platform or platform.system()) == "Windows" else "linux"
     if workload_profile == "training":
-        return ProfileSelection("linux-training-safe", "workload_profile=training")
+        return ProfileSelection(f"{prefix}-training-safe", "workload_profile=training")
     if workload_profile == "memory":
-        return ProfileSelection("linux-memory-conservative", "workload_profile=memory")
+        return ProfileSelection(f"{prefix}-memory-conservative", "workload_profile=memory")
     if workload_profile == "throughput":
-        return ProfileSelection("linux-throughput", "workload_profile=throughput")
+        return ProfileSelection(f"{prefix}-throughput", "workload_profile=throughput")
     if workload_profile == "low-latency":
-        return ProfileSelection("linux-low-latency", "workload_profile=low-latency")
+        return ProfileSelection(f"{prefix}-low-latency", "workload_profile=low-latency")
     if budget.memory_budget_gb is not None or budget.reserve_memory_gb > 0:
         return ProfileSelection(
-            "linux-memory-conservative",
+            f"{prefix}-memory-conservative",
             "auto selected memory-conservative because a memory budget or memory reserve is configured",
         )
     if budget.cpu_quota_percent is not None and budget.cpu_quota_percent < 100:
         return ProfileSelection(
-            "linux-low-latency",
+            f"{prefix}-low-latency",
             "auto selected low-latency because a CPU quota is configured",
         )
-    return ProfileSelection("linux-training-safe", "auto selected general training profile")
+    return ProfileSelection(f"{prefix}-training-safe", "auto selected general training profile")

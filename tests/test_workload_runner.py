@@ -12,6 +12,7 @@ from autotune.resource.workload_runner import (
     _resolve_executor,
     _sample_systemd_scope,
     _summarize_timeline,
+    validate_workload_command,
     run_with_budget,
 )
 
@@ -30,6 +31,15 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertTrue((run_dir / "resource_timeline.json").exists())
         manifest = load_manifest(Path(run_dir))
         self.assertEqual(manifest["status"], "completed")
+
+    def test_run_with_budget_passes_run_dir_to_workload_metrics(self) -> None:
+        return_code, run_dir = run_with_budget(
+            ["python", "tests/fixtures/write_metrics_workload.py"],
+            ResourceBudget(memory_budget_gb=1),
+            sample_interval_seconds=0.05,
+        )
+        self.assertEqual(return_code, 0)
+        self.assertTrue((Path(run_dir) / "training_metrics.json").exists())
 
     def test_summary_includes_cgroup_fields_when_samples_have_them(self) -> None:
         summary = _summarize_timeline(
@@ -162,6 +172,21 @@ class WorkloadRunnerTest(unittest.TestCase):
         )
         which.assert_not_called()
 
+    def test_validate_workload_command_rejects_missing_python_script(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "workload script does not exist: train.py"):
+            validate_workload_command(["python", "train.py"])
+
+    def test_validate_workload_command_rejects_missing_config_path(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, r"--config path does not exist: configs/train.yaml"):
+            validate_workload_command(["python", "tests/fixtures/sleep_workload.py", "--config", "configs/train.yaml"])
+
+    def test_validate_workload_command_accepts_inline_python(self) -> None:
+        validate_workload_command(["python", "-c", "print('ok')"])
+
+    def test_validate_workload_command_unwraps_conda_run(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "workload script does not exist: train.py"):
+            validate_workload_command(["conda", "run", "-n", "demo", "python", "train.py"])
+
     @patch("autotune.resource.workload_runner.restore_system_tuning")
     @patch("autotune.resource.workload_runner.apply_system_tuning_to_run")
     def test_run_with_budget_applies_and_restores_system_tuning(self, apply_tuning, restore_tuning) -> None:
@@ -180,6 +205,10 @@ class WorkloadRunnerTest(unittest.TestCase):
         manifest = load_manifest(Path(run_dir))
         self.assertTrue(any("system_tuning_lifecycle_applied=True" in note for note in manifest["notes"]))
         self.assertTrue(any("system_tuning_lifecycle_restored=1" in note for note in manifest["notes"]))
+
+    def test_run_with_budget_fails_fast_for_missing_script(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "workload script does not exist: train.py"):
+            run_with_budget(["python", "train.py"], ResourceBudget())
 
 
 if __name__ == "__main__":

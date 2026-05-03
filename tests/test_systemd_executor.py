@@ -15,9 +15,11 @@ class SystemdExecutorTest(unittest.TestCase):
             ["python", "train.py"],
             ResourceBudget(memory_budget_gb=2, cpu_quota_percent=90),
             unit_name="autotuneai-test.scope",
+            environment={"AUTOTUNEAI_RUN_DIR": "/tmp/run1"},
         )
         self.assertEqual(command.command[:3], ["systemd-run", "--scope", "--quiet"])
         self.assertIn("autotuneai-test.scope", command.command)
+        self.assertIn("AUTOTUNEAI_RUN_DIR=/tmp/run1", command.command)
         self.assertIn("MemoryMax=2048M", command.command)
         self.assertIn("CPUQuota=90%", command.command)
         self.assertEqual(command.command[-2:], ["python", "train.py"])

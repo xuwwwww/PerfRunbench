@@ -35,6 +35,7 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Minimum available memory MB: {analysis['memory'].get('observed_min_available_memory_mb')}",
         f"- Workload peak memory MB: {analysis['memory'].get('peak_memory_mb')}",
         f"- Memory budget exceeded: {analysis['memory'].get('memory_budget_exceeded')}",
+        f"- Training metrics captured: {bool(analysis.get('workload'))}",
         f"- System tuning snapshots: {_system_tuning_snapshot_status(run_dir)}",
         f"- Source/config changes recorded: {_changed_file_count(run_dir)}",
         "",
@@ -70,9 +71,20 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Peak cgroup memory MB: {analysis['cgroup'].get('peak_memory_mb')}",
         f"- Peak cgroup CPU percent: {analysis['cgroup'].get('peak_cpu_percent')}",
         "",
-        "## Diagnostics",
+        "## Workload",
         "",
     ]
+    workload = analysis.get("workload", {})
+    if workload:
+        for key in sorted(workload):
+            lines.append(f"- {key}: {workload.get(key)}")
+    else:
+        lines.append("- No workload metrics captured.")
+    lines.extend([
+        "",
+        "## Diagnostics",
+        "",
+    ])
     diagnostics = analysis.get("diagnostics", [])
     if diagnostics:
         lines.extend(f"- {item}" for item in diagnostics)

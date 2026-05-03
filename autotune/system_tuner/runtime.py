@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import platform
+import re
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -195,6 +196,42 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             path="/sys/kernel/mm/transparent_hugepage/enabled",
         ),
     ],
+    "windows-training-safe": [
+        RuntimeSetting(
+            key="power.active_scheme",
+            value="SCHEME_MIN",
+            reason="Use the Windows high performance power scheme during training to reduce CPU frequency scaling noise.",
+            source="powercfg",
+            path="powercfg://active-scheme",
+        ),
+    ],
+    "windows-memory-conservative": [
+        RuntimeSetting(
+            key="power.active_scheme",
+            value="SCHEME_MIN",
+            reason="Windows does not expose Linux-style memory sysctls; keep CPU frequency stable while memory budget enforcement stays in AutoTuneAI.",
+            source="powercfg",
+            path="powercfg://active-scheme",
+        ),
+    ],
+    "windows-throughput": [
+        RuntimeSetting(
+            key="power.active_scheme",
+            value="SCHEME_MIN",
+            reason="Use the Windows high performance power scheme during throughput runs to reduce CPU downclocking.",
+            source="powercfg",
+            path="powercfg://active-scheme",
+        ),
+    ],
+    "windows-low-latency": [
+        RuntimeSetting(
+            key="power.active_scheme",
+            value="SCHEME_MIN",
+            reason="Use the Windows high performance power scheme during latency-sensitive runs to reduce frequency ramp-up delays.",
+            source="powercfg",
+            path="powercfg://active-scheme",
+        ),
+    ],
 }
 
 
@@ -204,7 +241,8 @@ def available_profiles() -> list[str]:
 
 def recommend_system_tuning(profile: str = "linux-training-safe") -> dict[str, Any]:
     settings = _profile_settings(profile)
-    supported = platform.system() == "Linux"
+    current_platform = platform.system()
+    supported = _profile_supported_on_platform(profile, current_platform)
     recommendations = []
     for setting in settings:
         snapshot = read_setting(setting)
@@ -212,7 +250,7 @@ def recommend_system_tuning(profile: str = "linux-training-safe") -> dict[str, A
             {
                 "key": setting.key,
                 "source": setting.source,
-                "path": _setting_path(setting).as_posix(),
+                "path": _setting_location(setting),
                 "current": snapshot.value,
                 "target": setting.value,
                 "exists": snapshot.exists,
@@ -223,11 +261,11 @@ def recommend_system_tuning(profile: str = "linux-training-safe") -> dict[str, A
         )
     return {
         "profile": profile,
-        "platform": platform.system(),
+        "platform": current_platform,
         "supported": supported,
         "apply_supported": supported,
         "settings": recommendations,
-        "notes": _plan_notes(supported),
+        "notes": _plan_notes(profile, current_platform, supported),
     }
 
 
@@ -238,8 +276,9 @@ def apply_system_tuning(
     runner: CommandRunner | None = None,
     runs_dir: Path = RUNS_DIR,
 ) -> tuple[Path, dict[str, Any]]:
-    if platform.system() != "Linux":
-        raise SystemTuningError("runtime system tuning is currently implemented only for Linux runtime settings.")
+    current_platform = platform.system()
+    if not _profile_supported_on_platform(profile, current_platform):
+        raise SystemTuningError(f"runtime system tuning profile {profile} is not supported on {current_platform}.")
     runner = runner or _run_command
     run_dir, manifest = create_run(["tune_system", "--profile", profile], ResourceBudget(), runs_dir=runs_dir)
     status = "completed"
@@ -266,8 +305,9 @@ def apply_system_tuning_to_run(
     use_sudo: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
-    if platform.system() != "Linux":
-        raise SystemTuningError("runtime system tuning is currently implemented only for Linux runtime settings.")
+    current_platform = platform.system()
+    if not _profile_supported_on_platform(profile, current_platform):
+        raise SystemTuningError(f"runtime system tuning profile {profile} is not supported on {current_platform}.")
     runner = runner or _run_command
     run_path = Path(run_dir)
     settings = _profile_settings(profile)
@@ -290,7 +330,7 @@ def apply_system_tuning_to_run(
                         reason=setting.reason,
                         error=(snapshot.error or "setting does not exist") if setting.require_existing else None,
                         source=setting.source,
-                        path=_setting_path(setting).as_posix(),
+                        path=_setting_location(setting),
                     )
                 )
                 continue
@@ -309,7 +349,7 @@ def apply_system_tuning_to_run(
                         reason=setting.reason,
                         error=(result.stderr or result.stdout or "").strip(),
                         source=setting.source,
-                        path=_setting_path(setting).as_posix(),
+                        path=_setting_location(setting),
                     )
                 )
                 break
@@ -324,7 +364,7 @@ def apply_system_tuning_to_run(
                     applied=True,
                     reason=setting.reason,
                     source=setting.source,
-                    path=_setting_path(setting).as_posix(),
+                    path=_setting_location(setting),
                 )
             )
     except Exception as exc:
@@ -381,6 +421,8 @@ def snapshot_settings(settings: list[RuntimeSetting]) -> dict[str, SettingSnapsh
 def read_setting(setting: RuntimeSetting | str) -> SettingSnapshot:
     if isinstance(setting, str):
         setting = RuntimeSetting(key=setting, value="")
+    if setting.source == "powercfg":
+        return _read_powercfg_active_scheme(setting)
     path = _setting_path(setting)
     if not path.exists():
         return SettingSnapshot(
@@ -423,6 +465,14 @@ def _profile_settings(profile: str) -> list[RuntimeSetting]:
         raise SystemTuningError(f"unknown system tuning profile: {profile}") from exc
 
 
+def _profile_supported_on_platform(profile: str, current_platform: str) -> bool:
+    if profile.startswith("linux-"):
+        return current_platform == "Linux"
+    if profile.startswith("windows-"):
+        return current_platform == "Windows"
+    return False
+
+
 def _sysctl_path(key: str) -> Path:
     return Path("/proc/sys") / Path(*key.split("."))
 
@@ -434,7 +484,15 @@ def _setting_path(setting: RuntimeSetting) -> Path:
         if not setting.path:
             raise SystemTuningError(f"file setting {setting.key} is missing a path")
         return Path(setting.path)
+    if setting.source == "powercfg":
+        raise SystemTuningError("powercfg settings do not map to filesystem paths")
     raise SystemTuningError(f"unsupported runtime setting source: {setting.source}")
+
+
+def _setting_location(setting: RuntimeSetting) -> str:
+    if setting.source == "powercfg":
+        return setting.path or "powercfg://active-scheme"
+    return _setting_path(setting).as_posix()
 
 
 def _write_command(setting: RuntimeSetting, value: str, *, use_sudo: bool) -> list[str]:
@@ -449,6 +507,8 @@ def _write_command(setting: RuntimeSetting, value: str, *, use_sudo: bool) -> li
         if use_sudo:
             return ["sudo", *command]
         return command
+    if setting.source == "powercfg":
+        return ["powercfg", "/setactive", value]
     raise SystemTuningError(f"unsupported runtime setting source: {setting.source}")
 
 
@@ -473,6 +533,47 @@ def _run_command(command: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
+def _read_powercfg_active_scheme(setting: RuntimeSetting) -> SettingSnapshot:
+    try:
+        result = _run_command(["powercfg", "/getactivescheme"])
+    except (FileNotFoundError, OSError) as exc:
+        return SettingSnapshot(
+            key=setting.key,
+            value=None,
+            exists=False,
+            error=str(exc),
+            source=setting.source,
+            path=_setting_location(setting),
+        )
+    output = f"{result.stdout}\n{result.stderr}".strip()
+    if result.returncode != 0:
+        return SettingSnapshot(
+            key=setting.key,
+            value=None,
+            exists=False,
+            error=output,
+            source=setting.source,
+            path=_setting_location(setting),
+        )
+    match = re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", output)
+    if not match:
+        return SettingSnapshot(
+            key=setting.key,
+            value=None,
+            exists=False,
+            error=f"could not parse active power scheme from powercfg output: {output}",
+            source=setting.source,
+            path=_setting_location(setting),
+        )
+    return SettingSnapshot(
+        key=setting.key,
+        value=match.group(0),
+        exists=True,
+        source=setting.source,
+        path=_setting_location(setting),
+    )
+
+
 def _snapshots_to_records(snapshots: dict[str, SettingSnapshot]) -> list[dict[str, Any]]:
     return [asdict(snapshot) for snapshot in snapshots.values()]
 
@@ -481,9 +582,15 @@ def _change_to_record(change: SettingChange) -> dict[str, Any]:
     return asdict(change)
 
 
-def _plan_notes(supported: bool) -> list[str]:
+def _plan_notes(profile: str, current_platform: str, supported: bool) -> list[str]:
     if not supported:
-        return ["Runtime sysctl tuning is Linux-only; no system settings will be applied on this platform."]
+        return [f"Profile {profile} is not supported on {current_platform}; no system settings will be applied."]
+    if profile.startswith("windows-"):
+        return [
+            "Only reversible Windows runtime settings from an allowlist are considered.",
+            "The active power scheme is snapshotted before tuning and restored after the run.",
+            "Persistent registry settings are not modified.",
+        ]
     return [
         "Only runtime sysctl/sysfs values from an allowlist are considered.",
         "Persistent files such as /etc/sysctl.conf are not modified.",
