@@ -66,7 +66,10 @@ def train_softmax_classifier(
     feature_multiplier = int(config.get("feature_multiplier", 1))
     cpu_burn_per_batch = int(config.get("cpu_burn_per_batch", 0))
     memory_padding_mb = int(config.get("memory_padding_mb", 0))
+    memory_target_mb = int(config.get("memory_target_mb", 0))
     preload_copies = int(config.get("preload_copies", 1))
+    min_duration_seconds = float(config.get("min_duration_seconds", 0.0))
+    max_duration_seconds = float(config.get("max_duration_seconds", 0.0))
 
     expanded_train = [
         (expand_features(features, feature_multiplier), label)
@@ -80,6 +83,7 @@ def train_softmax_classifier(
     weights = [[0.0 for _ in range(feature_count)] for _ in range(classes)]
     bias = [0.0 for _ in range(classes)]
     padding = [0] * max(0, memory_padding_mb * 256 * 1024)
+    memory_target = bytearray(max(0, memory_target_mb * 1024 * 1024))
     _ = cached_train_views[0][0]
     batch_payload_values: list[float] = []
     epoch_times: list[float] = []
@@ -87,9 +91,15 @@ def train_softmax_classifier(
     loss_history: list[float] = []
     optimizer_steps = 0
     total_samples = 0
+    completed_epochs = 0
 
     overall_start = time.perf_counter()
-    for _epoch in range(epochs):
+    while True:
+        elapsed = time.perf_counter() - overall_start
+        if completed_epochs >= epochs and elapsed >= min_duration_seconds:
+            break
+        if max_duration_seconds > 0 and elapsed >= max_duration_seconds:
+            break
         epoch_start = time.perf_counter()
         grad_w = [[0.0 for _ in range(feature_count)] for _ in range(classes)]
         grad_b = [0.0 for _ in range(classes)]
@@ -125,6 +135,7 @@ def train_softmax_classifier(
             if cpu_burn_per_batch > 0:
                 burn_cpu(cpu_burn_per_batch, feature_count)
             _ = padding[:1]
+            _ = memory_target[:1]
             step_times.append(time.perf_counter() - batch_start)
         if accumulation:
             scale = learning_rate / max(1, batch_size * accumulation)
@@ -134,6 +145,7 @@ def train_softmax_classifier(
                     weights[class_index][feature_index] -= scale * grad_w[class_index][feature_index]
             optimizer_steps += 1
         epoch_times.append(time.perf_counter() - epoch_start)
+        completed_epochs += 1
 
     duration_seconds = time.perf_counter() - overall_start
     accuracy = evaluate_accuracy(expanded_test, weights, bias)
@@ -146,6 +158,7 @@ def train_softmax_classifier(
         "final_accuracy": round(accuracy, 4),
         "final_loss": round(loss_history[-1] if loss_history else 0.0, 6),
         "optimizer_steps": optimizer_steps,
+        "completed_epochs": completed_epochs,
         "feature_count": feature_count,
         "train_samples": len(expanded_train),
         "test_samples": len(expanded_test),
@@ -158,6 +171,9 @@ def train_softmax_classifier(
             "feature_multiplier": feature_multiplier,
             "cpu_burn_per_batch": cpu_burn_per_batch,
             "memory_padding_mb": memory_padding_mb,
+            "memory_target_mb": memory_target_mb,
+            "min_duration_seconds": min_duration_seconds,
+            "max_duration_seconds": max_duration_seconds,
             "preload_copies": preload_copies,
         },
     }

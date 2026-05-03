@@ -54,7 +54,7 @@ autotuneai compare-tuning \
   --system-tuning-sudo \
   --memory-budget-gb -3 \
   --repeat 3 \
-  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
+  -- python examples/stress_train.py --config examples/stress_train_60s_config.yaml
 ```
 
 In WSL or non-interactive shells, prefer the explicit conda path:
@@ -128,6 +128,9 @@ linux-throughput
 linux-low-latency
   Lower dirty-page and THP settings for smoother latency.
 
+linux-cpu-conservative
+  CPU quota / reserved-core profile that reduces kernel background flush bursts.
+
 windows-training-safe
   General Windows training profile using a temporary high performance power scheme.
 
@@ -139,6 +142,9 @@ windows-throughput
 
 windows-low-latency
   Latency-oriented Windows profile using a temporary high performance power scheme.
+
+windows-cpu-conservative
+  CPU/thermal conservative Windows profile using a temporary balanced power scheme.
 ```
 
 Resource guard smoke test with CPU and memory load:
@@ -266,8 +272,10 @@ autotuneai compare-tuning `
   --executor local `
   --sample-interval-seconds 0.1 `
   --repeat 3 `
-  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
+  -- python examples/stress_train.py --config examples/stress_train_60s_config.yaml
 ```
+
+For memory-pressure comparisons, use `examples/stress_train_memory_pressure_config.yaml` with a negative memory budget such as `--memory-budget-gb -3`. Comparison reports use `benchmark_duration_seconds`, which subtracts runtime tuning apply/restore time; workload quality metrics such as accuracy/loss/dice are intentionally excluded from `tuning_comparison.json`.
 
 NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:
 

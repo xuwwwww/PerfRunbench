@@ -435,6 +435,9 @@ linux-low-latency
   想降低 flush/THP latency spike 時使用。
   包含較低 dirty ratio、較頻繁 writeback、THP never。
 
+linux-cpu-conservative
+  CPU quota 或 reserve cores 場景使用，減少 kernel 背景 flush 對 workload CPU 的干擾。
+
 windows-training-safe
   Windows 一般訓練 profile，暫時切到 High performance power scheme，結束後還原。
 
@@ -446,6 +449,9 @@ windows-throughput
 
 windows-low-latency
   Windows latency profile，降低 CPU frequency ramp-up 延遲。
+
+windows-cpu-conservative
+  Windows CPU/thermal 保守 profile，暫時切到 Balanced power scheme。
 ```
 
 自動選擇規則：
@@ -458,6 +464,10 @@ windows-low-latency
 --auto-tune-system + 沒有 memory budget
   -> Linux/WSL: linux-training-safe
   -> Windows: windows-training-safe
+
+--auto-tune-system + 有 cpu quota / reserve cores
+  -> Linux/WSL: linux-cpu-conservative
+  -> Windows: windows-cpu-conservative
 ```
 
 手動指定更激進的 profile：
@@ -490,7 +500,7 @@ autotuneai compare-tuning \
   -- python examples/dummy_train.py
 ```
 
-要看 system tuning 是否真的對訓練有效，不建議用太短的 dummy workload。請優先用較長的 stress workload：
+要看 system tuning 是否真的對訓練有效，不建議用太短的 dummy workload。正式 benchmark 請用至少 60 秒的 stress workload：
 
 ```bash
 sudo -v
@@ -502,7 +512,22 @@ autotuneai compare-tuning \
   --memory-budget-gb -3 \
   --sample-interval-seconds 0.1 \
   --repeat 3 \
-  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
+  -- python examples/stress_train.py --config examples/stress_train_60s_config.yaml
+```
+
+如果要測 memory pressure，用較接近滿載的設定，並搭配 `--memory-budget-gb -3` 或更保守的 reserve：
+
+```bash
+sudo -v
+autotuneai compare-tuning \
+  --workload-profile memory \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --memory-budget-gb -3 \
+  --sample-interval-seconds 0.1 \
+  --repeat 3 \
+  -- python examples/stress_train.py --config examples/stress_train_memory_pressure_config.yaml
 ```
 
 Windows 上不使用 `systemd` / `sudo`，直接用 local executor；tuned run 會套用 Windows profile，結束後還原 power scheme：
@@ -513,7 +538,7 @@ autotuneai compare-tuning `
   --executor local `
   --sample-interval-seconds 0.1 `
   --repeat 3 `
-  -- python examples/stress_train.py --config examples/stress_train_long_config.yaml
+  -- python examples/stress_train.py --config examples/stress_train_60s_config.yaml
 ```
 
 這會先跑 baseline，再跑 tuned，最後輸出：
@@ -529,11 +554,14 @@ baseline.run_id
 tuned.run_id
 deltas.lifecycle_duration_seconds
 deltas.lifecycle_duration_percent
+deltas.adjusted_lifecycle_duration_seconds
+deltas.adjusted_lifecycle_duration_percent
+deltas.benchmark_duration_seconds
+deltas.benchmark_duration_percent
 deltas.workload_duration_seconds
 deltas.workload_duration_percent
 deltas.system_tuning_overhead_seconds
 deltas.workload.samples_per_second.percent
-deltas.workload.final_accuracy.absolute
 deltas.peak_memory_mb
 deltas.peak_memory_percent
 deltas.min_available_memory_mb
@@ -542,9 +570,12 @@ deltas.min_available_memory_mb
 判讀時要分清楚：
 
 - `lifecycle_duration_*` 是整段 AutoTuneAI run 時間，包含 system tuning apply/restore。
-- `workload_duration_*` 是 workload 自己寫出的訓練時間，較適合判斷訓練 loop 是否變快。
-- `system_tuning_overhead_seconds` 是 lifecycle 扣掉 workload 後的額外成本。
+- `system_tuning_overhead_seconds` 是 system tuning apply + restore 的成本。
+- `adjusted_lifecycle_duration_*` 是 `lifecycle_duration_*` 扣掉 system tuning apply/restore 後的時間，適合沒有 workload metrics 的通用 command。
+- `workload_duration_*` 是 workload 自己寫出的訓練時間，若有提供會優先作為 benchmark duration。
+- `benchmark_duration_*` 是公平比較用時間；有 workload metrics 時等於 workload duration，否則等於 adjusted lifecycle duration。
 - `deltas.workload.samples_per_second.percent` 是訓練吞吐變化，正值代表 tuned workload 更快。
+- `workload` 區塊只保留 performance metrics；不輸出 accuracy、loss、dice 這類任務品質指標，避免把 tuning comparison 綁死在分類任務。
 - `peak_memory_percent` 負值代表 tuned run peak memory 更低。
 
 短 workload 很容易被 system tuning apply/restore overhead 或排程雜訊蓋掉，所以正式比較請用 `--repeat 3` 以上，並看 aggregate median。

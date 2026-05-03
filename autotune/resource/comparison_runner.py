@@ -122,22 +122,30 @@ def _run_metrics(run_id: str, runs_dir: Path) -> dict[str, Any]:
     run_dir = runs_dir / run_id
     manifest = load_manifest(run_dir)
     analysis = analyze_run(run_id, runs_dir)
+    lifecycle_duration = _duration_seconds(manifest)
+    workload = _workload_performance_metrics(analysis.get("workload", {}))
+    workload_duration = _workload_duration_seconds(workload)
+    system_tuning_overhead = _system_tuning_overhead_seconds(analysis.get("system_tuning", {}))
+    adjusted_duration = _adjusted_duration_seconds(lifecycle_duration, system_tuning_overhead)
+    benchmark_duration = workload_duration if workload_duration is not None else adjusted_duration
     return {
         "run_id": run_id,
         "run_dir": str(run_dir),
         "status": manifest.get("status"),
         "return_code": manifest.get("return_code"),
-        "duration_seconds": _duration_seconds(manifest),
-        "lifecycle_duration_seconds": _duration_seconds(manifest),
-        "workload_duration_seconds": _workload_duration_seconds(analysis.get("workload", {})),
-        "system_tuning_overhead_seconds": _system_tuning_overhead_seconds(manifest, analysis.get("workload", {})),
+        "duration_seconds": benchmark_duration,
+        "benchmark_duration_seconds": benchmark_duration,
+        "lifecycle_duration_seconds": lifecycle_duration,
+        "adjusted_lifecycle_duration_seconds": adjusted_duration,
+        "workload_duration_seconds": workload_duration,
+        "system_tuning_overhead_seconds": system_tuning_overhead,
         "peak_memory_mb": analysis["memory"].get("peak_memory_mb"),
         "min_available_memory_mb": analysis["memory"].get("observed_min_available_memory_mb"),
         "memory_budget_exceeded": analysis["memory"].get("memory_budget_exceeded"),
         "peak_process_cpu_percent": analysis["cpu"].get("observed_peak_process_cpu_percent"),
         "peak_system_cpu_percent": analysis["cpu"].get("observed_peak_system_cpu_percent"),
         "system_tuning": analysis.get("system_tuning", {}),
-        "workload": analysis.get("workload", {}),
+        "workload": workload,
         "diagnostics": analysis.get("diagnostics", []),
     }
 
@@ -160,18 +168,34 @@ def _workload_duration_seconds(workload: dict[str, Any]) -> float | None:
     return round(value, 6) if isinstance(value, (int, float)) else None
 
 
-def _system_tuning_overhead_seconds(manifest: dict[str, Any], workload: dict[str, Any]) -> float | None:
-    lifecycle = _duration_seconds(manifest)
-    workload_duration = _workload_duration_seconds(workload)
-    if lifecycle is None or workload_duration is None:
+def _system_tuning_overhead_seconds(system_tuning: dict[str, Any]) -> float:
+    apply_seconds = system_tuning.get("apply_seconds")
+    restore_seconds = system_tuning.get("restore_seconds")
+    return round(
+        sum(value for value in [apply_seconds, restore_seconds] if isinstance(value, (int, float))),
+        6,
+    )
+
+
+def _adjusted_duration_seconds(lifecycle_duration: float | None, system_tuning_overhead: float | None) -> float | None:
+    if lifecycle_duration is None:
         return None
-    return round(max(0.0, lifecycle - workload_duration), 6)
+    overhead = system_tuning_overhead if isinstance(system_tuning_overhead, (int, float)) else 0.0
+    return round(max(0.0, lifecycle_duration - overhead), 6)
 
 
 def _deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[str, Any]:
     return {
         "duration_seconds": _delta(tuned.get("duration_seconds"), baseline.get("duration_seconds")),
         "duration_percent": _percent_delta(tuned.get("duration_seconds"), baseline.get("duration_seconds")),
+        "benchmark_duration_seconds": _delta(
+            tuned.get("benchmark_duration_seconds"),
+            baseline.get("benchmark_duration_seconds"),
+        ),
+        "benchmark_duration_percent": _percent_delta(
+            tuned.get("benchmark_duration_seconds"),
+            baseline.get("benchmark_duration_seconds"),
+        ),
         "lifecycle_duration_seconds": _delta(
             tuned.get("lifecycle_duration_seconds"),
             baseline.get("lifecycle_duration_seconds"),
@@ -191,6 +215,14 @@ def _deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[str, Any]:
         "system_tuning_overhead_seconds": _delta(
             tuned.get("system_tuning_overhead_seconds"),
             baseline.get("system_tuning_overhead_seconds"),
+        ),
+        "adjusted_lifecycle_duration_seconds": _delta(
+            tuned.get("adjusted_lifecycle_duration_seconds"),
+            baseline.get("adjusted_lifecycle_duration_seconds"),
+        ),
+        "adjusted_lifecycle_duration_percent": _percent_delta(
+            tuned.get("adjusted_lifecycle_duration_seconds"),
+            baseline.get("adjusted_lifecycle_duration_seconds"),
         ),
         "peak_memory_mb": _delta(tuned.get("peak_memory_mb"), baseline.get("peak_memory_mb")),
         "peak_memory_percent": _percent_delta(tuned.get("peak_memory_mb"), baseline.get("peak_memory_mb")),
@@ -231,11 +263,14 @@ def _workload_deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[st
     keys = [
         "duration_seconds",
         "epoch_time_mean_seconds",
+        "epoch_time_max_seconds",
         "step_time_mean_seconds",
         "samples_per_second",
-        "final_accuracy",
-        "final_loss",
         "peak_batch_payload_mb",
+        "optimizer_steps",
+        "completed_epochs",
+        "feature_count",
+        "train_samples",
     ]
     deltas: dict[str, Any] = {}
     for key in keys:
@@ -244,6 +279,25 @@ def _workload_deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[st
             "percent": _percent_delta(tuned.get(key), baseline.get(key)),
         }
     return deltas
+
+
+def _workload_performance_metrics(workload: dict[str, Any]) -> dict[str, Any]:
+    allowed = [
+        "duration_seconds",
+        "epoch_time_mean_seconds",
+        "epoch_time_max_seconds",
+        "step_time_mean_seconds",
+        "samples_per_second",
+        "peak_batch_payload_mb",
+        "optimizer_steps",
+        "completed_epochs",
+        "feature_count",
+        "train_samples",
+        "cache_copies",
+        "config_path",
+        "dataset",
+    ]
+    return {key: workload[key] for key in allowed if key in workload}
 
 
 def _aggregate_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
@@ -263,7 +317,9 @@ def _aggregate_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
         "status": "completed" if all(run.get("status") == "completed" for run in runs) else "mixed",
         "return_code": 0 if all(run.get("return_code") == 0 for run in runs) else None,
         "duration_seconds": _median_value(runs, "duration_seconds"),
+        "benchmark_duration_seconds": _median_value(runs, "benchmark_duration_seconds"),
         "lifecycle_duration_seconds": _median_value(runs, "lifecycle_duration_seconds"),
+        "adjusted_lifecycle_duration_seconds": _median_value(runs, "adjusted_lifecycle_duration_seconds"),
         "workload_duration_seconds": _median_value(runs, "workload_duration_seconds"),
         "system_tuning_overhead_seconds": _median_value(runs, "system_tuning_overhead_seconds"),
         "peak_memory_mb": _median_value(runs, "peak_memory_mb"),
@@ -274,11 +330,14 @@ def _aggregate_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
         "workload": {
             "duration_seconds": _median_value(workload, "duration_seconds"),
             "epoch_time_mean_seconds": _median_value(workload, "epoch_time_mean_seconds"),
+            "epoch_time_max_seconds": _median_value(workload, "epoch_time_max_seconds"),
             "step_time_mean_seconds": _median_value(workload, "step_time_mean_seconds"),
             "samples_per_second": _median_value(workload, "samples_per_second"),
-            "final_accuracy": _median_value(workload, "final_accuracy"),
-            "final_loss": _median_value(workload, "final_loss"),
             "peak_batch_payload_mb": _median_value(workload, "peak_batch_payload_mb"),
+            "optimizer_steps": _median_value(workload, "optimizer_steps"),
+            "completed_epochs": _median_value(workload, "completed_epochs"),
+            "feature_count": _median_value(workload, "feature_count"),
+            "train_samples": _median_value(workload, "train_samples"),
         },
     }
 

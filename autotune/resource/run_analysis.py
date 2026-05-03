@@ -230,6 +230,8 @@ def _analyze_system_tuning(run_dir: Path, notes: list[str]) -> dict[str, Any]:
         "applied_settings": len(applied),
         "restored_settings": len(restored),
         "failed_settings": len(failed),
+        "apply_seconds": _to_float(_note_value(notes, "system_tuning_apply_seconds=")),
+        "restore_seconds": _to_float(_note_value(notes, "system_tuning_restore_seconds=")),
         "diagnostics": diagnostics,
     }
 
@@ -301,6 +303,17 @@ def _to_int(value: Any) -> int | None:
     if isinstance(value, str):
         try:
             return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _to_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
         except ValueError:
             return None
     return None

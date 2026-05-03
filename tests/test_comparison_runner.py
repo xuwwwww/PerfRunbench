@@ -21,11 +21,45 @@ class ComparisonRunnerTest(unittest.TestCase):
 
         self.assertEqual(result["deltas"]["duration_seconds"], -2.0)
         self.assertEqual(result["deltas"]["duration_percent"], -20.0)
+        self.assertEqual(result["deltas"]["benchmark_duration_seconds"], -2.0)
         self.assertEqual(result["deltas"]["workload_duration_seconds"], -2.0)
         self.assertEqual(result["baseline"]["system_tuning_overhead_seconds"], 0.0)
         self.assertEqual(result["deltas"]["peak_memory_mb"], -20)
-        self.assertEqual(result["deltas"]["workload"]["final_accuracy"]["absolute"], 0.0)
+        self.assertNotIn("final_accuracy", result["baseline"]["workload"])
+        self.assertNotIn("final_accuracy", result["deltas"]["workload"])
         self.assertEqual(result["tuned_profile"], "linux-throughput")
+
+    def test_build_comparison_result_subtracts_system_tuning_apply_restore_time(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runs_dir = Path(temp_dir)
+            self._write_run(
+                runs_dir,
+                "baseline",
+                peak=100,
+                started="2026-05-02T10:00:00",
+                finished="2026-05-02T10:00:10",
+                workload_metrics=False,
+            )
+            self._write_run(
+                runs_dir,
+                "tuned",
+                peak=80,
+                started="2026-05-02T10:01:00",
+                finished="2026-05-02T10:01:13",
+                notes=[
+                    "selected_executor=local",
+                    "system_tuning_apply_seconds=2.5",
+                    "system_tuning_restore_seconds=1.5",
+                ],
+                workload_metrics=False,
+            )
+
+            result = build_comparison_result("baseline", "tuned", tuned_profile="linux-throughput", runs_dir=runs_dir)
+
+        self.assertEqual(result["tuned"]["lifecycle_duration_seconds"], 13.0)
+        self.assertEqual(result["tuned"]["adjusted_lifecycle_duration_seconds"], 9.0)
+        self.assertEqual(result["tuned"]["benchmark_duration_seconds"], 9.0)
+        self.assertEqual(result["deltas"]["benchmark_duration_seconds"], -1.0)
 
     def test_compare_tuning_raises_when_workload_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -133,6 +167,8 @@ class ComparisonRunnerTest(unittest.TestCase):
         finished: str,
         status: str = "completed",
         return_code: int = 0,
+        notes: list[str] | None = None,
+        workload_metrics: bool = True,
     ) -> None:
         run_dir = runs_dir / run_id
         run_dir.mkdir()
@@ -146,23 +182,24 @@ class ComparisonRunnerTest(unittest.TestCase):
                 "finished_at": finished,
                 "command": ["python", "train.py"],
                 "budget": {},
-                "notes": ["selected_executor=local"],
+                "notes": notes or ["selected_executor=local"],
             },
         )
         write_json(run_dir / "resource_summary.json", {"peak_rss_mb": peak, "memory_budget_exceeded": False})
         write_json(run_dir / "resource_timeline.json", [{"available_memory_mb": 1000, "system_cpu_percent": 10}])
-        write_json(
-            run_dir / "training_metrics.json",
-            {
-                "duration_seconds": 10 if run_id == "baseline" else 8,
-                "epoch_time_mean_seconds": 2.0 if run_id == "baseline" else 1.5,
-                "step_time_mean_seconds": 0.5 if run_id == "baseline" else 0.4,
-                "samples_per_second": 100.0 if run_id == "baseline" else 125.0,
-                "final_accuracy": 0.9,
-                "final_loss": 0.2 if run_id == "baseline" else 0.18,
-                "peak_batch_payload_mb": 3.0 if run_id == "baseline" else 2.5,
-            },
-        )
+        if workload_metrics:
+            write_json(
+                run_dir / "training_metrics.json",
+                {
+                    "duration_seconds": 10 if run_id == "baseline" else 8,
+                    "epoch_time_mean_seconds": 2.0 if run_id == "baseline" else 1.5,
+                    "step_time_mean_seconds": 0.5 if run_id == "baseline" else 0.4,
+                    "samples_per_second": 100.0 if run_id == "baseline" else 125.0,
+                    "final_accuracy": 0.9,
+                    "final_loss": 0.2 if run_id == "baseline" else 0.18,
+                    "peak_batch_payload_mb": 3.0 if run_id == "baseline" else 2.5,
+                },
+            )
 
 
 if __name__ == "__main__":

@@ -196,6 +196,31 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             path="/sys/kernel/mm/transparent_hugepage/enabled",
         ),
     ],
+    "linux-cpu-conservative": [
+        RuntimeSetting(
+            key="vm.swappiness",
+            value="10",
+            reason="Keep memory behavior predictable while CPU limits are enforced by the selected executor.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_background_ratio",
+            value="5",
+            reason="Start writeback earlier to reduce CPU bursts from large dirty-page flushes.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_ratio",
+            value="15",
+            reason="Limit dirty page accumulation so background kernel work does not compete heavily with the workload.",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.enabled",
+            value="madvise",
+            reason="Avoid forcing transparent huge pages globally while allowing runtimes to opt in.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/enabled",
+        ),
+    ],
     "windows-training-safe": [
         RuntimeSetting(
             key="power.active_scheme",
@@ -228,6 +253,15 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             key="power.active_scheme",
             value="SCHEME_MIN",
             reason="Use the Windows high performance power scheme during latency-sensitive runs to reduce frequency ramp-up delays.",
+            source="powercfg",
+            path="powercfg://active-scheme",
+        ),
+    ],
+    "windows-cpu-conservative": [
+        RuntimeSetting(
+            key="power.active_scheme",
+            value="SCHEME_BALANCED",
+            reason="Use the Windows balanced power scheme when conserving CPU/thermals is preferred over maximum throughput.",
             source="powercfg",
             path="powercfg://active-scheme",
         ),

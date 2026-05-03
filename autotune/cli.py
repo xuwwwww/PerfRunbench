@@ -34,6 +34,7 @@ from autotune.training_tuner.multi_knob import parse_knob_specs, tune_training_k
 
 DEMO_WORKLOAD = ["python", "examples/dummy_train.py"]
 DEMO_CONFIG = "examples/train_config.yaml"
+WORKLOAD_PROFILE_CHOICES = ["auto", "training", "memory", "throughput", "low-latency", "cpu-conservative"]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -75,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep runtime system tuning after the workload instead of restoring the before snapshot.",
     )
     run.add_argument("--system-tuning-sudo", action="store_true", help="Use sudo for runtime sysctl tuning writes.")
-    run.add_argument("--workload-profile", choices=["auto", "training", "memory", "throughput", "low-latency"], default="auto")
+    run.add_argument("--workload-profile", choices=WORKLOAD_PROFILE_CHOICES, default="auto")
     run.add_argument("--tune-gpu", choices=available_nvidia_profiles(), help="Apply an NVIDIA runtime tuning profile first.")
     run.add_argument("--auto-tune-gpu", action="store_true", help="Apply the default NVIDIA throughput runtime profile when nvidia-smi is available.")
     run.add_argument("--gpu-tuning-sudo", action="store_true", help="Use sudo for NVIDIA runtime tuning writes.")
@@ -106,7 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
     compare = subparsers.add_parser("compare-tuning", help="Run baseline and tuned workloads and compare metrics.")
     _add_budget_args(compare)
     compare.add_argument("--profile", choices=available_profiles(), default=None)
-    compare.add_argument("--workload-profile", choices=["auto", "training", "memory", "throughput", "low-latency"], default="auto")
+    compare.add_argument("--workload-profile", choices=WORKLOAD_PROFILE_CHOICES, default="auto")
     compare.add_argument("--system-tuning-sudo", action="store_true")
     compare.add_argument("--repeat", type=int, default=1, help="Run baseline/tuned pairs multiple times and report medians.")
     compare.add_argument("--output", default="results/reports/tuning_comparison.json")
@@ -127,7 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["run", "tune-batch", "compare-tuning", "all"],
         default="run",
     )
-    demo.add_argument("--workload-profile", choices=["auto", "training", "memory", "throughput", "low-latency"], default="auto")
+    demo.add_argument("--workload-profile", choices=WORKLOAD_PROFILE_CHOICES, default="auto")
     demo.add_argument("--system-tuning-sudo", action="store_true")
     demo.add_argument("--batch-values", nargs="+", type=int, default=[128, 64, 32])
     demo.add_argument("--output-dir", default="results/reports")

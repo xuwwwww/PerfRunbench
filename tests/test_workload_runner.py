@@ -205,6 +205,8 @@ class WorkloadRunnerTest(unittest.TestCase):
         manifest = load_manifest(Path(run_dir))
         self.assertTrue(any("system_tuning_lifecycle_applied=True" in note for note in manifest["notes"]))
         self.assertTrue(any("system_tuning_lifecycle_restored=1" in note for note in manifest["notes"]))
+        self.assertTrue(any(note.startswith("system_tuning_apply_seconds=") for note in manifest["notes"]))
+        self.assertTrue(any(note.startswith("system_tuning_restore_seconds=") for note in manifest["notes"]))
 
     def test_run_with_budget_fails_fast_for_missing_script(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "workload script does not exist: train.py"):

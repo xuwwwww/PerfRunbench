@@ -73,14 +73,17 @@ def run_with_budget(
     gpu_tuning_applied = False
     try:
         if tune_system_profile:
+            start = time.perf_counter()
             result = apply_system_tuning_to_run(
                 run_dir,
                 manifest,
                 tune_system_profile,
                 use_sudo=system_tuning_sudo,
             )
+            apply_seconds = time.perf_counter() - start
             system_tuning_applied = any(change.get("applied") for change in result.get("changes", []))
             manifest.notes.append(f"system_tuning_lifecycle_applied={system_tuning_applied}")
+            manifest.notes.append(f"system_tuning_apply_seconds={apply_seconds:.6f}")
         if tune_gpu_profile:
             result = apply_nvidia_tuning_to_run(
                 run_dir,
@@ -156,8 +159,11 @@ def run_with_budget(
         return_code = 130
     finally:
         if tune_system_profile and restore_system_after:
+            start = time.perf_counter()
             restored = restore_system_tuning(run_dir, use_sudo=system_tuning_sudo)
+            restore_seconds = time.perf_counter() - start
             manifest.notes.append(f"system_tuning_lifecycle_restored={len(restored)}")
+            manifest.notes.append(f"system_tuning_restore_seconds={restore_seconds:.6f}")
         if tune_gpu_profile and restore_gpu_after:
             restored = restore_nvidia_tuning(run_dir, use_sudo=gpu_tuning_sudo)
             manifest.notes.append(f"gpu_tuning_lifecycle_restored={len(restored)}")

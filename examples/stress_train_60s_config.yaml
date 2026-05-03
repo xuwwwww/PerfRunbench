@@ -1,0 +1,12 @@
+batch_size: 32
+dataloader_workers: 4
+gradient_accumulation_steps: 2
+epochs: 180
+learning_rate: 0.05
+feature_multiplier: 96
+cpu_burn_per_batch: 45000
+memory_padding_mb: 512
+memory_target_mb: 1024
+preload_copies: 128
+min_duration_seconds: 60
+max_duration_seconds: 75
