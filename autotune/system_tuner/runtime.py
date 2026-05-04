@@ -161,6 +161,59 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             path="/sys/kernel/mm/transparent_hugepage/enabled",
         ),
     ],
+    "linux-performance": [
+        RuntimeSetting(
+            key="vm.swappiness",
+            value="1",
+            reason="Keep anonymous training memory resident as aggressively as possible during throughput-first runs.",
+        ),
+        RuntimeSetting(
+            key="vm.vfs_cache_pressure",
+            value="20",
+            reason="Retain dataset and metadata cache aggressively when chasing raw throughput.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_background_ratio",
+            value="15",
+            reason="Delay background writeback so checkpoint-heavy runs can batch IO more aggressively.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_ratio",
+            value="40",
+            reason="Allow large dirty-page bursts when maximum throughput matters more than steady-state latency.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_expire_centisecs",
+            value="3000",
+            reason="Let dirty data live longer so the kernel can coalesce writes more aggressively.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_writeback_centisecs",
+            value="1500",
+            reason="Reduce periodic writeback frequency to favor compute-heavy foreground work.",
+        ),
+        RuntimeSetting(
+            key="kernel.numa_balancing",
+            value="0",
+            reason="Avoid NUMA migration noise while the workload is pushing for stable high throughput.",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.enabled",
+            value="always",
+            reason="Force transparent huge pages for large linear allocations during throughput-first runs.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/enabled",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.defrag",
+            value="always",
+            reason="Allow aggressive huge-page defragmentation when absolute throughput is preferred over latency stability.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/defrag",
+        ),
+    ],
     "linux-low-latency": [
         RuntimeSetting(
             key="vm.swappiness",
@@ -244,6 +297,15 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             key="power.active_scheme",
             value="SCHEME_MIN",
             reason="Use the Windows high performance power scheme during throughput runs to reduce CPU downclocking.",
+            source="powercfg",
+            path="powercfg://active-scheme",
+        ),
+    ],
+    "windows-performance": [
+        RuntimeSetting(
+            key="power.active_scheme",
+            value="SCHEME_MIN",
+            reason="Use the Windows high performance power scheme for the most aggressive throughput-first mode AutoTuneAI can restore safely.",
             source="powercfg",
             path="powercfg://active-scheme",
         ),

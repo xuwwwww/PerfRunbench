@@ -35,7 +35,7 @@ from autotune.training_tuner.multi_knob import parse_knob_specs, tune_training_k
 
 DEMO_WORKLOAD = ["python", "examples/dummy_train.py"]
 DEMO_CONFIG = "examples/train_config.yaml"
-WORKLOAD_PROFILE_CHOICES = ["auto", "training", "memory", "throughput", "low-latency", "cpu-conservative"]
+WORKLOAD_PROFILE_CHOICES = ["auto", "training", "memory", "throughput", "performance", "low-latency", "cpu-conservative"]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--output")
     report.set_defaults(handler=_cmd_report)
 
-    report_comparison = subparsers.add_parser("report-comparison", help="Generate a visual Markdown report for a tuning comparison JSON.")
+    report_comparison = subparsers.add_parser("report-comparison", help="Generate a visual Markdown/HTML report for a comparison JSON.")
     report_comparison.add_argument("--input", default="results/reports/tuning_comparison.json")
     report_comparison.add_argument("--output")
     report_comparison.set_defaults(handler=_cmd_report_comparison)
@@ -280,6 +280,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
     print(f"Run directory: {run_dir}")
+    html_path = _auto_run_report_html(run_dir)
+    print(f"HTML report: {html_path}")
     return return_code
 
 
@@ -354,6 +356,8 @@ def _cmd_compare_tuning(args: argparse.Namespace) -> int:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote tuning comparison to {args.output}")
+    html_path = _auto_comparison_report_html(args.output)
+    print(f"HTML report: {html_path}")
     return 0
 
 
@@ -381,6 +385,8 @@ def _cmd_compare_profiles(args: argparse.Namespace) -> int:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote profile comparison summary to {args.output}")
+    html_paths = _auto_profile_comparison_reports(result, args.output)
+    print(f"HTML summary: {html_paths['summary']}")
     return 0
 
 
@@ -411,6 +417,8 @@ def _cmd_compare_budgets(args: argparse.Namespace) -> int:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote budget comparison to {args.output}")
+    html_path = _auto_comparison_report_html(args.output)
+    print(f"HTML report: {html_path}")
     return 0
 
 
@@ -451,6 +459,7 @@ def _cmd_demo(args: argparse.Namespace) -> int:
         except RuntimeError as exc:
             raise SystemExit(str(exc)) from exc
         results["run"] = {"return_code": return_code, "run_dir": str(run_dir)}
+        results["run"]["html_report"] = str(_auto_run_report_html(run_dir))
 
     if "tune-batch" in scenarios:
         try:
@@ -497,6 +506,7 @@ def _cmd_demo(args: argparse.Namespace) -> int:
             "tuned_profile": comparison.get("tuned_profile"),
             "output": str(output_dir / "demo_tuning_comparison.json"),
         }
+        results["compare_tuning"]["html_report"] = str(_auto_comparison_report_html(output_dir / "demo_tuning_comparison.json"))
 
     print(json.dumps({"kind": "demo", "scenario": args.scenario, "results": results}, indent=2, sort_keys=True))
     return 0
@@ -697,6 +707,32 @@ def _command_after_separator(command: list[str], usage: str) -> list[str]:
     if not command:
         raise SystemExit(usage)
     return command
+
+
+def _auto_run_report_html(run_dir: str | Path) -> Path:
+    run_path = Path(run_dir)
+    output_path = run_path / "report.html"
+    try:
+        return generate_run_report(run_path.name, output_path)
+    except FileNotFoundError:
+        return output_path
+
+
+def _auto_comparison_report_html(json_path: str | Path) -> Path:
+    path = Path(json_path)
+    output_path = path.with_suffix(".html")
+    try:
+        return generate_comparison_report(path, output_path)
+    except FileNotFoundError:
+        return output_path
+
+
+def _auto_profile_comparison_reports(result: dict[str, object], summary_path: str | Path) -> dict[str, object]:
+    html_outputs: dict[str, object] = {"summary": _auto_comparison_report_html(summary_path), "profiles": []}
+    for item in result.get("comparisons", []):
+        if isinstance(item, dict) and item.get("output"):
+            html_outputs["profiles"].append(_auto_comparison_report_html(str(item["output"])))
+    return html_outputs
 
 
 if __name__ == "__main__":

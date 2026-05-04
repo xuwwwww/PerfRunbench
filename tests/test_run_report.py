@@ -91,6 +91,36 @@ class RunReportTest(unittest.TestCase):
             self.assertIn("Tuning Comparison", report)
             self.assertIn("<svg", report)
 
+    def test_generate_profile_summary_report_writes_html(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            path = Path(temp_dir) / "profile_summary.json"
+            output = Path(temp_dir) / "profile_summary.html"
+            write_json(
+                path,
+                {
+                    "kind": "profile_comparison_summary",
+                    "repeat": 3,
+                    "best_profile": "linux-performance",
+                    "best_profile_beats_baseline": True,
+                    "comparisons": [
+                        {
+                            "profile": "linux-performance",
+                            "output": "results/reports/linux_performance_comparison.json",
+                            "samples_per_second_percent": 5.5,
+                            "benchmark_duration_percent": -1.2,
+                            "peak_memory_percent": 0.0,
+                        }
+                    ],
+                },
+            )
+
+            report_path = generate_comparison_report(path, output)
+
+            report = report_path.read_text(encoding="utf-8")
+            self.assertEqual(report_path, output)
+            self.assertIn("Profile Comparison Summary", report)
+            self.assertIn("linux-performance", report)
+
 
 if __name__ == "__main__":
     unittest.main()

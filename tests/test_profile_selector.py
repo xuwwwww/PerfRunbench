@@ -19,6 +19,10 @@ class ProfileSelectorTest(unittest.TestCase):
         selection = select_system_profile(ResourceBudget(memory_budget_gb=-3), workload_profile="throughput", runtime_platform="Linux")
         self.assertEqual(selection.profile, "linux-throughput")
 
+    def test_manual_performance_profile_wins(self) -> None:
+        selection = select_system_profile(ResourceBudget(memory_budget_gb=-3), workload_profile="performance", runtime_platform="Linux")
+        self.assertEqual(selection.profile, "linux-performance")
+
     def test_selects_windows_profile_on_windows(self) -> None:
         selection = select_system_profile(ResourceBudget(memory_budget_gb=-3), workload_profile="auto", runtime_platform="Windows")
         self.assertEqual(selection.profile, "windows-memory-conservative")

@@ -81,8 +81,10 @@ Runtime system tuning can be previewed without changing the machine:
 autotuneai tune-system
 autotuneai tune-system --profile linux-memory-conservative
 autotuneai tune-system --profile linux-throughput
+autotuneai tune-system --profile linux-performance
 autotuneai tune-system --profile linux-low-latency
 autotuneai tune-system --profile windows-throughput
+autotuneai tune-system --profile windows-performance
 autotuneai tune-system --recommend-all
 ```
 
@@ -130,6 +132,9 @@ linux-memory-conservative
 linux-throughput
   Throughput-oriented profile for dataset/checkpoint-heavy runs.
 
+linux-performance
+  Aggressive throughput-first Linux/WSL profile with larger dirty-page windows and forced THP.
+
 linux-low-latency
   Lower dirty-page and THP settings for smoother latency.
 
@@ -144,6 +149,9 @@ windows-memory-conservative
 
 windows-throughput
   Throughput-oriented Windows profile using a temporary high performance power scheme.
+
+windows-performance
+  Aggressive throughput-first Windows profile using the reversible high performance power scheme path.
 
 windows-low-latency
   Latency-oriented Windows profile using a temporary high performance power scheme.
@@ -174,6 +182,7 @@ autotuneai report --run-id <run_id>
 ```
 
 The analyzer reports selected executor, affinity cores, expected CPU cap, observed peak CPU, effective memory budget, observed memory headroom, and cgroup stats when available.
+`autotuneai run`, `compare-tuning`, `compare-budgets`, and `compare-profiles` now also emit sibling `.html` reports automatically, so you do not need a separate conversion step after each benchmark.
 
 Benchmark install for PyTorch / ONNX Runtime experiments:
 

@@ -18,7 +18,7 @@ def select_system_profile(
     workload_profile: str = "auto",
     runtime_platform: str | None = None,
 ) -> ProfileSelection:
-    if workload_profile not in {"auto", "training", "memory", "throughput", "low-latency", "cpu-conservative"}:
+    if workload_profile not in {"auto", "training", "memory", "throughput", "performance", "low-latency", "cpu-conservative"}:
         raise ValueError(f"unknown workload profile: {workload_profile}")
     prefix = "windows" if (runtime_platform or platform.system()) == "Windows" else "linux"
     if workload_profile == "training":
@@ -27,6 +27,8 @@ def select_system_profile(
         return ProfileSelection(f"{prefix}-memory-conservative", "workload_profile=memory")
     if workload_profile == "throughput":
         return ProfileSelection(f"{prefix}-throughput", "workload_profile=throughput")
+    if workload_profile == "performance":
+        return ProfileSelection(f"{prefix}-performance", "workload_profile=performance")
     if workload_profile == "low-latency":
         return ProfileSelection(f"{prefix}-low-latency", "workload_profile=low-latency")
     if workload_profile == "cpu-conservative":

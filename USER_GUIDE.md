@@ -918,3 +918,21 @@ AutoTuneAI 的定位是把「單機訓練入口包住」，同時做資源限制
 - Docker executor 需要使用者提供合適 image。
 - Windows Job Object executor 尚未實作。
 - config tuner 目前只支援單一檔案、單一 numeric key。
+## Auto-generated HTML reports
+
+`autotuneai run`, `autotuneai compare-tuning`, `autotuneai compare-budgets`, and `autotuneai compare-profiles` now auto-write `.html` reports next to their JSON or run directory outputs.
+
+Examples:
+
+```bash
+autotuneai run -- python examples/iris_train.py --config examples/iris_train_config.yaml
+autotuneai compare-tuning --profile linux-performance --repeat 3 -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
+autotuneai compare-profiles --repeat 3 -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
+```
+
+Linux and Windows both now expose a dedicated `performance` workload profile:
+
+```bash
+autotuneai run --auto-tune-system --workload-profile performance -- python train.py
+autotuneai compare-tuning --workload-profile performance -- python train.py
+```

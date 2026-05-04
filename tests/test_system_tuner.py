@@ -162,11 +162,13 @@ class SystemTunerTest(unittest.TestCase):
         self.assertIn("linux-training-safe", profiles)
         self.assertIn("linux-memory-conservative", profiles)
         self.assertIn("linux-throughput", profiles)
+        self.assertIn("linux-performance", profiles)
         self.assertIn("linux-low-latency", profiles)
         self.assertIn("linux-cpu-conservative", profiles)
         self.assertIn("windows-training-safe", profiles)
         self.assertIn("windows-memory-conservative", profiles)
         self.assertIn("windows-throughput", profiles)
+        self.assertIn("windows-performance", profiles)
         self.assertIn("windows-low-latency", profiles)
         self.assertIn("windows-cpu-conservative", profiles)
 
