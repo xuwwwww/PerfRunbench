@@ -8,6 +8,7 @@ __pycache__/
 .coverage
 htmlcov/
 USER_GUIDE.pdf
+README.pdf
 .autotuneai/
 artifacts/*
 !artifacts/.gitkeep

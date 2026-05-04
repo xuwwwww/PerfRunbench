@@ -13,12 +13,13 @@ from autotune.gpu.nvidia_tuner import (
     restore_nvidia_tuning,
 )
 from autotune.report.run_report import generate_run_report
+from autotune.report.comparison_report import generate_comparison_report
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.comparison_runner import compare_tuning
 from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.memory_calibration import calibrate_memory
 from autotune.resource.run_analysis import analyze_run, format_analysis
-from autotune.resource.run_state import RUNS_DIR, list_runs, load_manifest
+from autotune.resource.run_state import ACTIVE_TUNING_STATE, RUNS_DIR, clear_active_tuning_state, list_runs, load_active_tuning_state, load_manifest
 from autotune.resource.workload_runner import run_with_budget
 from autotune.source_tuner.transaction import SourceTuningError, restore_changed_files
 from autotune.system_tuner.runtime import (
@@ -93,6 +94,11 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--output")
     report.set_defaults(handler=_cmd_report)
 
+    report_comparison = subparsers.add_parser("report-comparison", help="Generate a visual Markdown report for a tuning comparison JSON.")
+    report_comparison.add_argument("--input", default="results/reports/tuning_comparison.json")
+    report_comparison.add_argument("--output")
+    report_comparison.set_defaults(handler=_cmd_report_comparison)
+
     calibrate = subparsers.add_parser("calibrate-memory", help="Measure memory budget behavior on this machine.")
     calibrate.add_argument("--budget-gb", nargs="+", type=float, required=True)
     calibrate.add_argument("--workload-memory-mb", type=int, default=1024)
@@ -136,6 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     tune_system = subparsers.add_parser("tune-system", help="Recommend or apply reversible runtime system tuning.")
     tune_system.add_argument("--profile", default=None, choices=available_profiles())
+    tune_system.add_argument("--recommend-all", action="store_true", help="Print recommendations for every profile supported on this platform.")
     tune_system.add_argument("--apply", action="store_true")
     tune_system.add_argument("--sudo", action="store_true")
     tune_system.set_defaults(handler=_cmd_tune_system)
@@ -170,7 +177,9 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.set_defaults(handler=_cmd_list_runs)
 
     restore = subparsers.add_parser("restore", help="Restore files and runtime system settings changed by a run.")
-    restore.add_argument("--run-id", required=True)
+    restore.add_argument("--run-id")
+    restore.add_argument("--latest", action="store_true", help="Restore the most recent run with recorded changes.")
+    restore.add_argument("--active", action="store_true", help="Restore the currently active tuning state recorded before a run.")
     restore.add_argument("--sudo", action="store_true")
     restore.add_argument("--gpu-sudo", action="store_true")
     restore.set_defaults(handler=_cmd_restore)
@@ -264,6 +273,12 @@ def _cmd_report(args: argparse.Namespace) -> int:
     except FileNotFoundError as exc:
         raise SystemExit(str(exc)) from exc
     print(f"Wrote run report to {report_path}")
+    return 0
+
+
+def _cmd_report_comparison(args: argparse.Namespace) -> int:
+    report_path = generate_comparison_report(args.input, args.output)
+    print(f"Wrote tuning comparison report to {report_path}")
     return 0
 
 
@@ -406,6 +421,14 @@ def _cmd_demo(args: argparse.Namespace) -> int:
 def _cmd_tune_system(args: argparse.Namespace) -> int:
     profile = args.profile or select_system_profile(ResourceBudget()).profile
     try:
+        if args.recommend_all:
+            recommendations = [
+                item
+                for item in (recommend_system_tuning(candidate) for candidate in available_profiles())
+                if item.get("supported")
+            ]
+            print(json.dumps({"profiles": recommendations}, indent=2, sort_keys=True))
+            return 0
         if not args.apply:
             print(json.dumps(recommend_system_tuning(profile), indent=2, sort_keys=True))
             return 0
@@ -500,7 +523,8 @@ def _cmd_list_runs(args: argparse.Namespace) -> int:
 
 
 def _cmd_restore(args: argparse.Namespace) -> int:
-    run_dir = RUNS_DIR / args.run_id
+    run_id = _resolve_restore_run_id(args)
+    run_dir = RUNS_DIR / run_id
     if not run_dir.exists():
         raise SystemExit(f"Run not found: {run_dir}")
     manifest = load_manifest(run_dir)
@@ -526,9 +550,29 @@ def _cmd_restore(args: argparse.Namespace) -> int:
         else:
             print(f"Failed to restore NVIDIA setting: {item['error']}")
         restored_any = True
+    active_state = load_active_tuning_state()
+    if active_state and active_state.get("run_id") == run_id:
+        clear_active_tuning_state()
+        print(f"Cleared active tuning state: {ACTIVE_TUNING_STATE}")
     if not restored_any:
-        print(f"Run {args.run_id} has no changed files or system settings to restore.")
+        print(f"Run {run_id} has no changed files or system settings to restore.")
     return 0
+
+
+def _resolve_restore_run_id(args: argparse.Namespace) -> str:
+    if args.active:
+        active_state = load_active_tuning_state()
+        if not active_state:
+            raise SystemExit("No active tuning state was found.")
+        return str(active_state["run_id"])
+    if args.latest:
+        runs = list_runs()
+        if not runs:
+            raise SystemExit("No AutoTuneAI runs found.")
+        return str(runs[0]["run_id"])
+    if not args.run_id:
+        raise SystemExit("Usage: autotuneai restore --run-id <run_id> [--sudo], autotuneai restore --latest [--sudo], or autotuneai restore --active [--sudo]")
+    return args.run_id
 
 
 def _budget_from_args(args: argparse.Namespace) -> ResourceBudget:

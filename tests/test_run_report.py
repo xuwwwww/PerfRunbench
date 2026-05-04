@@ -5,12 +5,13 @@ import unittest
 from pathlib import Path
 
 from autotune.report.run_report import generate_run_report
+from autotune.report.comparison_report import generate_comparison_report
 from autotune.resource.run_state import write_json
 
 
 class RunReportTest(unittest.TestCase):
     def test_generate_run_report_writes_markdown(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
             runs_dir = Path(temp_dir)
             run_dir = runs_dir / "run1"
             run_dir.mkdir()
@@ -41,10 +42,32 @@ class RunReportTest(unittest.TestCase):
             report = report_path.read_text(encoding="utf-8")
             self.assertIn("AutoTuneAI Run Report: run1", report)
             self.assertIn("## Before / After", report)
+            self.assertIn("## Visual Summary", report)
+            self.assertIn("<svg", report)
             self.assertIn("Available memory at start", report)
             self.assertIn("## CPU", report)
             self.assertIn("## Memory", report)
             self.assertIn("## Diagnostics", report)
+
+    def test_generate_comparison_report_writes_visual_markdown(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            path = Path(temp_dir) / "comparison.json"
+            write_json(
+                path,
+                {
+                    "tuned_profile": "linux-throughput",
+                    "baseline": {"run_id": "b1", "benchmark_duration_seconds": 10, "lifecycle_duration_seconds": 11, "peak_memory_mb": 100},
+                    "tuned": {"run_id": "t1", "benchmark_duration_seconds": 8, "lifecycle_duration_seconds": 9, "peak_memory_mb": 90},
+                    "deltas": {"benchmark_duration_percent": -20, "peak_memory_percent": -10},
+                },
+            )
+
+            report_path = generate_comparison_report(path)
+
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("AutoTuneAI Tuning Comparison", report)
+            self.assertIn("Performance Deltas", report)
+            self.assertIn("<svg", report)
 
 
 if __name__ == "__main__":

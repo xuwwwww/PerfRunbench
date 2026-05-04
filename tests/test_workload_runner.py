@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.run_state import load_manifest
+from autotune.resource.run_state import ACTIVE_TUNING_STATE, clear_active_tuning_state, load_active_tuning_state, load_manifest
 from autotune.resource.workload_runner import (
     ChildSample,
     _resolve_command_executable,
@@ -192,6 +192,7 @@ class WorkloadRunnerTest(unittest.TestCase):
     def test_run_with_budget_applies_and_restores_system_tuning(self, apply_tuning, restore_tuning) -> None:
         apply_tuning.return_value = {"changes": [{"applied": True}]}
         restore_tuning.return_value = [{"key": "vm.swappiness", "return_code": 0}]
+        clear_active_tuning_state()
         return_code, run_dir = run_with_budget(
             ["python", "tests/fixtures/sleep_workload.py"],
             ResourceBudget(),
@@ -207,6 +208,25 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertTrue(any("system_tuning_lifecycle_restored=1" in note for note in manifest["notes"]))
         self.assertTrue(any(note.startswith("system_tuning_apply_seconds=") for note in manifest["notes"]))
         self.assertTrue(any(note.startswith("system_tuning_restore_seconds=") for note in manifest["notes"]))
+        self.assertFalse(ACTIVE_TUNING_STATE.exists())
+
+    @patch("autotune.resource.workload_runner.apply_system_tuning_to_run")
+    def test_run_with_budget_persists_active_tuning_when_restore_is_disabled(self, apply_tuning) -> None:
+        apply_tuning.return_value = {"changes": [{"applied": True}]}
+        clear_active_tuning_state()
+        return_code, run_dir = run_with_budget(
+            ["python", "tests/fixtures/sleep_workload.py"],
+            ResourceBudget(),
+            sample_interval_seconds=0.05,
+            tune_system_profile="linux-training-safe",
+            restore_system_after=False,
+        )
+        self.assertEqual(return_code, 0)
+        self.assertTrue(ACTIVE_TUNING_STATE.exists())
+        state = load_active_tuning_state()
+        self.assertEqual(state["run_id"], Path(run_dir).name)
+        self.assertTrue(state["system_active"])
+        clear_active_tuning_state()
 
     def test_run_with_budget_fails_fast_for_missing_script(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "workload script does not exist: train.py"):

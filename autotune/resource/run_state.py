@@ -11,6 +11,7 @@ from autotune.resource.budget import ResourceBudget
 
 
 RUNS_DIR = Path(".autotuneai") / "runs"
+ACTIVE_TUNING_STATE = Path(".autotuneai") / "active_tuning_state.json"
 
 
 @dataclass
@@ -68,6 +69,25 @@ def write_json(path: Path, payload: Any) -> None:
 
 def load_manifest(run_dir: Path) -> dict[str, Any]:
     return json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+
+
+def write_active_tuning_state(payload: dict[str, Any], path: Path | None = None) -> Path:
+    target = path or ACTIVE_TUNING_STATE
+    write_json(target, payload)
+    return target
+
+
+def load_active_tuning_state(path: Path | None = None) -> dict[str, Any] | None:
+    target = path or ACTIVE_TUNING_STATE
+    if not target.exists():
+        return None
+    return json.loads(target.read_text(encoding="utf-8"))
+
+
+def clear_active_tuning_state(path: Path | None = None) -> None:
+    target = path or ACTIVE_TUNING_STATE
+    if target.exists():
+        target.unlink()
 
 
 def manifest_from_dict(raw: dict[str, Any]) -> RunManifest:

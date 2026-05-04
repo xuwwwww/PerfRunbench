@@ -271,6 +271,9 @@ def _workload_deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[st
         "completed_epochs",
         "feature_count",
         "train_samples",
+        "cpu_workers",
+        "memory_target_mb",
+        "memory_touched_mb",
     ]
     deltas: dict[str, Any] = {}
     for key in keys:
@@ -294,6 +297,9 @@ def _workload_performance_metrics(workload: dict[str, Any]) -> dict[str, Any]:
         "feature_count",
         "train_samples",
         "cache_copies",
+        "cpu_workers",
+        "memory_target_mb",
+        "memory_touched_mb",
         "config_path",
         "dataset",
     ]
@@ -338,6 +344,9 @@ def _aggregate_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
             "completed_epochs": _median_value(workload, "completed_epochs"),
             "feature_count": _median_value(workload, "feature_count"),
             "train_samples": _median_value(workload, "train_samples"),
+            "cpu_workers": _median_value(workload, "cpu_workers"),
+            "memory_target_mb": _median_value(workload, "memory_target_mb"),
+            "memory_touched_mb": _median_value(workload, "memory_touched_mb"),
         },
     }
 

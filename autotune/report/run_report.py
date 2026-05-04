@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from autotune.report.charts import metric_bar_chart, sparkline_svg
 from autotune.resource.run_analysis import analyze_run
 from autotune.resource.run_state import RUNS_DIR
 
@@ -38,6 +39,24 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Training metrics captured: {bool(analysis.get('workload'))}",
         f"- System tuning snapshots: {_system_tuning_snapshot_status(run_dir)}",
         f"- Source/config changes recorded: {_changed_file_count(run_dir)}",
+        "",
+        "## Visual Summary",
+        "",
+        metric_bar_chart(
+            "Run Summary",
+            [
+                ("peak memory MB", analysis["memory"].get("peak_memory_mb")),
+                ("min available memory MB", analysis["memory"].get("observed_min_available_memory_mb")),
+                ("peak process CPU %", analysis["cpu"].get("observed_peak_process_cpu_percent")),
+                ("peak system CPU %", analysis["cpu"].get("observed_peak_system_cpu_percent")),
+                ("workload samples/sec", analysis.get("workload", {}).get("samples_per_second")),
+            ],
+        ),
+        "",
+        sparkline_svg(
+            "Available Memory Timeline",
+            [item.get("available_memory_mb") for item in _load_json(run_dir / "resource_timeline.json", default=[])],
+        ),
         "",
         "## Executor",
         "",

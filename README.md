@@ -24,6 +24,7 @@ autotuneai inspect
 autotuneai executors --probe-systemd --probe-docker --check-sudo-cache
 autotuneai tune-system
 autotuneai run -- python examples/dummy_train.py
+autotuneai report-comparison --input results/reports/tuning_comparison.json
 python -m unittest discover -s tests
 ```
 
@@ -40,6 +41,7 @@ Real training workloads bundled in the repo:
 ```bash
 autotuneai run -- python examples/iris_train.py --config examples/iris_train_config.yaml
 autotuneai run --memory-budget-gb 1.5 --hard-kill -- python examples/stress_train.py --config examples/stress_train_config.yaml
+autotuneai run --memory-budget-gb -3 --hard-kill -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
 autotuneai tune-training \
   --file examples/iris_train_config.yaml \
   --knob batch_size=8,16,32 \
@@ -81,6 +83,7 @@ autotuneai tune-system --profile linux-memory-conservative
 autotuneai tune-system --profile linux-throughput
 autotuneai tune-system --profile linux-low-latency
 autotuneai tune-system --profile windows-throughput
+autotuneai tune-system --recommend-all
 ```
 
 On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/runs/<run_id>/`:
@@ -89,6 +92,8 @@ On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/run
 sudo -v
 autotuneai tune-system --apply --sudo
 autotuneai restore --run-id <run_id> --sudo
+autotuneai restore --latest --sudo
+autotuneai restore --active --sudo
 ```
 
 On Windows, runtime system tuning currently uses reversible `powercfg` active power scheme changes:
@@ -276,6 +281,24 @@ autotuneai compare-tuning `
 ```
 
 For memory-pressure comparisons, use `examples/stress_train_memory_pressure_config.yaml` with a negative memory budget such as `--memory-budget-gb -3`. Comparison reports use `benchmark_duration_seconds`, which subtracts runtime tuning apply/restore time; workload quality metrics such as accuracy/loss/dice are intentionally excluded from `tuning_comparison.json`.
+
+For a more generic high-pressure benchmark that is not tied to Iris classification semantics, use:
+
+```bash
+autotuneai run \
+  --memory-budget-gb -3 \
+  --hard-kill \
+  -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
+```
+
+If a run is interrupted after runtime tuning was applied, AutoTuneAI records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
+
+Visual reports are available for both single runs and tuning comparisons:
+
+```bash
+autotuneai report --run-id <run_id>
+autotuneai report-comparison --input results/reports/tuning_comparison.json
+```
 
 NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:
 

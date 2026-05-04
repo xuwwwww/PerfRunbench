@@ -1,0 +1,7 @@
+duration_seconds: 60
+cpu_workers: 6
+memory_target_mb: 6144
+batch_size: 192
+feature_count: 4096
+samples_per_step: 192
+steps_per_epoch: 100

@@ -4,6 +4,8 @@ import subprocess
 import shutil
 import time
 import os
+import signal
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -13,7 +15,15 @@ from autotune.resource.budget import ResourceBudget
 from autotune.resource.cgroup_monitor import CgroupStats, cgroup_path, read_cgroup_stats, wait_for_systemd_control_group
 from autotune.resource.docker_executor import build_docker_run_command
 from autotune.resource.executor_capabilities import collect_executor_capabilities
-from autotune.resource.run_state import RunManifest, create_run, finish_run, write_json
+from autotune.resource.run_state import (
+    RunManifest,
+    clear_active_tuning_state,
+    create_run,
+    finish_run,
+    load_active_tuning_state,
+    write_active_tuning_state,
+    write_json,
+)
 from autotune.resource.systemd_executor import build_systemd_run_command, make_systemd_scope_name
 from autotune.system_tuner.runtime import apply_system_tuning_to_run, restore_system_tuning
 
@@ -71,6 +81,7 @@ def run_with_budget(
     status = "failed"
     system_tuning_applied = False
     gpu_tuning_applied = False
+    active_tuning_state: dict[str, object] | None = None
     try:
         if tune_system_profile:
             start = time.perf_counter()
@@ -92,6 +103,19 @@ def run_with_budget(
             )
             gpu_tuning_applied = any(change.get("return_code") == 0 for change in result.get("changes", []))
             manifest.notes.append(f"gpu_tuning_lifecycle_applied={gpu_tuning_applied}")
+        if tune_system_profile or tune_gpu_profile:
+            active_tuning_state = {
+                "run_id": manifest.run_id,
+                "run_dir": str(run_dir),
+                "system_profile": tune_system_profile,
+                "gpu_profile": tune_gpu_profile,
+                "system_active": bool(tune_system_profile and system_tuning_applied),
+                "gpu_active": bool(tune_gpu_profile and gpu_tuning_applied),
+                "restore_system_after": restore_system_after,
+                "restore_gpu_after": restore_gpu_after,
+            }
+            if active_tuning_state["system_active"] or active_tuning_state["gpu_active"]:
+                write_active_tuning_state(active_tuning_state)
         command_to_run = command
         manifest.notes.extend(selection_notes)
         if selected_executor == "local":
@@ -128,22 +152,23 @@ def run_with_budget(
         else:
             raise ValueError(f"unsupported executor: {selected_executor}")
         process = subprocess.Popen(command_to_run, env=child_env)
-        if selected_executor == "systemd":
-            return_code, control_group = _monitor_systemd_scope(
-                process,
-                unit_name,
-                budget,
-                timeline,
-                sample_interval_seconds,
-                hard_kill,
-                use_sudo=selected_use_sudo,
-            )
-            if control_group:
-                manifest.notes.append(f"systemd_control_group={control_group}")
+        with _interrupt_restore_guard(lambda: process):
+            if selected_executor == "systemd":
+                return_code, control_group = _monitor_systemd_scope(
+                    process,
+                    unit_name,
+                    budget,
+                    timeline,
+                    sample_interval_seconds,
+                    hard_kill,
+                    use_sudo=selected_use_sudo,
+                )
+                if control_group:
+                    manifest.notes.append(f"systemd_control_group={control_group}")
+                else:
+                    manifest.notes.append("systemd_control_group=unavailable")
             else:
-                manifest.notes.append("systemd_control_group=unavailable")
-        else:
-            return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill)
+                return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill)
         status = "completed" if return_code == 0 else "failed"
     except RuntimeError as exc:
         manifest.notes.append(f"runtime_error={exc}")
@@ -164,13 +189,60 @@ def run_with_budget(
             restore_seconds = time.perf_counter() - start
             manifest.notes.append(f"system_tuning_lifecycle_restored={len(restored)}")
             manifest.notes.append(f"system_tuning_restore_seconds={restore_seconds:.6f}")
+            if active_tuning_state is not None:
+                active_tuning_state["system_active"] = False
         if tune_gpu_profile and restore_gpu_after:
             restored = restore_nvidia_tuning(run_dir, use_sudo=gpu_tuning_sudo)
             manifest.notes.append(f"gpu_tuning_lifecycle_restored={len(restored)}")
+            if active_tuning_state is not None:
+                active_tuning_state["gpu_active"] = False
+        _finalize_active_tuning_state(active_tuning_state, run_dir)
         write_json(run_dir / "resource_timeline.json", [asdict(sample) for sample in timeline])
         write_json(run_dir / "resource_summary.json", _summarize_timeline(timeline, budget))
         finish_run(run_dir, manifest, status, return_code)
     return return_code, run_dir
+
+
+def _finalize_active_tuning_state(active_tuning_state: dict[str, object] | None, run_dir: Path) -> None:
+    if active_tuning_state is None:
+        return
+    if active_tuning_state.get("system_active") or active_tuning_state.get("gpu_active"):
+        write_active_tuning_state(active_tuning_state)
+        return
+    current = load_active_tuning_state()
+    if current and current.get("run_id") == run_dir.name:
+        clear_active_tuning_state()
+
+
+@contextmanager
+def _interrupt_restore_guard(process_getter):
+    signals = [signal.SIGINT]
+    if hasattr(signal, "SIGTERM"):
+        signals.append(signal.SIGTERM)
+    previous_handlers: dict[int, object] = {}
+    triggered = {"value": False}
+
+    def _handler(_signum, _frame):
+        if triggered["value"]:
+            return
+        triggered["value"] = True
+        process = process_getter()
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        raise KeyboardInterrupt()
+
+    try:
+        for sig in signals:
+            previous_handlers[sig] = signal.getsignal(sig)
+            signal.signal(sig, _handler)
+        yield
+    finally:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
 
 
 def _resolve_executor(executor: str, *, use_sudo: bool, allow_sudo_auto: bool) -> tuple[str, bool, list[str]]:

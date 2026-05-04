@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import io
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 from autotune.cli import main
@@ -43,6 +45,15 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         generate.assert_called_once_with("run1", None)
         self.assertIn("Wrote run report", output.getvalue())
+
+    def test_report_comparison_command_writes_report(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.generate_comparison_report") as generate, redirect_stdout(output):
+            generate.return_value = "comparison.md"
+            code = main(["report-comparison", "--input", "comparison.json"])
+        self.assertEqual(code, 0)
+        generate.assert_called_once_with("comparison.json", None)
+        self.assertIn("Wrote tuning comparison report", output.getvalue())
 
     def test_calibrate_memory_command_writes_summary(self) -> None:
         output = io.StringIO()
@@ -172,6 +183,14 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         recommend.assert_called_once_with("windows-training-safe")
 
+    def test_tune_system_recommend_all_prints_supported_profiles(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.recommend_system_tuning") as recommend, redirect_stdout(output):
+            recommend.side_effect = lambda profile: {"profile": profile, "supported": profile.startswith("linux-")}
+            code = main(["tune-system", "--recommend-all"])
+        self.assertEqual(code, 0)
+        self.assertIn("linux-training-safe", output.getvalue())
+
     @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Linux")
     @patch("autotune.cli.run_with_budget")
     def test_run_command_auto_tunes_system_on_linux(self, run_with_budget, _system) -> None:
@@ -218,6 +237,50 @@ class CliTest(unittest.TestCase):
     def test_run_command_requires_workload(self) -> None:
         with self.assertRaises(SystemExit):
             main(["run"])
+
+    @patch("autotune.cli.list_runs")
+    @patch("autotune.cli.restore_system_tuning")
+    @patch("autotune.cli.restore_nvidia_tuning")
+    def test_restore_latest_uses_most_recent_run(self, restore_gpu, restore_system, list_runs_mock) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            runs_dir = Path(temp_dir)
+            run_dir = runs_dir / "latest1"
+            run_dir.mkdir()
+            (run_dir / "manifest.json").write_text('{"changed_files": []}', encoding="utf-8")
+            list_runs_mock.return_value = [{"run_id": "latest1"}]
+            restore_system.return_value = []
+            restore_gpu.return_value = []
+            output = io.StringIO()
+            with patch("autotune.cli.RUNS_DIR", runs_dir), redirect_stdout(output):
+                code = main(["restore", "--latest"])
+        self.assertEqual(code, 0)
+        restore_system.assert_called_once()
+        self.assertIn("latest1", output.getvalue())
+
+    @patch("autotune.cli.restore_system_tuning")
+    @patch("autotune.cli.restore_nvidia_tuning")
+    def test_restore_active_uses_active_tuning_state(self, restore_gpu, restore_system) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            runs_dir = Path(temp_dir) / "runs"
+            runs_dir.mkdir()
+            run_dir = runs_dir / "active1"
+            run_dir.mkdir()
+            (run_dir / "manifest.json").write_text('{"changed_files": []}', encoding="utf-8")
+            active_state_path = Path(temp_dir) / "active_tuning_state.json"
+            active_state_path.write_text('{"run_id": "active1", "system_active": true}', encoding="utf-8")
+            restore_system.return_value = []
+            restore_gpu.return_value = []
+            output = io.StringIO()
+            with (
+                patch("autotune.cli.RUNS_DIR", runs_dir),
+                patch("autotune.cli.ACTIVE_TUNING_STATE", active_state_path),
+                patch("autotune.resource.run_state.ACTIVE_TUNING_STATE", active_state_path),
+                redirect_stdout(output),
+            ):
+                code = main(["restore", "--active"])
+        self.assertEqual(code, 0)
+        restore_system.assert_called_once()
+        self.assertIn("Cleared active tuning state", output.getvalue())
 
 
 if __name__ == "__main__":
