@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 import statistics
+import platform
+import time
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +11,7 @@ from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_analysis import analyze_run
 from autotune.resource.run_state import RUNS_DIR, load_manifest, write_json
 from autotune.resource.workload_runner import run_with_budget
+from autotune.system_tuner.runtime import available_profiles
 
 
 def compare_tuning(
@@ -25,39 +28,55 @@ def compare_tuning(
     system_tuning_sudo: bool = False,
     docker_image: str = "python:3.12-slim",
     repeat: int = 1,
+    alternate_order: bool = True,
+    cooldown_seconds: float = 0.0,
 ) -> dict[str, Any]:
     if not command:
         raise ValueError("command cannot be empty")
     if repeat < 1:
         raise ValueError("repeat must be >= 1")
-    runs = []
-    for _index in range(repeat):
-        baseline_code, baseline_dir = run_with_budget(
-            command,
-            budget,
-            sample_interval_seconds=sample_interval_seconds,
-            hard_kill=hard_kill,
-            executor=executor,
-            use_sudo=use_sudo,
-            allow_sudo_auto=allow_sudo_auto,
-            docker_image=docker_image,
-        )
-        tuned_code, tuned_dir = run_with_budget(
-            command,
-            budget,
-            sample_interval_seconds=sample_interval_seconds,
-            hard_kill=hard_kill,
-            executor=executor,
-            use_sudo=use_sudo,
-            allow_sudo_auto=allow_sudo_auto,
-            tune_system_profile=tuned_profile,
-            restore_system_after=True,
-            system_tuning_sudo=system_tuning_sudo,
-            docker_image=docker_image,
-        )
-        runs.append((baseline_code, baseline_dir, tuned_code, tuned_dir))
+    runs: list[dict[str, Any]] = []
+    for index in range(repeat):
+        tuned_first = alternate_order and index % 2 == 1
+        run_order = ["tuned", "baseline"] if tuned_first else ["baseline", "tuned"]
+        trial: dict[str, Any] = {"execution_order": run_order}
+        for position, label in enumerate(run_order):
+            if label == "baseline":
+                return_code, run_dir = run_with_budget(
+                    command,
+                    budget,
+                    sample_interval_seconds=sample_interval_seconds,
+                    hard_kill=hard_kill,
+                    executor=executor,
+                    use_sudo=use_sudo,
+                    allow_sudo_auto=allow_sudo_auto,
+                    docker_image=docker_image,
+                )
+            else:
+                return_code, run_dir = run_with_budget(
+                    command,
+                    budget,
+                    sample_interval_seconds=sample_interval_seconds,
+                    hard_kill=hard_kill,
+                    executor=executor,
+                    use_sudo=use_sudo,
+                    allow_sudo_auto=allow_sudo_auto,
+                    tune_system_profile=tuned_profile,
+                    restore_system_after=True,
+                    system_tuning_sudo=system_tuning_sudo,
+                    docker_image=docker_image,
+                )
+            trial[f"{label}_code"] = return_code
+            trial[f"{label}_dir"] = run_dir
+            if cooldown_seconds > 0 and not (index == repeat - 1 and position == len(run_order) - 1):
+                time.sleep(cooldown_seconds)
+        runs.append(trial)
 
-    baseline_code, baseline_dir, tuned_code, tuned_dir = runs[-1]
+    last_trial = runs[-1]
+    baseline_code = last_trial["baseline_code"]
+    baseline_dir = last_trial["baseline_dir"]
+    tuned_code = last_trial["tuned_code"]
+    tuned_dir = last_trial["tuned_dir"]
     result = build_comparison_result(
         baseline_dir.name,
         tuned_dir.name,
@@ -66,18 +85,12 @@ def compare_tuning(
         tuned_return_code=tuned_code,
         runs_dir=RUNS_DIR,
     )
+    result["execution_order"] = list(last_trial["execution_order"])
     if repeat > 1:
         result["repeat"] = repeat
         result["trials"] = [
-            build_comparison_result(
-                baseline_dir.name,
-                tuned_dir.name,
-                tuned_profile=tuned_profile,
-                baseline_return_code=baseline_code,
-                tuned_return_code=tuned_code,
-                runs_dir=RUNS_DIR,
-            )
-            for baseline_code, baseline_dir, tuned_code, tuned_dir in runs
+            _trial_result_from_record(trial, tuned_profile=tuned_profile)
+            for trial in runs
         ]
         result["aggregate"] = _aggregate_trials(result["trials"])
     write_json(Path(output), result)
@@ -92,6 +105,70 @@ def compare_tuning(
             f"Failed run(s): {details}"
         )
     return result
+
+
+def compare_profiles(
+    command: list[str],
+    budget: ResourceBudget,
+    *,
+    profiles: list[str] | None = None,
+    output: str | Path = "results/reports/profile_comparison_summary.json",
+    sample_interval_seconds: float = 0.5,
+    hard_kill: bool = False,
+    executor: str = "local",
+    use_sudo: bool = False,
+    allow_sudo_auto: bool = False,
+    system_tuning_sudo: bool = False,
+    docker_image: str = "python:3.12-slim",
+    repeat: int = 3,
+    alternate_order: bool = True,
+    cooldown_seconds: float = 0.0,
+) -> dict[str, Any]:
+    selected_profiles = profiles or _default_profile_sweep(executor)
+    comparisons = []
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    for profile in selected_profiles:
+        profile_output = output_path.parent / f"{profile.replace('-', '_')}_comparison.json"
+        result = compare_tuning(
+            command,
+            budget,
+            tuned_profile=profile,
+            output=profile_output,
+            sample_interval_seconds=sample_interval_seconds,
+            hard_kill=hard_kill,
+            executor=executor,
+            use_sudo=use_sudo,
+            allow_sudo_auto=allow_sudo_auto,
+            system_tuning_sudo=system_tuning_sudo,
+            docker_image=docker_image,
+            repeat=repeat,
+            alternate_order=alternate_order,
+            cooldown_seconds=cooldown_seconds,
+        )
+        aggregate = result.get("aggregate", {})
+        deltas = aggregate.get("deltas", result.get("deltas", {}))
+        comparisons.append(
+            {
+                "profile": profile,
+                "output": str(profile_output),
+                "samples_per_second_percent": _nested(deltas, "workload", "samples_per_second", "percent"),
+                "benchmark_duration_percent": deltas.get("benchmark_duration_percent"),
+                "peak_memory_percent": deltas.get("peak_memory_percent"),
+                "system_tuning_overhead_seconds": deltas.get("system_tuning_overhead_seconds"),
+            }
+        )
+    ranked = sorted(comparisons, key=_profile_rank_key, reverse=True)
+    summary = {
+        "kind": "profile_comparison_summary",
+        "repeat": repeat,
+        "profiles": selected_profiles,
+        "best_profile": ranked[0]["profile"] if ranked else None,
+        "best_profile_beats_baseline": _profile_beats_baseline(ranked[0]) if ranked else False,
+        "comparisons": ranked,
+    }
+    write_json(output_path, summary)
+    return summary
 
 
 def build_comparison_result(
@@ -259,6 +336,19 @@ def _failed_runs(result: dict[str, Any]) -> list[dict[str, Any]]:
     return failures
 
 
+def _trial_result_from_record(trial: dict[str, Any], *, tuned_profile: str) -> dict[str, Any]:
+    result = build_comparison_result(
+        trial["baseline_dir"].name,
+        trial["tuned_dir"].name,
+        tuned_profile=tuned_profile,
+        baseline_return_code=trial["baseline_code"],
+        tuned_return_code=trial["tuned_code"],
+        runs_dir=RUNS_DIR,
+    )
+    result["execution_order"] = list(trial["execution_order"])
+    return result
+
+
 def _workload_deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[str, Any]:
     keys = [
         "duration_seconds",
@@ -316,6 +406,13 @@ def _aggregate_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _default_profile_sweep(executor: str) -> list[str]:
+    prefix = "windows" if platform.system() == "Windows" else "linux"
+    available = available_profiles()
+    matched = [item for item in available if item.startswith(prefix)]
+    return matched or available
+
+
 def _aggregate_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
     workload = [_run.get("workload", {}) for _run in runs]
     return {
@@ -356,6 +453,19 @@ def _median_value(items: list[dict[str, Any]], key: str) -> float | None:
     if not values:
         return None
     return round(float(statistics.median(values)), 6)
+
+
+def _profile_rank_key(item: dict[str, Any]) -> tuple[float, float, float]:
+    throughput = float(item.get("samples_per_second_percent") or float("-inf"))
+    duration = -(float(item.get("benchmark_duration_percent") or float("inf")))
+    memory = -(float(item.get("peak_memory_percent") or 0.0))
+    return throughput, duration, memory
+
+
+def _profile_beats_baseline(item: dict[str, Any]) -> bool:
+    throughput = item.get("samples_per_second_percent")
+    duration = item.get("benchmark_duration_percent")
+    return isinstance(throughput, (int, float)) and isinstance(duration, (int, float)) and throughput > 0 and duration <= 0
 
 
 def _delta(tuned: Any, baseline: Any) -> float | None:

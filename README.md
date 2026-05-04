@@ -299,6 +299,7 @@ Visual reports are available for both single runs and tuning comparisons:
 autotuneai report --run-id <run_id>
 autotuneai report-comparison --input results/reports/tuning_comparison.json
 autotuneai report-comparison --input results/reports/tuning_comparison.json --output results/reports/tuning_comparison_report.html
+autotuneai compare-profiles --repeat 3 -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
 ```
 
 NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:

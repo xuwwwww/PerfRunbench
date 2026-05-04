@@ -104,7 +104,18 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(compare.call_args.kwargs["tuned_profile"], "linux-throughput")
         self.assertEqual(compare.call_args.kwargs["repeat"], 3)
+        self.assertTrue(compare.call_args.kwargs["alternate_order"])
         self.assertIn("Wrote tuning comparison", output.getvalue())
+
+    def test_compare_profiles_command_runs_summary(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.compare_profiles") as compare, redirect_stdout(output):
+            compare.return_value = {"best_profile": "linux-low-latency"}
+            code = main(["compare-profiles", "--profiles", "linux-throughput", "linux-low-latency", "--repeat", "2", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(compare.call_args.kwargs["profiles"], ["linux-throughput", "linux-low-latency"])
+        self.assertEqual(compare.call_args.kwargs["repeat"], 2)
+        self.assertIn("Wrote profile comparison summary", output.getvalue())
 
     @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Windows")
     def test_compare_tuning_auto_selects_windows_profile(self, _system) -> None:

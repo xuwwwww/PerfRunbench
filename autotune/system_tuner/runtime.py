@@ -154,8 +154,8 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
         ),
         RuntimeSetting(
             key="transparent_hugepage.enabled",
-            value="madvise",
-            reason="Allow runtimes to opt into transparent huge pages without forcing them globally.",
+            value="always",
+            reason="Favor huge pages for large, streaming memory regions during throughput-oriented workloads.",
             require_existing=False,
             source="file",
             path="/sys/kernel/mm/transparent_hugepage/enabled",

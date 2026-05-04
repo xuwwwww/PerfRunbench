@@ -833,6 +833,7 @@ autotuneai analyze --run-id <run_id> --json
 autotuneai report --run-id <run_id>
 autotuneai report-comparison --input results/reports/tuning_comparison.json
 autotuneai report-comparison --input results/reports/tuning_comparison.json --output results/reports/tuning_comparison_report.html
+autotuneai compare-profiles --repeat 3 -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
 ```
 
 預設輸出：
