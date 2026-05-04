@@ -298,6 +298,7 @@ Visual reports are available for both single runs and tuning comparisons:
 ```bash
 autotuneai report --run-id <run_id>
 autotuneai report-comparison --input results/reports/tuning_comparison.json
+autotuneai report-comparison --input results/reports/tuning_comparison.json --output results/reports/tuning_comparison_report.html
 ```
 
 NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:

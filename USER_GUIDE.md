@@ -832,6 +832,7 @@ autotuneai analyze --run-id <run_id> --json
 ```bash
 autotuneai report --run-id <run_id>
 autotuneai report-comparison --input results/reports/tuning_comparison.json
+autotuneai report-comparison --input results/reports/tuning_comparison.json --output results/reports/tuning_comparison_report.html
 ```
 
 預設輸出：

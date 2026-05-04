@@ -69,6 +69,28 @@ class RunReportTest(unittest.TestCase):
             self.assertIn("Performance Deltas", report)
             self.assertIn("<svg", report)
 
+    def test_generate_comparison_report_writes_html_when_requested(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            path = Path(temp_dir) / "comparison.json"
+            output = Path(temp_dir) / "comparison.html"
+            write_json(
+                path,
+                {
+                    "tuned_profile": "linux-low-latency",
+                    "baseline": {"run_id": "b1", "benchmark_duration_seconds": 10, "lifecycle_duration_seconds": 11, "peak_memory_mb": 100},
+                    "tuned": {"run_id": "t1", "benchmark_duration_seconds": 9, "lifecycle_duration_seconds": 10, "peak_memory_mb": 95},
+                    "deltas": {"benchmark_duration_percent": -10, "peak_memory_percent": -5},
+                },
+            )
+
+            report_path = generate_comparison_report(path, output)
+
+            report = report_path.read_text(encoding="utf-8")
+            self.assertEqual(report_path, output)
+            self.assertIn("<!doctype html>", report.lower())
+            self.assertIn("Tuning Comparison", report)
+            self.assertIn("<svg", report)
+
 
 if __name__ == "__main__":
     unittest.main()
