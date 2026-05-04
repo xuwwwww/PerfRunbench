@@ -25,7 +25,7 @@ autotuneai executors --probe-systemd --probe-docker --check-sudo-cache
 autotuneai tune-system
 autotuneai run -- python examples/dummy_train.py
 autotuneai report-comparison --input results/reports/tuning_comparison.json
-python -m unittest discover -s tests
+python scripts/run_tests.py --fast
 ```
 
 Benchmark/GPU install for server-side performance optimization:
@@ -43,7 +43,7 @@ print("cuda", torch.cuda.is_available())
 print("device", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none")
 PY
 
-python -m unittest discover -s tests
+python scripts/run_tests.py --fast
 ```
 
 `environment.yml` is intentionally small and does not install PyTorch. Use `environment-benchmark.yml` or `python -m pip install -e ".[benchmark]"` when running PyTorch, ONNX, or GPU pressure benchmarks. If the server needs a specific CUDA wheel, install the matching `torch`/`torchvision` build from the official PyTorch selector before running GPU benchmarks.
@@ -404,12 +404,14 @@ autotuneai optimize-performance \
   --sudo \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
-  --repeat 2 \
+  --monitor-mode minimal \
+  --time-budget-hours 8 \
+  --repeat 3 \
   --warmup-runs 1 \
   --cooldown-seconds 8 \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 
-autotuneai run \
+autotuneai launch-performance \
   --apply-recommendation \
   --executor systemd \
   --sudo \
@@ -418,7 +420,9 @@ autotuneai run \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits, and it defaults to low-frequency monitoring so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. It writes `results/reports/performance_recommendation.json`, generates `results/reports/performance_recommendation.html`, and caches the recommendation at `.autotuneai/recommendations/latest.json`.
+`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without AutoTuneAI's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. It writes `results/reports/performance_recommendation.json`, generates `results/reports/performance_recommendation.html`, and caches the recommendation at `.autotuneai/recommendations/latest.json`.
+
+`launch-performance --apply-recommendation` applies the cached `system_profile`, `runtime_profile`, and `gpu_profile`, starts the real workload without resource monitoring, waits for it to finish, and restores the original system/GPU settings even on nonzero exit or Ctrl+C. If baseline is still the fastest candidate, the cached recommendation can still be launched this way to avoid measurement overhead during the real run.
 
 Guarded recommendation search for local machines:
 
@@ -442,6 +446,19 @@ autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.p
 `optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. Use it when the goal includes resource guard behavior. It writes `results/reports/auto_recommendation.json`, automatically generates `results/reports/auto_recommendation.html`, and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
 
 Open `results/reports/auto_recommendation.html` to see the current baseline, the recommended configuration, per-candidate throughput, GPU throughput, CPU peaks, and deltas.
+
+For daily development, run the fast suite first:
+
+```bash
+python scripts/run_tests.py --fast
+```
+
+Before release or after executor/lifecycle changes, run the full suite:
+
+```bash
+python scripts/run_tests.py --all
+python -m unittest discover -s tests
+```
 
 If the environment already exists:
 

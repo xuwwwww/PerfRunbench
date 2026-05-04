@@ -65,6 +65,172 @@ def run_with_budget(
     gpu_tuning_sudo: bool = False,
     runtime_env_profile: str | None = None,
 ) -> tuple[int, Path]:
+    run_dir, manifest, child_env, runtime_env_result, selected_executor, selected_use_sudo, selection_notes = _prepare_run(
+        command,
+        budget,
+        run_dir=run_dir,
+        manifest=manifest,
+        executor=executor,
+        use_sudo=use_sudo,
+        allow_sudo_auto=allow_sudo_auto,
+        runtime_env_profile=runtime_env_profile,
+    )
+    timeline: list[ChildSample] = []
+    process = None
+    return_code = 1
+    status = "failed"
+    terminate_process = _terminate_process_tree
+    try:
+        with _tuning_lifecycle(
+            run_dir,
+            manifest,
+            tune_system_profile=tune_system_profile,
+            restore_system_after=restore_system_after,
+            system_tuning_sudo=system_tuning_sudo,
+            tune_gpu_profile=tune_gpu_profile,
+            restore_gpu_after=restore_gpu_after,
+            gpu_tuning_sudo=gpu_tuning_sudo,
+        ):
+            manifest.notes.extend(selection_notes)
+            command_to_run, unit_name = _build_executor_command(
+                command,
+                budget,
+                selected_executor=selected_executor,
+                selected_use_sudo=selected_use_sudo,
+                child_env=child_env,
+                runtime_env_result=runtime_env_result,
+                manifest=manifest,
+                docker_image=docker_image,
+                monitored=True,
+            )
+            process = _open_process(command_to_run, child_env, new_process_group=selected_executor != "systemd")
+            if selected_executor == "systemd" and unit_name:
+                terminate_process = lambda item: _terminate_systemd_scope(unit_name, item, use_sudo=selected_use_sudo)
+            with _interrupt_restore_guard(lambda: process, terminate_process=terminate_process):
+                if selected_executor == "systemd":
+                    return_code, control_group = _monitor_systemd_scope(
+                        process,
+                        unit_name or "",
+                        budget,
+                        timeline,
+                        sample_interval_seconds,
+                        hard_kill,
+                        use_sudo=selected_use_sudo,
+                    )
+                    if control_group:
+                        manifest.notes.append(f"systemd_control_group={control_group}")
+                    else:
+                        manifest.notes.append("systemd_control_group=unavailable")
+                else:
+                    return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill)
+            status = "completed" if return_code == 0 else "failed"
+    except RuntimeError as exc:
+        manifest.notes.append(f"runtime_error={exc}")
+        raise
+    except KeyboardInterrupt:
+        status = "interrupted"
+        if process is not None:
+            terminate_process(process)
+        return_code = 130
+    finally:
+        write_json(run_dir / "resource_timeline.json", [asdict(sample) for sample in timeline])
+        write_json(run_dir / "resource_summary.json", _summarize_timeline(timeline, budget))
+        finish_run(run_dir, manifest, status, return_code)
+    return return_code, run_dir
+
+
+def launch_performance(
+    command: list[str],
+    budget: ResourceBudget | None = None,
+    *,
+    run_dir: Path | None = None,
+    manifest: RunManifest | None = None,
+    executor: str = "local",
+    use_sudo: bool = False,
+    allow_sudo_auto: bool = False,
+    tune_system_profile: str | None = None,
+    restore_system_after: bool = True,
+    system_tuning_sudo: bool = False,
+    docker_image: str = "python:3.12-slim",
+    tune_gpu_profile: str | None = None,
+    restore_gpu_after: bool = True,
+    gpu_tuning_sudo: bool = False,
+    runtime_env_profile: str | None = None,
+) -> tuple[int, Path]:
+    budget = budget or ResourceBudget(enforce=False)
+    run_dir, manifest, child_env, runtime_env_result, selected_executor, selected_use_sudo, selection_notes = _prepare_run(
+        command,
+        budget,
+        run_dir=run_dir,
+        manifest=manifest,
+        executor=executor,
+        use_sudo=use_sudo,
+        allow_sudo_auto=allow_sudo_auto,
+        runtime_env_profile=runtime_env_profile,
+    )
+    manifest.notes.append("monitor_mode=minimal")
+    manifest.notes.append("performance launch applies tuning and waits for workload without resource sampling.")
+    process = None
+    return_code = 1
+    status = "failed"
+    terminate_process = _terminate_process_tree
+    try:
+        with _tuning_lifecycle(
+            run_dir,
+            manifest,
+            tune_system_profile=tune_system_profile,
+            restore_system_after=restore_system_after,
+            system_tuning_sudo=system_tuning_sudo,
+            tune_gpu_profile=tune_gpu_profile,
+            restore_gpu_after=restore_gpu_after,
+            gpu_tuning_sudo=gpu_tuning_sudo,
+        ):
+            manifest.notes.extend(selection_notes)
+            command_to_run, unit_name = _build_executor_command(
+                command,
+                budget,
+                selected_executor=selected_executor,
+                selected_use_sudo=selected_use_sudo,
+                child_env=child_env,
+                runtime_env_result=runtime_env_result,
+                manifest=manifest,
+                docker_image=docker_image,
+                monitored=False,
+            )
+            process = _open_process(command_to_run, child_env, new_process_group=selected_executor != "systemd")
+            if selected_executor == "systemd" and unit_name:
+                terminate_process = lambda item: _terminate_systemd_scope(unit_name, item, use_sudo=selected_use_sudo)
+            with _interrupt_restore_guard(lambda: process, terminate_process=terminate_process):
+                return_code = process.wait()
+            status = "completed" if return_code == 0 else "failed"
+    except RuntimeError as exc:
+        manifest.notes.append(f"runtime_error={exc}")
+        raise
+    except KeyboardInterrupt:
+        status = "interrupted"
+        if process is not None:
+            terminate_process(process)
+        return_code = 130
+    finally:
+        write_json(
+            run_dir / "resource_summary.json",
+            {"samples": 0, "monitoring_mode": "none", "memory_budget_exceeded": False},
+        )
+        finish_run(run_dir, manifest, status, return_code)
+    return return_code, run_dir
+
+
+def _prepare_run(
+    command: list[str],
+    budget: ResourceBudget,
+    *,
+    run_dir: Path | None,
+    manifest: RunManifest | None,
+    executor: str,
+    use_sudo: bool,
+    allow_sudo_auto: bool,
+    runtime_env_profile: str | None,
+) -> tuple[Path, RunManifest, dict[str, str], dict[str, Any] | None, str, bool, list[str]]:
     if not command:
         raise ValueError("command cannot be empty")
     selected_executor, selected_use_sudo, selection_notes = _resolve_executor(
@@ -88,13 +254,78 @@ def run_with_budget(
     if runtime_env_result is not None:
         write_json(run_dir / "runtime_env_tuning.json", runtime_env_result)
         manifest.notes.extend(runtime_env_result["notes"])
-    timeline: list[ChildSample] = []
-    process = None
-    return_code = 1
-    status = "failed"
+    return run_dir, manifest, child_env, runtime_env_result, selected_executor, selected_use_sudo, selection_notes
+
+
+def _build_executor_command(
+    command: list[str],
+    budget: ResourceBudget,
+    *,
+    selected_executor: str,
+    selected_use_sudo: bool,
+    child_env: dict[str, str],
+    runtime_env_result: dict[str, Any] | None,
+    manifest: RunManifest,
+    docker_image: str,
+    monitored: bool,
+) -> tuple[list[str], str | None]:
+    if selected_executor == "local":
+        affinity_context = apply_cpu_affinity(budget)
+        manifest.notes.append(f"affinity_context={affinity_context}")
+        return command, None
+    if selected_executor == "systemd":
+        unit_name = make_systemd_scope_name(manifest.run_id)
+        resolved_command = _resolve_command_executable(command)
+        if resolved_command != command:
+            manifest.notes.append(f"resolved_systemd_command_executable={resolved_command[0]}")
+        systemd_command = build_systemd_run_command(
+            resolved_command,
+            budget,
+            use_sudo=selected_use_sudo,
+            unit_name=unit_name,
+            environment={
+                key: child_env[key]
+                for key in [
+                    "AUTOTUNEAI_RUN_DIR",
+                    "AUTOTUNEAI_RUN_ID",
+                    *list((runtime_env_result or {}).get("env", {}).keys()),
+                ]
+            },
+        )
+        manifest.notes.extend(systemd_command.notes)
+        if monitored:
+            manifest.notes.append("systemd executor applies hard limits and samples the scope cgroup when available.")
+        else:
+            manifest.notes.append("systemd executor launches the workload scope without resource sampling.")
+        return systemd_command.command, unit_name
+    if selected_executor == "docker":
+        docker_command = build_docker_run_command(
+            command,
+            budget,
+            image=docker_image,
+            total_cores=_visible_cpu_count(),
+            total_memory_mb=_visible_memory_mb(),
+        )
+        manifest.notes.extend(docker_command.notes)
+        return docker_command.command, None
+    raise ValueError(f"unsupported executor: {selected_executor}")
+
+
+@contextmanager
+def _tuning_lifecycle(
+    run_dir: Path,
+    manifest: RunManifest,
+    *,
+    tune_system_profile: str | None,
+    restore_system_after: bool,
+    system_tuning_sudo: bool,
+    tune_gpu_profile: str | None,
+    restore_gpu_after: bool,
+    gpu_tuning_sudo: bool,
+):
+    active_tuning_state: dict[str, object] | None = None
     system_tuning_applied = False
     gpu_tuning_applied = False
-    active_tuning_state: dict[str, object] | None = None
     try:
         if tune_system_profile:
             start = time.perf_counter()
@@ -129,76 +360,7 @@ def run_with_budget(
             }
             if active_tuning_state["system_active"] or active_tuning_state["gpu_active"]:
                 write_active_tuning_state(active_tuning_state)
-        command_to_run = command
-        manifest.notes.extend(selection_notes)
-        if selected_executor == "local":
-            affinity_context = apply_cpu_affinity(budget)
-            manifest.notes.append(f"affinity_context={affinity_context}")
-        elif selected_executor == "systemd":
-            unit_name = make_systemd_scope_name(manifest.run_id)
-            resolved_command = _resolve_command_executable(command)
-            if resolved_command != command:
-                manifest.notes.append(f"resolved_systemd_command_executable={resolved_command[0]}")
-            systemd_command = build_systemd_run_command(
-                resolved_command,
-                budget,
-                use_sudo=selected_use_sudo,
-                unit_name=unit_name,
-                environment={
-                    key: child_env[key]
-                    for key in [
-                        "AUTOTUNEAI_RUN_DIR",
-                        "AUTOTUNEAI_RUN_ID",
-                        *list((runtime_env_result or {}).get("env", {}).keys()),
-                    ]
-                },
-            )
-            command_to_run = systemd_command.command
-            manifest.notes.extend(systemd_command.notes)
-            manifest.notes.append("systemd executor applies hard limits and samples the scope cgroup when available.")
-        elif selected_executor == "docker":
-            docker_command = build_docker_run_command(
-                command,
-                budget,
-                image=docker_image,
-                total_cores=_visible_cpu_count(),
-                total_memory_mb=_visible_memory_mb(),
-            )
-            command_to_run = docker_command.command
-            manifest.notes.extend(docker_command.notes)
-        else:
-            raise ValueError(f"unsupported executor: {selected_executor}")
-        process = subprocess.Popen(command_to_run, env=child_env)
-        with _interrupt_restore_guard(lambda: process):
-            if selected_executor == "systemd":
-                return_code, control_group = _monitor_systemd_scope(
-                    process,
-                    unit_name,
-                    budget,
-                    timeline,
-                    sample_interval_seconds,
-                    hard_kill,
-                    use_sudo=selected_use_sudo,
-                )
-                if control_group:
-                    manifest.notes.append(f"systemd_control_group={control_group}")
-                else:
-                    manifest.notes.append("systemd_control_group=unavailable")
-            else:
-                return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill)
-        status = "completed" if return_code == 0 else "failed"
-    except RuntimeError as exc:
-        manifest.notes.append(f"runtime_error={exc}")
-        raise
-    except KeyboardInterrupt:
-        status = "interrupted"
-        if process and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-        return_code = 130
+        yield
     finally:
         if tune_system_profile and restore_system_after:
             start = time.perf_counter()
@@ -214,10 +376,6 @@ def run_with_budget(
             if active_tuning_state is not None:
                 active_tuning_state["gpu_active"] = False
         _finalize_active_tuning_state(active_tuning_state, run_dir)
-        write_json(run_dir / "resource_timeline.json", [asdict(sample) for sample in timeline])
-        write_json(run_dir / "resource_summary.json", _summarize_timeline(timeline, budget))
-        finish_run(run_dir, manifest, status, return_code)
-    return return_code, run_dir
 
 
 def _finalize_active_tuning_state(active_tuning_state: dict[str, object] | None, run_dir: Path) -> None:
@@ -231,8 +389,45 @@ def _finalize_active_tuning_state(active_tuning_state: dict[str, object] | None,
         clear_active_tuning_state()
 
 
+def _open_process(command: list[str], env: dict[str, str], *, new_process_group: bool) -> subprocess.Popen:
+    kwargs: dict[str, Any] = {"env": env}
+    if new_process_group:
+        if os.name == "nt":
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        else:
+            kwargs["start_new_session"] = True
+    return subprocess.Popen(command, **kwargs)
+
+
+def _terminate_process_tree(process: subprocess.Popen, *, timeout_seconds: float = 10.0) -> None:
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        try:
+            process.send_signal(getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM))
+        except (OSError, ValueError):
+            process.terminate()
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            process.terminate()
+    try:
+        process.wait(timeout=timeout_seconds)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    if os.name == "nt":
+        process.kill()
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (ProcessLookupError, OSError):
+            process.kill()
+
+
 @contextmanager
-def _interrupt_restore_guard(process_getter):
+def _interrupt_restore_guard(process_getter, *, terminate_process=_terminate_process_tree):
     signals = [signal.SIGINT]
     if hasattr(signal, "SIGTERM"):
         signals.append(signal.SIGTERM)
@@ -245,11 +440,7 @@ def _interrupt_restore_guard(process_getter):
         triggered["value"] = True
         process = process_getter()
         if process and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
+            terminate_process(process)
         raise KeyboardInterrupt()
 
     try:
@@ -337,11 +528,7 @@ def _monitor_child(
             sample = _sample_child(child, psutil)
             timeline.append(sample)
             if hard_kill and _exceeds_memory_budget(sample, budget, psutil):
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+                _terminate_process_tree(process)
                 return process.returncode if process.returncode is not None else 137
         except psutil.NoSuchProcess:
             break

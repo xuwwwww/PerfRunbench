@@ -26,7 +26,7 @@ from autotune.resource.executor_capabilities import collect_executor_capabilitie
 from autotune.resource.memory_calibration import calibrate_memory
 from autotune.resource.run_analysis import analyze_run, format_analysis
 from autotune.resource.run_state import ACTIVE_TUNING_STATE, RUNS_DIR, clear_active_tuning_state, list_runs, load_active_tuning_state, load_manifest
-from autotune.resource.workload_runner import run_with_budget
+from autotune.resource.workload_runner import launch_performance, run_with_budget
 from autotune.runtime_tuner.env import available_runtime_profiles, recommend_runtime_env
 from autotune.source_tuner.transaction import SourceTuningError, restore_changed_files
 from autotune.system_tuner.runtime import (
@@ -93,6 +93,19 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--apply-recommendation", action="store_true", help="Apply the cached empirical tuning recommendation.")
     run.add_argument("--recommendation", default=str(LATEST_RECOMMENDATION), help="Recommendation JSON to use with --apply-recommendation.")
     run.set_defaults(handler=_cmd_run)
+
+    launch_performance_parser = subparsers.add_parser(
+        "launch-performance",
+        help="Apply a cached performance recommendation, run the workload without resource monitoring, then restore tuning.",
+    )
+    _add_budget_executor_args(launch_performance_parser)
+    launch_performance_parser.add_argument("--apply-recommendation", action="store_true", help="Required: apply the cached empirical performance recommendation.")
+    launch_performance_parser.add_argument("--recommendation", default=str(LATEST_RECOMMENDATION), help="Recommendation JSON to use with --apply-recommendation.")
+    launch_performance_parser.add_argument("--system-tuning-sudo", action="store_true")
+    launch_performance_parser.add_argument("--gpu-tuning-sudo", action="store_true")
+    launch_performance_parser.add_argument("--runtime-profile", choices=available_runtime_profiles(), help="Override the cached runtime profile.")
+    launch_performance_parser.add_argument("workload", nargs=argparse.REMAINDER)
+    launch_performance_parser.set_defaults(handler=_cmd_launch_performance)
 
     analyze = subparsers.add_parser("analyze", help="Analyze a run's resource guard behavior.")
     analyze.add_argument("--run-id", required=True)
@@ -201,6 +214,13 @@ def build_parser() -> argparse.ArgumentParser:
     optimize_performance.add_argument("--repeat", type=int, default=2)
     optimize_performance.add_argument("--warmup-runs", type=int, default=1)
     optimize_performance.add_argument("--cooldown-seconds", type=float, default=8.0)
+    optimize_performance.add_argument(
+        "--time-budget-hours",
+        type=float,
+        default=8.0,
+        help="Maximum wall-clock hours for the sweep; completed candidates are flushed as partial results.",
+    )
+    optimize_performance.add_argument("--monitor-mode", choices=["minimal", "full"], default="minimal")
     optimize_performance.add_argument("--max-candidates", type=int)
     optimize_performance.add_argument("--no-gpu", action="store_true")
     optimize_performance.add_argument("--output", default="results/reports/performance_recommendation.json")
@@ -545,6 +565,8 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
             include_gpu=not args.no_gpu,
             max_candidates=args.max_candidates,
             optimization_mode="guarded",
+            monitor_mode="full",
+            time_budget_hours=None,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
@@ -580,6 +602,8 @@ def _cmd_optimize_performance(args: argparse.Namespace) -> int:
             include_gpu=not args.no_gpu,
             max_candidates=args.max_candidates,
             optimization_mode="performance",
+            monitor_mode=args.monitor_mode,
+            time_budget_hours=args.time_budget_hours,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
@@ -591,6 +615,45 @@ def _cmd_optimize_performance(args: argparse.Namespace) -> int:
     if result.get("recommendation"):
         print(f"Best performance recommendation: {result['recommendation'].get('label')}")
     return 0
+
+
+def _cmd_launch_performance(args: argparse.Namespace) -> int:
+    command = _command_after_separator(args.workload, "Usage: autotuneai launch-performance --apply-recommendation -- <command>")
+    if not args.apply_recommendation:
+        raise SystemExit("launch-performance requires --apply-recommendation")
+    recommendation = _resolve_cached_recommendation(args)
+    tune_system_profile = recommendation.get("system_profile")
+    tune_gpu_profile = recommendation.get("gpu_profile")
+    runtime_env_profile = args.runtime_profile or recommendation.get("runtime_profile")
+    print(
+        "Launching performance workload without resource monitoring: "
+        f"label={recommendation.get('label')} "
+        f"system={tune_system_profile} "
+        f"runtime={runtime_env_profile} "
+        f"gpu={tune_gpu_profile}"
+    )
+    try:
+        return_code, run_dir = launch_performance(
+            command,
+            ResourceBudget(enforce=False),
+            executor=args.executor,
+            use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
+            tune_system_profile=tune_system_profile,
+            restore_system_after=True,
+            system_tuning_sudo=args.system_tuning_sudo,
+            docker_image=args.docker_image,
+            tune_gpu_profile=tune_gpu_profile,
+            restore_gpu_after=True,
+            gpu_tuning_sudo=args.gpu_tuning_sudo,
+            runtime_env_profile=runtime_env_profile,
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(f"Run directory: {run_dir}")
+    html_path = _auto_run_report_html(run_dir)
+    print(f"HTML report: {html_path}")
+    return return_code
 
 
 def _cmd_demo(args: argparse.Namespace) -> int:

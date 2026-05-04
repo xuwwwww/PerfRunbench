@@ -27,7 +27,7 @@ print("cuda", torch.cuda.is_available())
 print("device", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none")
 PY
 
-python -m unittest discover -s tests
+python scripts/run_tests.py --fast
 ```
 
 `environment.yml` is the minimal resource-guard environment and does not install PyTorch. Use `environment-benchmark.yml` or `python -m pip install -e ".[benchmark]"` for PyTorch, ONNX, CUDA/GPU pressure benchmarks, and modules under the `google.protobuf` namespace.
@@ -61,13 +61,20 @@ autotuneai run -- python examples/iris_train.py --config examples/iris_train_con
 autotuneai run --memory-budget-gb 1.5 --hard-kill -- python examples/stress_train.py --config examples/stress_train_config.yaml
 ```
 
-跑完整測試：
+日常快速測試：
 
 ```bash
+python scripts/run_tests.py --fast
+```
+
+發版前或修改 executor / restore lifecycle 後，再跑完整測試：
+
+```bash
+python scripts/run_tests.py --all
 python -m unittest discover -s tests
 ```
 
-這個指令會從 `tests/` 目錄自動尋找 `test_*.py`，然後執行全部 unittest。成功時最後會看到 `OK`。
+完整測試指令會從 `tests/` 目錄自動尋找 `test_*.py`，然後執行全部 unittest。成功時最後會看到 `OK`。
 
 ## 2. 不要用 sudo su 進 root shell 跑 AutoTuneAI
 
@@ -1016,13 +1023,15 @@ autotuneai optimize-performance \
   --sudo \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
-  --repeat 2 \
+  --monitor-mode minimal \
+  --time-budget-hours 8 \
+  --repeat 3 \
   --warmup-runs 1 \
   --cooldown-seconds 8 \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-It only runs unbounded candidates, defaults to low-frequency monitoring, and ranks candidates using workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+It only runs unbounded candidates, does not apply memory/CPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
 
 Use `optimize` when you want AutoTuneAI to empirically find a guarded configuration instead of guessing:
 
@@ -1045,8 +1054,17 @@ It tests curated candidates across guard mode, system profile, runtime environme
 
 Open `results/reports/auto_recommendation.html` to inspect the current baseline, recommended configuration, candidate ranking, and measured deltas. `--warmup-runs` executes discarded baseline trial(s) before measurement so cold-start effects are less likely to bias the recommendation.
 
-Apply the cached recommendation later:
+Apply the cached performance recommendation later without resource monitoring:
 
 ```bash
-autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+sudo -v
+autotuneai launch-performance \
+  --apply-recommendation \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
+
+`launch-performance` applies the cached system/GPU/runtime profiles, starts the real workload, waits for completion, and restores the previous machine settings in `finally`. It is the path to use after a performance sweep because the formal training run is not slowed down by AutoTuneAI resource monitoring. Use `autotuneai run --apply-recommendation` only when the cached recommendation is from guarded `optimize` and you intentionally want the resource guard runner.

@@ -205,14 +205,40 @@ class CliTest(unittest.TestCase):
         with patch("autotune.cli.optimize_recommendation") as optimize, patch("autotune.cli.generate_comparison_report") as report, redirect_stdout(output):
             optimize.return_value = {"recommendation": {"label": "performance:baseline"}}
             report.return_value = Path("results/reports/performance_recommendation.html")
-            code = main(["optimize-performance", "--max-candidates", "2", "--", "python", "train.py"])
+            code = main(["optimize-performance", "--max-candidates", "2", "--time-budget-hours", "8", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(optimize.call_args.kwargs["optimization_mode"], "performance")
+        self.assertEqual(optimize.call_args.kwargs["monitor_mode"], "minimal")
+        self.assertEqual(optimize.call_args.kwargs["time_budget_hours"], 8)
         self.assertFalse(optimize.call_args.args[1].enforce)
         self.assertEqual(optimize.call_args.kwargs["sample_interval_seconds"], 5.0)
         self.assertFalse(optimize.call_args.kwargs["hard_kill"])
         report.assert_called_once()
         self.assertIn("Best performance recommendation", output.getvalue())
+
+    @patch("autotune.cli.launch_performance")
+    @patch("autotune.cli.generate_run_report")
+    def test_launch_performance_applies_cached_recommendation_without_budget(self, generate_report, launch_performance) -> None:
+        launch_performance.return_value = (0, ".autotuneai/runs/run1")
+        generate_report.return_value = Path(".autotuneai/runs/run1/report.html")
+        cached = {
+            "recommendation": {
+                "label": "performance:linux-performance",
+                "system_profile": "linux-performance",
+                "runtime_profile": "runtime-pytorch-max-performance",
+                "gpu_profile": "nvidia-performance",
+                "budget": {"memory_budget_gb": -3, "resource_budget_enforced": True},
+            }
+        }
+        output = io.StringIO()
+        with patch("autotune.cli.load_recommendation", return_value=cached), redirect_stdout(output):
+            code = main(["launch-performance", "--apply-recommendation", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertFalse(launch_performance.call_args.args[1].enforce)
+        self.assertEqual(launch_performance.call_args.kwargs["tune_system_profile"], "linux-performance")
+        self.assertEqual(launch_performance.call_args.kwargs["runtime_env_profile"], "runtime-pytorch-max-performance")
+        self.assertEqual(launch_performance.call_args.kwargs["tune_gpu_profile"], "nvidia-performance")
+        self.assertIn("without resource monitoring", output.getvalue())
 
     @patch("autotune.cli.run_with_budget")
     @patch("autotune.cli.generate_run_report")

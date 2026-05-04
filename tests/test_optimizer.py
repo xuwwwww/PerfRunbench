@@ -105,6 +105,66 @@ class OptimizerTest(unittest.TestCase):
         self.assertEqual(result["optimization_mode"], "performance")
         self.assertEqual(result["candidates"][0]["guard_mode"], "performance")
 
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    @patch("autotune.recommendation.optimizer.analyze_run")
+    @patch("autotune.recommendation.optimizer.launch_performance")
+    @patch("autotune.recommendation.optimizer.run_with_budget")
+    def test_performance_minimal_mode_uses_unmonitored_launcher(self, run_with_budget, launch_performance, analyze_run, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": False}
+        launch_performance.return_value = (0, Path(".autotuneai/runs/run0"))
+        analyze_run.return_value = {
+            "status": "completed",
+            "return_code": 0,
+            "workload": {"samples_per_second": 100.0, "duration_seconds": 10.0},
+            "memory": {"memory_budget_exceeded": False},
+            "cpu": {},
+        }
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            result = optimize_recommendation(
+                ["python", "train.py"],
+                ResourceBudget(),
+                output=Path(temp_dir) / "recommendation.json",
+                cache_path=Path(temp_dir) / "latest.json",
+                max_candidates=1,
+                optimization_mode="performance",
+                monitor_mode="minimal",
+            )
+
+        launch_performance.assert_called_once()
+        run_with_budget.assert_not_called()
+        self.assertEqual(result["monitor_mode"], "minimal")
+
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    @patch("autotune.recommendation.optimizer.analyze_run")
+    @patch("autotune.recommendation.optimizer.run_with_budget")
+    @patch("autotune.recommendation.optimizer._deadline_expired")
+    def test_time_budget_flushes_partial_summary(self, deadline_expired, run_with_budget, analyze_run, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": False}
+        deadline_expired.side_effect = [False, True]
+        run_with_budget.return_value = (0, Path(".autotuneai/runs/run0"))
+        analyze_run.return_value = {
+            "status": "completed",
+            "return_code": 0,
+            "workload": {"samples_per_second": 100.0, "duration_seconds": 10.0},
+            "memory": {"memory_budget_exceeded": False},
+            "cpu": {},
+        }
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            result = optimize_recommendation(
+                ["python", "train.py"],
+                ResourceBudget(),
+                output=Path(temp_dir) / "recommendation.json",
+                cache_path=Path(temp_dir) / "latest.json",
+                max_candidates=3,
+                time_budget_hours=8,
+            )
+            self.assertTrue((Path(temp_dir) / "recommendation.json").exists())
+
+        self.assertGreaterEqual(len(result["candidates"]), 1)
+        self.assertLess(len(result["candidates"]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

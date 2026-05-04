@@ -12,6 +12,8 @@ from autotune.resource.workload_runner import (
     _resolve_executor,
     _sample_systemd_scope,
     _summarize_timeline,
+    _terminate_systemd_scope,
+    launch_performance,
     validate_workload_command,
     run_with_budget,
 )
@@ -52,6 +54,20 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertTrue((Path(run_dir) / "runtime_env_tuning.json").exists())
         manifest = load_manifest(Path(run_dir))
         self.assertTrue(any("runtime_env_profile=runtime-cpu-performance" in note for note in manifest["notes"]))
+
+    def test_launch_performance_runs_without_resource_timeline(self) -> None:
+        return_code, run_dir = launch_performance(
+            ["python", "tests/fixtures/write_metrics_workload.py"],
+            ResourceBudget(enforce=False),
+            runtime_env_profile="runtime-cpu-performance",
+        )
+        self.assertEqual(return_code, 0)
+        self.assertFalse((Path(run_dir) / "resource_timeline.json").exists())
+        self.assertTrue((Path(run_dir) / "resource_summary.json").exists())
+        self.assertTrue((Path(run_dir) / "training_metrics.json").exists())
+        manifest = load_manifest(Path(run_dir))
+        self.assertEqual(manifest["status"], "completed")
+        self.assertTrue(any("monitor_mode=minimal" in note for note in manifest["notes"]))
 
     def test_summary_includes_cgroup_fields_when_samples_have_them(self) -> None:
         summary = _summarize_timeline(
@@ -106,6 +122,37 @@ class WorkloadRunnerTest(unittest.TestCase):
             control_group="/system.slice/demo.scope",
         )
         self.assertEqual(sample.cgroup_path, "/sys/fs/cgroup/system.slice/demo.scope")
+
+    @patch("autotune.resource.workload_runner.subprocess.run")
+    def test_systemd_termination_kills_scope_before_wrapper(self, run_command) -> None:
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.terminated = False
+                self.killed = False
+
+            def poll(self):
+                return None if not self.terminated else -15
+
+            def terminate(self) -> None:
+                self.terminated = True
+
+            def wait(self, timeout=None):
+                return -15
+
+            def kill(self) -> None:
+                self.killed = True
+
+        process = FakeProcess()
+        _terminate_systemd_scope("autotuneai-demo.scope", process, use_sudo=True)
+
+        run_command.assert_called_once_with(
+            ["sudo", "systemctl", "kill", "--kill-who=all", "autotuneai-demo.scope"],
+            check=False,
+            capture_output=True,
+            timeout=5,
+        )
+        self.assertTrue(process.terminated)
+        self.assertFalse(process.killed)
 
     @patch("autotune.resource.workload_runner.collect_executor_capabilities")
     def test_auto_executor_falls_back_to_local(self, collect_capabilities) -> None:
@@ -248,6 +295,25 @@ class WorkloadRunnerTest(unittest.TestCase):
     def test_run_with_budget_fails_fast_for_missing_script(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "workload script does not exist: train.py"):
             run_with_budget(["python", "train.py"], ResourceBudget())
+
+    @patch("autotune.resource.workload_runner.restore_system_tuning")
+    @patch("autotune.resource.workload_runner.apply_system_tuning_to_run")
+    def test_launch_performance_restores_system_tuning(self, apply_tuning, restore_tuning) -> None:
+        apply_tuning.return_value = {"changes": [{"applied": True}]}
+        restore_tuning.return_value = [{"key": "vm.swappiness", "return_code": 0}]
+        clear_active_tuning_state()
+        return_code, run_dir = launch_performance(
+            ["python", "tests/fixtures/write_metrics_workload.py"],
+            ResourceBudget(enforce=False),
+            tune_system_profile="linux-performance",
+            system_tuning_sudo=True,
+        )
+        self.assertEqual(return_code, 0)
+        apply_tuning.assert_called_once()
+        restore_tuning.assert_called_once()
+        self.assertFalse(ACTIVE_TUNING_STATE.exists())
+        manifest = load_manifest(Path(run_dir))
+        self.assertTrue(any("system_tuning_lifecycle_restored=1" in note for note in manifest["notes"]))
 
 
 if __name__ == "__main__":
