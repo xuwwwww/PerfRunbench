@@ -8,6 +8,7 @@ import signal
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 from autotune.gpu.nvidia_tuner import apply_nvidia_tuning_to_run, restore_nvidia_tuning
 from autotune.resource.affinity import apply_cpu_affinity
@@ -42,6 +43,7 @@ class ChildSample:
     cgroup_memory_peak_mb: float | None = None
     cgroup_cpu_percent: float | None = None
     cgroup_cpu_usage_usec: int | None = None
+    per_cpu_percent: list[float] | None = None
 
 
 def run_with_budget(
@@ -404,6 +406,7 @@ def _sample_child(child, psutil) -> ChildSample:
         available_memory_mb=memory.available / (1024 * 1024),
         child_cpu_percent=cpu,
         system_cpu_percent=psutil.cpu_percent(interval=None),
+        per_cpu_percent=[round(value, 3) for value in psutil.cpu_percent(interval=None, percpu=True)],
     )
 
 
@@ -423,6 +426,7 @@ def _sample_systemd_scope(
         memory = psutil.virtual_memory()
         available_memory_mb = memory.available / (1024 * 1024)
         system_cpu_percent = psutil.cpu_percent(interval=None)
+        per_cpu_percent = psutil.cpu_percent(interval=None, percpu=True)
         if child is not None:
             try:
                 process_sample = _sample_child(child, psutil)
@@ -443,6 +447,7 @@ def _sample_systemd_scope(
         cgroup_memory_peak_mb=stats.memory_peak_mb if stats is not None else None,
         cgroup_cpu_percent=_cgroup_cpu_percent(stats, previous_stats),
         cgroup_cpu_usage_usec=stats.cpu_usage_usec if stats is not None else None,
+        per_cpu_percent=[round(value, 3) for value in per_cpu_percent] if psutil is not None else None,
     )
 
 
@@ -502,6 +507,7 @@ def _summarize_timeline(timeline: list[ChildSample], budget: ResourceBudget) -> 
         }
     peak_rss = max(sample.rss_mb for sample in timeline)
     child_cpu = [sample.child_cpu_percent for sample in timeline]
+    system_cpu = [sample.system_cpu_percent for sample in timeline]
     cgroup_memory = [
         sample.cgroup_memory_current_mb for sample in timeline if sample.cgroup_memory_current_mb is not None
     ]
@@ -521,6 +527,12 @@ def _summarize_timeline(timeline: list[ChildSample], budget: ResourceBudget) -> 
         "available_memory_after_mb": round(timeline[-1].available_memory_mb, 3),
         "average_child_cpu_percent": round(sum(child_cpu) / len(child_cpu), 3),
         "peak_child_cpu_percent": round(max(child_cpu), 3),
+        "child_cpu_percent_p50": _percentile(child_cpu, 50),
+        "child_cpu_percent_p95": _percentile(child_cpu, 95),
+        "average_system_cpu_percent": round(sum(system_cpu) / len(system_cpu), 3),
+        "peak_system_cpu_percent": round(max(system_cpu), 3),
+        "system_cpu_percent_p50": _percentile(system_cpu, 50),
+        "system_cpu_percent_p95": _percentile(system_cpu, 95),
         "memory_budget_mb": round(budget.memory_budget_mb, 3) if budget.memory_budget_mb is not None else None,
         "effective_memory_budget_mb": round(effective_budget, 3) if effective_budget is not None else None,
         "memory_budget_exceeded": bool(effective_budget is not None and peak_rss > effective_budget),
@@ -535,7 +547,43 @@ def _summarize_timeline(timeline: list[ChildSample], budget: ResourceBudget) -> 
     cgroup_paths = [sample.cgroup_path for sample in timeline if sample.cgroup_path]
     if cgroup_paths:
         summary["cgroup_path"] = cgroup_paths[-1]
+    per_cpu = _per_cpu_summary(timeline)
+    if per_cpu:
+        summary.update(per_cpu)
     return summary
+
+
+def _per_cpu_summary(timeline: list[ChildSample]) -> dict[str, Any]:
+    rows = [sample.per_cpu_percent for sample in timeline if sample.per_cpu_percent]
+    if not rows:
+        return {}
+    core_count = max(len(row) for row in rows)
+    averages = []
+    peaks = []
+    for index in range(core_count):
+        values = [row[index] for row in rows if index < len(row)]
+        if values:
+            averages.append(round(sum(values) / len(values), 3))
+            peaks.append(round(max(values), 3))
+    return {
+        "per_cpu_average_percent": averages,
+        "per_cpu_peak_percent": peaks,
+        "per_cpu_average_max_percent": round(max(averages), 3) if averages else None,
+        "per_cpu_peak_max_percent": round(max(peaks), 3) if peaks else None,
+    }
+
+
+def _percentile(values: list[float], percentile: float) -> float | None:
+    clean = sorted(value for value in values if isinstance(value, (int, float)))
+    if not clean:
+        return None
+    if len(clean) == 1:
+        return round(clean[0], 3)
+    rank = (len(clean) - 1) * (percentile / 100.0)
+    lower = int(rank)
+    upper = min(lower + 1, len(clean) - 1)
+    weight = rank - lower
+    return round(clean[lower] * (1 - weight) + clean[upper] * weight, 3)
 
 
 def _visible_memory_mb() -> float | None:

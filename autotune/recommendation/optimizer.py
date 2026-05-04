@@ -46,6 +46,7 @@ def optimize_recommendation(
     gpu_tuning_sudo: bool = False,
     docker_image: str = "python:3.12-slim",
     repeat: int = 1,
+    warmup_runs: int = 0,
     cooldown_seconds: float = 0.0,
     include_gpu: bool = True,
     max_candidates: int | None = None,
@@ -54,30 +55,47 @@ def optimize_recommendation(
         raise ValueError("command cannot be empty")
     if repeat < 1:
         raise ValueError("repeat must be >= 1")
+    if warmup_runs < 0:
+        raise ValueError("warmup_runs must be >= 0")
     fingerprint = _fingerprint(command, budget, executor)
     candidates = _candidate_plan(budget, include_gpu=include_gpu)
     if max_candidates is not None:
         candidates = candidates[: max(1, max_candidates)]
 
-    results = []
-    for candidate in candidates:
-        trials = []
-        for trial_index in range(repeat):
-            return_code, run_dir = run_with_budget(
+    warmups = []
+    if warmup_runs:
+        warmup_candidate = RecommendationCandidate("warmup:baseline", "warmup", ResourceBudget())
+        for warmup_index in range(warmup_runs):
+            return_code, run_dir = _run_candidate(
                 command,
-                candidate.budget,
+                warmup_candidate,
                 sample_interval_seconds=sample_interval_seconds,
                 hard_kill=hard_kill,
                 executor=executor,
                 use_sudo=use_sudo,
                 allow_sudo_auto=allow_sudo_auto,
-                tune_system_profile=candidate.system_profile,
-                restore_system_after=bool(candidate.system_profile),
                 system_tuning_sudo=system_tuning_sudo,
-                tune_gpu_profile=candidate.gpu_profile,
-                restore_gpu_after=bool(candidate.gpu_profile),
                 gpu_tuning_sudo=gpu_tuning_sudo,
-                runtime_env_profile=candidate.runtime_profile,
+                docker_image=docker_image,
+            )
+            warmups.append({"run_id": run_dir.name, "return_code": return_code, "index": warmup_index})
+            if cooldown_seconds > 0:
+                time.sleep(cooldown_seconds)
+
+    results = []
+    for candidate in candidates:
+        trials = []
+        for trial_index in range(repeat):
+            return_code, run_dir = _run_candidate(
+                command,
+                candidate,
+                sample_interval_seconds=sample_interval_seconds,
+                hard_kill=hard_kill,
+                executor=executor,
+                use_sudo=use_sudo,
+                allow_sudo_auto=allow_sudo_auto,
+                system_tuning_sudo=system_tuning_sudo,
+                gpu_tuning_sudo=gpu_tuning_sudo,
                 docker_image=docker_image,
             )
             metrics = _run_metrics(run_dir.name)
@@ -95,6 +113,8 @@ def optimize_recommendation(
         "command": command,
         "executor": executor,
         "repeat": repeat,
+        "warmup_runs": warmup_runs,
+        "warmups": warmups,
         "goal": "maximize throughput with duration and memory tie-breakers",
         "best_label": best["label"] if best else None,
         "recommendation": _recommendation_from_result(best) if best else None,
@@ -106,6 +126,38 @@ def optimize_recommendation(
     fingerprint_path = Path(cache_path).parent / f"{fingerprint}.json"
     write_json(fingerprint_path, summary)
     return summary
+
+
+def _run_candidate(
+    command: list[str],
+    candidate: RecommendationCandidate,
+    *,
+    sample_interval_seconds: float,
+    hard_kill: bool,
+    executor: str,
+    use_sudo: bool,
+    allow_sudo_auto: bool,
+    system_tuning_sudo: bool,
+    gpu_tuning_sudo: bool,
+    docker_image: str,
+) -> tuple[int, Path]:
+    return run_with_budget(
+        command,
+        candidate.budget,
+        sample_interval_seconds=sample_interval_seconds,
+        hard_kill=hard_kill,
+        executor=executor,
+        use_sudo=use_sudo,
+        allow_sudo_auto=allow_sudo_auto,
+        tune_system_profile=candidate.system_profile,
+        restore_system_after=bool(candidate.system_profile),
+        system_tuning_sudo=system_tuning_sudo,
+        tune_gpu_profile=candidate.gpu_profile,
+        restore_gpu_after=bool(candidate.gpu_profile),
+        gpu_tuning_sudo=gpu_tuning_sudo,
+        runtime_env_profile=candidate.runtime_profile,
+        docker_image=docker_image,
+    )
 
 
 def load_recommendation(path: str | Path = LATEST_RECOMMENDATION) -> dict[str, Any]:
@@ -140,6 +192,15 @@ def _candidate_plan(budget: ResourceBudget, *, include_gpu: bool) -> list[Recomm
     for guard_mode, candidate_budget in guard_modes:
         candidates.append(RecommendationCandidate(f"{guard_mode}:baseline", guard_mode, candidate_budget))
         candidates.append(RecommendationCandidate(f"{guard_mode}:runtime-cpu", guard_mode, candidate_budget, runtime_profile="runtime-cpu-performance"))
+        if "nvidia-performance" in gpu_profiles:
+            candidates.append(
+                RecommendationCandidate(
+                    f"{guard_mode}:gpu",
+                    guard_mode,
+                    candidate_budget,
+                    gpu_profile="nvidia-performance",
+                )
+            )
         if "runtime-pytorch-gpu-performance" in runtime_profiles:
             candidates.append(
                 RecommendationCandidate(
@@ -167,6 +228,16 @@ def _candidate_plan(budget: ResourceBudget, *, include_gpu: bool) -> list[Recomm
                     system_profile=system_profile,
                 )
             )
+            if "nvidia-performance" in gpu_profiles:
+                candidates.append(
+                    RecommendationCandidate(
+                        f"{guard_mode}:{system_profile}+gpu",
+                        guard_mode,
+                        candidate_budget,
+                        system_profile=system_profile,
+                        gpu_profile="nvidia-performance",
+                    )
+                )
             candidates.append(
                 RecommendationCandidate(
                     f"{guard_mode}:{system_profile}+runtime-max",
@@ -203,8 +274,8 @@ def _guard_modes(budget: ResourceBudget) -> list[tuple[str, ResourceBudget]]:
 def _default_system_profiles() -> list[str]:
     prefix = "windows" if platform.system() == "Windows" else "linux"
     preferred = [
-        f"{prefix}-throughput",
         f"{prefix}-performance",
+        f"{prefix}-throughput",
         f"{prefix}-low-latency",
         f"{prefix}-memory-conservative",
         f"{prefix}-cpu-conservative",
@@ -263,6 +334,13 @@ def _run_metrics(run_id: str) -> dict[str, Any]:
         "peak_memory_mb": _number(memory.get("peak_memory_mb")),
         "memory_budget_exceeded": bool(memory.get("memory_budget_exceeded")),
         "peak_process_cpu_percent": _number(cpu.get("observed_peak_process_cpu_percent")),
+        "average_process_cpu_percent": _number(cpu.get("observed_average_process_cpu_percent")),
+        "peak_system_cpu_percent": _number(cpu.get("observed_peak_system_cpu_percent")),
+        "average_system_cpu_percent": _number(cpu.get("observed_average_system_cpu_percent")),
+        "system_cpu_percent_p50": _number(cpu.get("observed_system_cpu_percent_p50")),
+        "system_cpu_percent_p95": _number(cpu.get("observed_system_cpu_percent_p95")),
+        "per_cpu_average_max_percent": _number(cpu.get("per_cpu_average_max_percent")),
+        "per_cpu_peak_max_percent": _number(cpu.get("per_cpu_peak_max_percent")),
     }
 
 
@@ -285,6 +363,13 @@ def _candidate_result(candidate: RecommendationCandidate, trials: list[dict[str,
             "gpu_peak_memory_allocated_mb": _median(trials, "gpu_peak_memory_allocated_mb"),
             "peak_memory_mb": _median(trials, "peak_memory_mb"),
             "peak_process_cpu_percent": _median(trials, "peak_process_cpu_percent"),
+            "average_process_cpu_percent": _median(trials, "average_process_cpu_percent"),
+            "peak_system_cpu_percent": _median(trials, "peak_system_cpu_percent"),
+            "average_system_cpu_percent": _median(trials, "average_system_cpu_percent"),
+            "system_cpu_percent_p50": _median(trials, "system_cpu_percent_p50"),
+            "system_cpu_percent_p95": _median(trials, "system_cpu_percent_p95"),
+            "per_cpu_average_max_percent": _median(trials, "per_cpu_average_max_percent"),
+            "per_cpu_peak_max_percent": _median(trials, "per_cpu_peak_max_percent"),
             "memory_budget_exceeded": any(trial.get("memory_budget_exceeded") for trial in trials),
         },
         "score": _score(trials),

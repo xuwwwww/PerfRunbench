@@ -32,6 +32,8 @@ class RunReportTest(unittest.TestCase):
                     "peak_rss_mb": 128,
                     "memory_budget_exceeded": False,
                     "peak_child_cpu_percent": 75,
+                    "system_cpu_percent_p95": 50,
+                    "per_cpu_peak_max_percent": 80,
                 },
             )
             write_json(run_dir / "resource_timeline.json", [{"system_cpu_percent": 50, "available_memory_mb": 1024}])
@@ -46,6 +48,7 @@ class RunReportTest(unittest.TestCase):
             self.assertIn("<svg", report)
             self.assertIn("Available memory at start", report)
             self.assertIn("## CPU", report)
+            self.assertIn("Observed system CPU p95 percent", report)
             self.assertIn("## Memory", report)
             self.assertIn("## Diagnostics", report)
 
@@ -120,6 +123,52 @@ class RunReportTest(unittest.TestCase):
             self.assertEqual(report_path, output)
             self.assertIn("Profile Comparison Summary", report)
             self.assertIn("linux-performance", report)
+
+    def test_generate_auto_recommendation_report_writes_html(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            path = Path(temp_dir) / "auto_recommendation.json"
+            output = Path(temp_dir) / "auto_recommendation.html"
+            write_json(
+                path,
+                {
+                    "kind": "auto_recommendation",
+                    "best_label": "unbounded:linux-performance",
+                    "cache_path": ".autotuneai/recommendations/latest.json",
+                    "fingerprint": "abc",
+                    "repeat": 1,
+                    "warmup_runs": 1,
+                    "recommendation": {
+                        "label": "unbounded:linux-performance",
+                        "guard_mode": "unbounded",
+                        "system_profile": "linux-performance",
+                        "runtime_profile": "runtime-pytorch-max-performance",
+                        "gpu_profile": "nvidia-performance",
+                        "metrics": {"samples_per_second": 120, "duration_seconds": 9, "gpu_tflops_estimate": 10},
+                    },
+                    "candidates": [
+                        {
+                            "label": "unbounded:baseline",
+                            "status": "completed",
+                            "metrics": {"samples_per_second": 100, "duration_seconds": 10, "gpu_tflops_estimate": 8},
+                        },
+                        {
+                            "label": "unbounded:linux-performance",
+                            "status": "completed",
+                            "system_profile": "linux-performance",
+                            "runtime_profile": "runtime-pytorch-max-performance",
+                            "gpu_profile": "nvidia-performance",
+                            "metrics": {"samples_per_second": 120, "duration_seconds": 9, "gpu_tflops_estimate": 10},
+                        },
+                    ],
+                },
+            )
+
+            report_path = generate_comparison_report(path, output)
+
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("Auto Recommendation", report)
+            self.assertIn("Current vs Recommended", report)
+            self.assertIn("unbounded:linux-performance", report)
 
 
 if __name__ == "__main__":

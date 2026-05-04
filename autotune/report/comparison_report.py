@@ -23,6 +23,8 @@ def generate_comparison_report(input_path: str | Path, output: str | Path | None
 def format_comparison_report(data: dict[str, Any], source: Path | None = None) -> str:
     if data.get("kind") == "profile_comparison_summary":
         return _format_profile_summary_report(data, source)
+    if data.get("kind") == "auto_recommendation":
+        return _format_auto_recommendation_report(data, source)
     title = _report_title(data)
     baseline_label = _baseline_label(data)
     tuned_label = _tuned_label(data)
@@ -93,6 +95,8 @@ def format_comparison_report(data: dict[str, Any], source: Path | None = None) -
 def format_comparison_report_html(data: dict[str, Any], source: Path | None = None) -> str:
     if data.get("kind") == "profile_comparison_summary":
         return _format_profile_summary_report_html(data, source)
+    if data.get("kind") == "auto_recommendation":
+        return _format_auto_recommendation_report_html(data, source)
     title = _report_title(data)
     baseline_label = _baseline_label(data)
     tuned_label = _tuned_label(data)
@@ -295,6 +299,171 @@ def _format_profile_summary_report_html(data: dict[str, Any], source: Path | Non
             "",
         ]
     )
+
+
+def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None = None) -> str:
+    candidates = data.get("candidates", [])
+    baseline = _auto_baseline_candidate(candidates)
+    best = data.get("recommendation") or {}
+    best_metrics = best.get("metrics", {}) if isinstance(best.get("metrics"), dict) else {}
+    baseline_metrics = baseline.get("metrics", {}) if isinstance(baseline, dict) else {}
+    lines = [
+        "# AutoTuneAI Auto Recommendation",
+        "",
+        f"- Source: `{source}`" if source else "- Source: in-memory recommendation",
+        f"- Best label: `{data.get('best_label')}`",
+        f"- Cache path: `{data.get('cache_path')}`",
+        f"- Fingerprint: `{data.get('fingerprint')}`",
+        f"- Repeat: {data.get('repeat', 1)}",
+        f"- Warmup runs: {data.get('warmup_runs', 0)}",
+        "",
+        "## Current vs Recommended",
+        "",
+        f"- Current baseline: `{baseline.get('label') if isinstance(baseline, dict) else None}`",
+        f"- Recommended: `{best.get('label')}`",
+        f"- Samples/sec delta: {_delta_percent(best_metrics.get('samples_per_second'), baseline_metrics.get('samples_per_second'))}%",
+        f"- Duration delta: {_delta_percent(best_metrics.get('duration_seconds'), baseline_metrics.get('duration_seconds'))}%",
+        f"- GPU TFLOPS delta: {_delta_percent(best_metrics.get('gpu_tflops_estimate'), baseline_metrics.get('gpu_tflops_estimate'))}%",
+        "",
+        "## Ranking",
+        "",
+        metric_bar_chart(
+            "Candidate samples/sec",
+            [(str(item.get("label")), _nested(item, "metrics", "samples_per_second")) for item in candidates],
+        ),
+        "",
+    ]
+    for item in candidates:
+        metrics = item.get("metrics", {})
+        lines.append(
+            "- "
+            f"{item.get('label')}: status={item.get('status')}, "
+            f"samples/sec={metrics.get('samples_per_second')}, "
+            f"duration={metrics.get('duration_seconds')}, "
+            f"system={item.get('system_profile')}, runtime={item.get('runtime_profile')}, gpu={item.get('gpu_profile')}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path | None = None) -> str:
+    candidates = data.get("candidates", [])
+    baseline = _auto_baseline_candidate(candidates)
+    best = data.get("recommendation") or {}
+    best_metrics = best.get("metrics", {}) if isinstance(best.get("metrics"), dict) else {}
+    baseline_metrics = baseline.get("metrics", {}) if isinstance(baseline, dict) else {}
+    summary_rows = [
+        ("Source", str(source) if source else "in-memory recommendation"),
+        ("Best label", data.get("best_label")),
+        ("Cache path", data.get("cache_path")),
+        ("Fingerprint", data.get("fingerprint")),
+        ("Repeat", data.get("repeat", 1)),
+        ("Warmup runs", data.get("warmup_runs", 0)),
+    ]
+    summary_html = "".join(
+        f"<div class=\"stat\"><span class=\"label\">{_html_escape(label)}</span><span class=\"value\">{_html_escape(value)}</span></div>"
+        for label, value in summary_rows
+    )
+    current_rows = [
+        ("Current baseline", baseline.get("label") if isinstance(baseline, dict) else None),
+        ("Recommended", best.get("label")),
+        ("Guard mode", best.get("guard_mode")),
+        ("System profile", best.get("system_profile")),
+        ("Runtime profile", best.get("runtime_profile")),
+        ("GPU profile", best.get("gpu_profile")),
+        ("Samples/sec delta", _format_delta(_delta_percent(best_metrics.get("samples_per_second"), baseline_metrics.get("samples_per_second")))),
+        ("Duration delta", _format_delta(_delta_percent(best_metrics.get("duration_seconds"), baseline_metrics.get("duration_seconds")))),
+        ("GPU TFLOPS delta", _format_delta(_delta_percent(best_metrics.get("gpu_tflops_estimate"), baseline_metrics.get("gpu_tflops_estimate")))),
+    ]
+    table_rows = "".join(
+        "<tr>"
+        f"<td>{_html_escape(item.get('label'))}</td>"
+        f"<td>{_html_escape(item.get('status'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'samples_per_second'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'duration_seconds'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'gpu_tflops_estimate'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'peak_system_cpu_percent'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'per_cpu_peak_max_percent'))}</td>"
+        f"<td>{_html_escape(item.get('system_profile'))}</td>"
+        f"<td>{_html_escape(item.get('runtime_profile'))}</td>"
+        f"<td>{_html_escape(item.get('gpu_profile'))}</td>"
+        "</tr>"
+        for item in candidates
+    ) or "<tr><td colspan=\"10\">No candidates recorded.</td></tr>"
+    return "\n".join(
+        [
+            "<!doctype html>",
+            "<html lang=\"en\">",
+            "<head>",
+            "<meta charset=\"utf-8\">",
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+            "<title>AutoTuneAI Auto Recommendation</title>",
+            "<style>",
+            _comparison_report_css(),
+            "table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.wide{overflow-x:auto}",
+            "</style>",
+            "</head>",
+            "<body>",
+            "<main class=\"page\">",
+            "<section class=\"hero\">",
+            "<p class=\"eyebrow\">AutoTuneAI</p>",
+            "<h1>Auto Recommendation</h1>",
+            "<p class=\"lede\">Current baseline, recommended configuration, and candidate ranking from the empirical sweep.</p>",
+            "</section>",
+            f"<section class=\"summary-grid\">{summary_html}</section>",
+            "<section class=\"card\">",
+            "<h2>Current vs Recommended</h2>",
+            _simple_table(current_rows),
+            "</section>",
+            "<section class=\"card\">",
+            "<h2>Throughput Ranking</h2>",
+            metric_bar_chart(
+                "Candidate samples/sec",
+                [(str(item.get("label")), _nested(item, "metrics", "samples_per_second")) for item in candidates],
+            ),
+            "</section>",
+            "<section class=\"card wide\">",
+            "<h2>Candidate Details</h2>",
+            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Duration sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
+            f"<tbody>{table_rows}</tbody></table>",
+            "</section>",
+            "</main>",
+            "</body>",
+            "</html>",
+            "",
+        ]
+    )
+
+
+def _auto_baseline_candidate(candidates: list[Any]) -> dict[str, Any]:
+    for item in candidates:
+        if isinstance(item, dict) and item.get("label") == "unbounded:baseline":
+            return item
+    for item in candidates:
+        if isinstance(item, dict) and str(item.get("label", "")).endswith(":baseline"):
+            return item
+    return candidates[0] if candidates and isinstance(candidates[0], dict) else {}
+
+
+def _delta_percent(value: Any, baseline: Any) -> float | None:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    if not isinstance(baseline, (int, float)) or isinstance(baseline, bool) or baseline == 0:
+        return None
+    return round(((float(value) - float(baseline)) / abs(float(baseline))) * 100, 3)
+
+
+def _format_delta(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:+.3f}%"
+
+
+def _simple_table(rows: list[tuple[str, object]]) -> str:
+    body = "".join(
+        f"<tr><th>{_html_escape(label)}</th><td>{_html_escape(value)}</td></tr>"
+        for label, value in rows
+    )
+    return f"<table><tbody>{body}</tbody></table>"
 
 
 def _preferred_group(data: dict[str, Any], key: str, *, aggregate: bool = True) -> dict[str, Any]:

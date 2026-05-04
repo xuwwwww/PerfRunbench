@@ -44,7 +44,14 @@ class RunAnalysisTest(unittest.TestCase):
                     "peak_rss_mb": 3000,
                     "effective_memory_budget_mb": 7000,
                     "available_memory_after_mb": 5000,
+                    "average_child_cpu_percent": 44,
                     "peak_child_cpu_percent": 88,
+                    "child_cpu_percent_p95": 80,
+                    "average_system_cpu_percent": 43,
+                    "peak_system_cpu_percent": 85,
+                    "system_cpu_percent_p95": 80.8,
+                    "per_cpu_average_max_percent": 55,
+                    "per_cpu_peak_max_percent": 99,
                     "memory_budget_exceeded": False,
                 },
             )
@@ -71,6 +78,9 @@ class RunAnalysisTest(unittest.TestCase):
             analysis = analyze_run("run1", runs_dir)
 
         self.assertEqual(analysis["cpu"]["expected_max_total_cpu_percent"], 87.5)
+        self.assertEqual(analysis["cpu"]["observed_average_process_cpu_percent"], 44)
+        self.assertEqual(analysis["cpu"]["observed_system_cpu_percent_p95"], 80.8)
+        self.assertEqual(analysis["cpu"]["per_cpu_peak_max_percent"], 99)
         self.assertEqual(analysis["cpu"]["affinity_cores"], "0,1,2,3,4,5,6")
         self.assertEqual(analysis["memory"]["requested_reserve_to_full_gb"], 5)
         self.assertFalse(analysis["memory"]["memory_budget_exceeded"])

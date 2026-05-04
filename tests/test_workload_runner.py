@@ -68,6 +68,7 @@ class WorkloadRunnerTest(unittest.TestCase):
                     cgroup_memory_peak_mb=120,
                     cgroup_cpu_percent=50,
                     cgroup_cpu_usage_usec=1_000_000,
+                    per_cpu_percent=[10, 20],
                 ),
                 ChildSample(
                     timestamp=2.0,
@@ -81,6 +82,7 @@ class WorkloadRunnerTest(unittest.TestCase):
                     cgroup_memory_peak_mb=180,
                     cgroup_cpu_percent=75,
                     cgroup_cpu_usage_usec=1_750_000,
+                    per_cpu_percent=[30, 40],
                 ),
             ],
             ResourceBudget(memory_budget_gb=1),
@@ -91,6 +93,9 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertEqual(summary["average_cgroup_cpu_percent"], 62.5)
         self.assertEqual(summary["peak_cgroup_cpu_percent"], 75)
         self.assertEqual(summary["cgroup_path"], "/sys/fs/cgroup/demo.scope")
+        self.assertEqual(summary["per_cpu_average_percent"], [20, 30])
+        self.assertEqual(summary["per_cpu_peak_percent"], [30, 40])
+        self.assertEqual(summary["system_cpu_percent_p95"], 11.9)
 
     def test_systemd_sample_records_attempted_cgroup_path_when_stats_are_missing(self) -> None:
         sample = _sample_systemd_scope(

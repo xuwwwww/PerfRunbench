@@ -155,14 +155,14 @@ autotuneai run \
   -- conda run -n user-train-env python train.py --config configs/train.yaml
 ```
 
-在 WSL 裡用完整 conda 路徑更穩：
+在 WSL 或非互動 shell 裡，用該機器的完整 conda/micromamba 路徑更穩：
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai autotuneai run \
+/path/to/conda run -n autotuneai autotuneai run \
   --executor systemd \
   --sudo \
   --memory-budget-gb 22 \
-  -- /home/louis/miniforge3/bin/conda run -n user-train-env python train.py
+  -- /path/to/conda run -n user-train-env python train.py
 ```
 
 這就是「雙環境」模型：AutoTuneAI 的環境只負責監控、限制、記錄和調度；使用者原本的 training environment 負責真正訓練。
@@ -610,6 +610,9 @@ nvidia-safe
 
 nvidia-throughput
   開 persistence mode，並嘗試把 power limit 設到 nvidia-smi 回報的 max limit。
+
+nvidia-performance
+  在 driver 支援時嘗試 persistence mode、最大 power limit，以及可用的 performance-oriented NVIDIA runtime controls。
 ```
 
 套用 GPU runtime tuning：
@@ -652,7 +655,8 @@ autotuneai run \
 
 - `nvidia-smi` 某些欄位在 laptop GPU 或 WSL 可能是 `[N/A]`，AutoTuneAI 會略過無法套用的 setting。
 - power limit / persistence mode 可能需要 root/admin 權限，也可能被 OEM/driver 鎖住。
-- 目前還沒有自動調 CUDA allocator、MIG、application clocks；那些會是下一層 GPU tuner。
+- AutoTuneAI 不把加電壓、BIOS/firmware overclock 當成通用自動動作；目前只套用可 snapshot/restore 的 OS 或 driver runtime controls。
+- Linux `linux-performance` 在 kernel 暴露 cpufreq 時，會嘗試 reversible governor/EPP/min-frequency tuning；如果 VM、WSL、雲端或 OEM 鎖住這些檔案，會記錄為 unsupported/unchanged。
 
 `autotuneai report --run-id <run_id>` 的 `Before / After` 區塊會集中顯示 memory start/end/min、peak memory、system tuning snapshots，以及 source/config change 數量。
 
@@ -920,7 +924,7 @@ AutoTuneAI 的定位是把「單機訓練入口包住」，同時做資源限制
 - config tuner 目前只支援單一檔案、單一 numeric key。
 ## Auto-generated HTML reports
 
-`autotuneai run`, `autotuneai compare-tuning`, `autotuneai compare-budgets`, and `autotuneai compare-profiles` now auto-write `.html` reports next to their JSON or run directory outputs.
+`autotuneai run`, `autotuneai compare-tuning`, `autotuneai compare-budgets`, `autotuneai compare-profiles`, and `autotuneai optimize` auto-write `.html` reports next to their JSON or run directory outputs.
 
 Examples:
 
@@ -995,11 +999,14 @@ autotuneai optimize \
   --memory-budget-gb -3 \
   --sample-interval-seconds 0.1 \
   --repeat 1 \
+  --warmup-runs 1 \
   --cooldown-seconds 8 \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. The result is written to `results/reports/auto_recommendation.json` and cached at `.autotuneai/recommendations/latest.json`.
+It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. The result is written to `results/reports/auto_recommendation.json`, a browser-ready report is generated at `results/reports/auto_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+
+Open `results/reports/auto_recommendation.html` to inspect the current baseline, recommended configuration, candidate ranking, and measured deltas. `--warmup-runs` executes discarded baseline trial(s) before measurement so cold-start effects are less likely to bias the recommendation.
 
 Apply the cached recommendation later:
 

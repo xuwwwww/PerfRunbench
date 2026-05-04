@@ -60,13 +60,13 @@ autotuneai compare-tuning \
   -- python examples/stress_train.py --config examples/stress_train_60s_config.yaml
 ```
 
-In WSL or non-interactive shells, prefer the explicit conda path:
+In WSL or non-interactive shells, prefer the explicit path to the conda executable on that machine:
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/inspect_system.py
+/path/to/conda run -n autotuneai python scripts/inspect_system.py
 ```
 
-Replace `/home/louis/miniforge3/bin/conda` with the user's own conda executable path on other machines.
+Replace `/path/to/conda` with `which conda`, `which micromamba`, or the absolute path used by the host environment.
 
 Executor capability detection reports the best available resource backend on the current machine:
 
@@ -338,6 +338,8 @@ autotuneai tune-gpu --apply --sudo --profile nvidia-performance
 autotuneai restore --run-id <run_id> --gpu-sudo
 ```
 
+Linux `linux-performance` also attempts reversible cpufreq tuning when the kernel exposes it: `scaling_governor=performance`, energy performance preference, and an aggressive minimum frequency during the run. AutoTuneAI does not perform voltage increases or BIOS/firmware overclocking as a generic runtime action; it only uses OS/driver controls that can be snapshotted and restored.
+
 For a single training run, GPU tuning can be applied and restored as part of the run lifecycle:
 
 ```bash
@@ -385,13 +387,16 @@ autotuneai optimize \
   --memory-budget-gb -3 \
   --sample-interval-seconds 0.1 \
   --repeat 1 \
+  --warmup-runs 1 \
   --cooldown-seconds 8 \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 
 autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. It writes `results/reports/auto_recommendation.json` and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
+`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. It writes `results/reports/auto_recommendation.json`, automatically generates `results/reports/auto_recommendation.html`, and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
+
+Open `results/reports/auto_recommendation.html` to see the current baseline, the recommended configuration, per-candidate throughput, GPU throughput, CPU peaks, and deltas.
 
 If the environment already exists:
 

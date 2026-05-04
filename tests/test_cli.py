@@ -190,11 +190,14 @@ class CliTest(unittest.TestCase):
 
     def test_optimize_command_writes_recommendation(self) -> None:
         output = io.StringIO()
-        with patch("autotune.cli.optimize_recommendation") as optimize, redirect_stdout(output):
+        with patch("autotune.cli.optimize_recommendation") as optimize, patch("autotune.cli.generate_comparison_report") as report, redirect_stdout(output):
             optimize.return_value = {"recommendation": {"label": "best"}}
-            code = main(["optimize", "--max-candidates", "2", "--", "python", "train.py"])
+            report.return_value = Path("results/reports/auto_recommendation.html")
+            code = main(["optimize", "--max-candidates", "2", "--warmup-runs", "1", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(optimize.call_args.kwargs["max_candidates"], 2)
+        self.assertEqual(optimize.call_args.kwargs["warmup_runs"], 1)
+        report.assert_called_once()
         self.assertIn("Cached recommendation", output.getvalue())
 
     @patch("autotune.cli.run_with_budget")

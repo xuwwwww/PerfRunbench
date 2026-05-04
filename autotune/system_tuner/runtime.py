@@ -556,9 +556,74 @@ def load_json(path: Path) -> Any:
 
 def _profile_settings(profile: str) -> list[RuntimeSetting]:
     try:
-        return PROFILES[profile]
+        return [*PROFILES[profile], *_dynamic_profile_settings(profile)]
     except KeyError as exc:
         raise SystemTuningError(f"unknown system tuning profile: {profile}") from exc
+
+
+def _dynamic_profile_settings(
+    profile: str,
+    *,
+    cpufreq_base: Path = Path("/sys/devices/system/cpu/cpufreq"),
+) -> list[RuntimeSetting]:
+    if not profile.startswith("linux-") or profile not in {"linux-throughput", "linux-performance"}:
+        return []
+    settings: list[RuntimeSetting] = []
+    for policy in sorted(cpufreq_base.glob("policy*")):
+        if not policy.is_dir():
+            continue
+        governor_path = policy / "scaling_governor"
+        available_governors = _read_words(policy / "scaling_available_governors")
+        if governor_path.exists() and (not available_governors or "performance" in available_governors):
+            settings.append(
+                RuntimeSetting(
+                    key=f"cpu.cpufreq.{policy.name}.scaling_governor",
+                    value="performance",
+                    reason="Force the CPU frequency governor to performance for the benchmark window.",
+                    source="file",
+                    path=governor_path.as_posix(),
+                )
+            )
+        epp_path = policy / "energy_performance_preference"
+        available_epp = _read_words(policy / "energy_performance_available_preferences")
+        if profile == "linux-performance" and epp_path.exists() and (not available_epp or "performance" in available_epp):
+            settings.append(
+                RuntimeSetting(
+                    key=f"cpu.cpufreq.{policy.name}.energy_performance_preference",
+                    value="performance",
+                    reason="Ask Intel/AMD energy preference controls to favor performance during the run.",
+                    source="file",
+                    path=epp_path.as_posix(),
+                )
+            )
+        min_freq_path = policy / "scaling_min_freq"
+        max_freq_path = policy / "cpuinfo_max_freq"
+        max_freq = _read_text(max_freq_path)
+        if profile == "linux-performance" and min_freq_path.exists() and max_freq:
+            settings.append(
+                RuntimeSetting(
+                    key=f"cpu.cpufreq.{policy.name}.scaling_min_freq",
+                    value=max_freq,
+                    reason="Pin the minimum CPU frequency to the advertised maximum for an aggressive throughput trial.",
+                    source="file",
+                    path=min_freq_path.as_posix(),
+                )
+            )
+    return settings
+
+
+def _read_words(path: Path) -> set[str]:
+    text = _read_text(path)
+    return set(text.split()) if text else set()
+
+
+def _read_text(path: Path) -> str | None:
+    try:
+        if not path.exists():
+            return None
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
 
 
 def _profile_supported_on_platform(profile: str, current_platform: str) -> bool:

@@ -9,6 +9,7 @@ from unittest.mock import patch
 from autotune.system_tuner.runtime import (
     RuntimeSetting,
     SettingSnapshot,
+    _dynamic_profile_settings,
     apply_system_tuning,
     available_profiles,
     recommend_system_tuning,
@@ -189,6 +190,24 @@ class SystemTunerTest(unittest.TestCase):
         self.assertTrue(all("source" in item for item in result["settings"]))
         self.assertTrue(all("path" in item for item in result["settings"]))
         self.assertTrue(any(item["source"] == "file" for item in result["settings"]))
+
+    def test_linux_performance_discovers_cpufreq_runtime_controls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            policy = Path(temp_dir) / "policy0"
+            policy.mkdir()
+            (policy / "scaling_governor").write_text("powersave\n", encoding="utf-8")
+            (policy / "scaling_available_governors").write_text("powersave performance\n", encoding="utf-8")
+            (policy / "energy_performance_preference").write_text("balance_power\n", encoding="utf-8")
+            (policy / "energy_performance_available_preferences").write_text("balance_power performance\n", encoding="utf-8")
+            (policy / "scaling_min_freq").write_text("400000\n", encoding="utf-8")
+            (policy / "cpuinfo_max_freq").write_text("3800000\n", encoding="utf-8")
+
+            settings = _dynamic_profile_settings("linux-performance", cpufreq_base=Path(temp_dir))
+
+        keys = {setting.key: setting.value for setting in settings}
+        self.assertEqual(keys["cpu.cpufreq.policy0.scaling_governor"], "performance")
+        self.assertEqual(keys["cpu.cpufreq.policy0.energy_performance_preference"], "performance")
+        self.assertEqual(keys["cpu.cpufreq.policy0.scaling_min_freq"], "3800000")
 
 
 if __name__ == "__main__":

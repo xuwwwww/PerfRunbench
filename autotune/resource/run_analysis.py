@@ -68,8 +68,13 @@ def format_analysis(analysis: dict[str, Any]) -> str:
         f"  affinity_applied: {analysis['cpu'].get('affinity_applied')}",
         f"  affinity_cores: {analysis['cpu'].get('affinity_cores')}",
         f"  expected_max_total_cpu_percent: {analysis['cpu'].get('expected_max_total_cpu_percent')}",
+        f"  observed_average_process_cpu_percent: {analysis['cpu'].get('observed_average_process_cpu_percent')}",
         f"  observed_peak_process_cpu_percent: {analysis['cpu'].get('observed_peak_process_cpu_percent')}",
+        f"  observed_average_system_cpu_percent: {analysis['cpu'].get('observed_average_system_cpu_percent')}",
         f"  observed_peak_system_cpu_percent: {analysis['cpu'].get('observed_peak_system_cpu_percent')}",
+        f"  observed_system_cpu_percent_p95: {analysis['cpu'].get('observed_system_cpu_percent_p95')}",
+        f"  per_cpu_average_max_percent: {analysis['cpu'].get('per_cpu_average_max_percent')}",
+        f"  per_cpu_peak_max_percent: {analysis['cpu'].get('per_cpu_peak_max_percent')}",
         "",
         "Memory",
         f"  mode: {analysis['memory'].get('mode')}",
@@ -117,8 +122,11 @@ def _analyze_cpu(
     allowed = _to_int(affinity.get("allowed_threads") or budget.get("allowed_threads"))
     expected = round((allowed / logical) * 100, 3) if logical and allowed else None
     peak_process = summary.get("peak_child_cpu_percent")
+    average_process = summary.get("average_child_cpu_percent")
     system_values = [sample.get("system_cpu_percent") for sample in timeline if sample.get("system_cpu_percent") is not None]
-    peak_system = round(max(system_values), 3) if system_values else None
+    peak_system = summary.get("peak_system_cpu_percent")
+    if peak_system is None and system_values:
+        peak_system = round(max(system_values), 3)
     diagnostics = []
     if affinity.get("cpu_affinity_applied"):
         diagnostics.append(
@@ -138,8 +146,18 @@ def _analyze_cpu(
         "affinity_applied": affinity.get("cpu_affinity_applied"),
         "affinity_cores": affinity.get("affinity_cores"),
         "expected_max_total_cpu_percent": expected,
+        "observed_average_process_cpu_percent": average_process,
         "observed_peak_process_cpu_percent": peak_process,
+        "observed_process_cpu_percent_p50": summary.get("child_cpu_percent_p50"),
+        "observed_process_cpu_percent_p95": summary.get("child_cpu_percent_p95"),
+        "observed_average_system_cpu_percent": summary.get("average_system_cpu_percent"),
         "observed_peak_system_cpu_percent": peak_system,
+        "observed_system_cpu_percent_p50": summary.get("system_cpu_percent_p50"),
+        "observed_system_cpu_percent_p95": summary.get("system_cpu_percent_p95"),
+        "per_cpu_average_percent": summary.get("per_cpu_average_percent"),
+        "per_cpu_peak_percent": summary.get("per_cpu_peak_percent"),
+        "per_cpu_average_max_percent": summary.get("per_cpu_average_max_percent"),
+        "per_cpu_peak_max_percent": summary.get("per_cpu_peak_max_percent"),
         "diagnostics": diagnostics,
     }
 

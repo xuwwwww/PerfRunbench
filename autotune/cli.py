@@ -176,6 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--system-tuning-sudo", action="store_true")
     optimize.add_argument("--gpu-tuning-sudo", action="store_true")
     optimize.add_argument("--repeat", type=int, default=1)
+    optimize.add_argument("--warmup-runs", type=int, default=0, help="Run unbounded baseline warmup trial(s) before measurement and discard them.")
     optimize.add_argument("--cooldown-seconds", type=float, default=0.0)
     optimize.add_argument("--max-candidates", type=int)
     optimize.add_argument("--no-gpu", action="store_true")
@@ -516,6 +517,7 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
             gpu_tuning_sudo=args.gpu_tuning_sudo,
             docker_image=args.docker_image,
             repeat=args.repeat,
+            warmup_runs=args.warmup_runs,
             cooldown_seconds=args.cooldown_seconds,
             include_gpu=not args.no_gpu,
             max_candidates=args.max_candidates,
@@ -525,6 +527,8 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote auto recommendation to {args.output}")
     print(f"Cached recommendation at {args.cache}")
+    html_path = _auto_comparison_report_html(args.output)
+    print(f"HTML report: {html_path}")
     if result.get("recommendation"):
         print(f"Best recommendation: {result['recommendation'].get('label')}")
     return 0
