@@ -50,6 +50,7 @@ def optimize_recommendation(
     cooldown_seconds: float = 0.0,
     include_gpu: bool = True,
     max_candidates: int | None = None,
+    optimization_mode: str = "guarded",
 ) -> dict[str, Any]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -57,8 +58,11 @@ def optimize_recommendation(
         raise ValueError("repeat must be >= 1")
     if warmup_runs < 0:
         raise ValueError("warmup_runs must be >= 0")
-    fingerprint = _fingerprint(command, budget, executor)
-    candidates = _candidate_plan(budget, include_gpu=include_gpu)
+    if optimization_mode not in {"guarded", "performance"}:
+        raise ValueError("optimization_mode must be 'guarded' or 'performance'")
+    effective_budget = ResourceBudget(enforce=False) if optimization_mode == "performance" else budget
+    fingerprint = _fingerprint(command, effective_budget, executor, optimization_mode=optimization_mode)
+    candidates = _candidate_plan(effective_budget, include_gpu=include_gpu, optimization_mode=optimization_mode)
     if max_candidates is not None:
         candidates = candidates[: max(1, max_candidates)]
 
@@ -115,7 +119,8 @@ def optimize_recommendation(
         "repeat": repeat,
         "warmup_runs": warmup_runs,
         "warmups": warmups,
-        "goal": "maximize throughput with duration and memory tie-breakers",
+        "optimization_mode": optimization_mode,
+        "goal": _goal_text(optimization_mode),
         "best_label": best["label"] if best else None,
         "recommendation": _recommendation_from_result(best) if best else None,
         "candidates": ranked,
@@ -180,8 +185,13 @@ def budget_from_recommendation(recommendation: dict[str, Any], fallback: Resourc
     )
 
 
-def _candidate_plan(budget: ResourceBudget, *, include_gpu: bool) -> list[RecommendationCandidate]:
-    guard_modes = _guard_modes(budget)
+def _candidate_plan(
+    budget: ResourceBudget,
+    *,
+    include_gpu: bool,
+    optimization_mode: str = "guarded",
+) -> list[RecommendationCandidate]:
+    guard_modes = [("performance", ResourceBudget(enforce=False))] if optimization_mode == "performance" else _guard_modes(budget)
     system_profiles = _default_system_profiles()
     runtime_profiles = [None, *_default_runtime_profiles()]
     gpu_profiles = [None]
@@ -198,6 +208,26 @@ def _candidate_plan(budget: ResourceBudget, *, include_gpu: bool) -> list[Recomm
                     f"{guard_mode}:gpu",
                     guard_mode,
                     candidate_budget,
+                    gpu_profile="nvidia-performance",
+                )
+            )
+        if "runtime-pytorch-gpu-performance" in runtime_profiles and "nvidia-performance" in gpu_profiles:
+            candidates.append(
+                RecommendationCandidate(
+                    f"{guard_mode}:runtime-gpu+gpu",
+                    guard_mode,
+                    candidate_budget,
+                    runtime_profile="runtime-pytorch-gpu-performance",
+                    gpu_profile="nvidia-performance",
+                )
+            )
+        if "runtime-pytorch-max-performance" in runtime_profiles and "nvidia-performance" in gpu_profiles:
+            candidates.append(
+                RecommendationCandidate(
+                    f"{guard_mode}:runtime-max+gpu",
+                    guard_mode,
+                    candidate_budget,
+                    runtime_profile="runtime-pytorch-max-performance",
                     gpu_profile="nvidia-performance",
                 )
             )
@@ -400,11 +430,12 @@ def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float]:
     gpu_tflops = metrics.get("gpu_tflops_estimate")
     duration = metrics.get("duration_seconds")
     memory = metrics.get("peak_memory_mb")
+    has_throughput = 1.0 if throughput is not None else 0.0
     return (
-        float(throughput if throughput is not None else float("-inf")),
+        has_throughput,
+        float(throughput if throughput is not None else 0.0),
         float(gpu_tflops if gpu_tflops is not None else 0.0),
         -float(duration if duration is not None else float("inf")),
-        -float(memory if memory is not None else 0.0),
     )
 
 
@@ -440,11 +471,18 @@ def _reason(candidate: RecommendationCandidate, trials: list[dict[str, Any]]) ->
     return reasons
 
 
-def _fingerprint(command: list[str], budget: ResourceBudget, executor: str) -> str:
+def _fingerprint(
+    command: list[str],
+    budget: ResourceBudget,
+    executor: str,
+    *,
+    optimization_mode: str = "guarded",
+) -> str:
     payload = {
         "command": command,
         "budget": budget.to_record(),
         "executor": executor,
+        "optimization_mode": optimization_mode,
         "platform": platform.platform(),
     }
     encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
@@ -469,3 +507,9 @@ def _number(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _goal_text(optimization_mode: str) -> str:
+    if optimization_mode == "performance":
+        return "maximize raw throughput without resource guard limits; use low-frequency monitoring and workload metrics for ranking"
+    return "maximize throughput with duration and memory tie-breakers"

@@ -395,7 +395,32 @@ autotuneai compare-tuning \
   -- /path/to/benchmark/env/bin/python train_or_benchmark.py --config config.yaml
 ```
 
-Empirical one-command recommendation search:
+Performance-only recommendation search for servers:
+
+```bash
+sudo -v
+autotuneai optimize-performance \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --repeat 2 \
+  --warmup-runs 1 \
+  --cooldown-seconds 8 \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+
+autotuneai run \
+  --apply-recommendation \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+```
+
+`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits, and it defaults to low-frequency monitoring so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. It writes `results/reports/performance_recommendation.json`, generates `results/reports/performance_recommendation.html`, and caches the recommendation at `.autotuneai/recommendations/latest.json`.
+
+Guarded recommendation search for local machines:
 
 ```bash
 sudo -v
@@ -414,7 +439,7 @@ autotuneai optimize \
 autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. It writes `results/reports/auto_recommendation.json`, automatically generates `results/reports/auto_recommendation.html`, and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
+`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. Use it when the goal includes resource guard behavior. It writes `results/reports/auto_recommendation.json`, automatically generates `results/reports/auto_recommendation.html`, and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
 
 Open `results/reports/auto_recommendation.html` to see the current baseline, the recommended configuration, per-candidate throughput, GPU throughput, CPU peaks, and deltas.
 

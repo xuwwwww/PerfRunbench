@@ -1007,7 +1007,24 @@ autotuneai compare-tuning \
 
 ## One-command recommendation cache
 
-Use `optimize` when you want AutoTuneAI to empirically find a configuration instead of guessing:
+Use `optimize-performance` on servers when the goal is raw speed and you do not want memory/CPU guard limits:
+
+```bash
+sudo -v
+autotuneai optimize-performance \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --repeat 2 \
+  --warmup-runs 1 \
+  --cooldown-seconds 8 \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+```
+
+It only runs unbounded candidates, defaults to low-frequency monitoring, and ranks candidates using workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+
+Use `optimize` when you want AutoTuneAI to empirically find a guarded configuration instead of guessing:
 
 ```bash
 sudo -v
@@ -1024,7 +1041,7 @@ autotuneai optimize \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. The result is written to `results/reports/auto_recommendation.json`, a browser-ready report is generated at `results/reports/auto_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. Use this path when the goal includes resource guard behavior. The result is written to `results/reports/auto_recommendation.json`, a browser-ready report is generated at `results/reports/auto_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
 
 Open `results/reports/auto_recommendation.html` to inspect the current baseline, recommended configuration, candidate ranking, and measured deltas. `--warmup-runs` executes discarded baseline trial(s) before measurement so cold-start effects are less likely to bias the recommendation.
 

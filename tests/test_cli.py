@@ -200,6 +200,20 @@ class CliTest(unittest.TestCase):
         report.assert_called_once()
         self.assertIn("Cached recommendation", output.getvalue())
 
+    def test_optimize_performance_command_uses_performance_mode(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.optimize_recommendation") as optimize, patch("autotune.cli.generate_comparison_report") as report, redirect_stdout(output):
+            optimize.return_value = {"recommendation": {"label": "performance:baseline"}}
+            report.return_value = Path("results/reports/performance_recommendation.html")
+            code = main(["optimize-performance", "--max-candidates", "2", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(optimize.call_args.kwargs["optimization_mode"], "performance")
+        self.assertFalse(optimize.call_args.args[1].enforce)
+        self.assertEqual(optimize.call_args.kwargs["sample_interval_seconds"], 5.0)
+        self.assertFalse(optimize.call_args.kwargs["hard_kill"])
+        report.assert_called_once()
+        self.assertIn("Best performance recommendation", output.getvalue())
+
     @patch("autotune.cli.run_with_budget")
     @patch("autotune.cli.generate_run_report")
     def test_run_command_applies_cached_recommendation(self, generate_report, run_with_budget) -> None:

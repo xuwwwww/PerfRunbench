@@ -185,6 +185,29 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("workload", nargs=argparse.REMAINDER)
     optimize.set_defaults(handler=_cmd_optimize)
 
+    optimize_performance = subparsers.add_parser(
+        "optimize-performance",
+        help="Find and cache the fastest unbounded performance configuration without CPU/memory guard limits.",
+    )
+    _add_budget_executor_args(optimize_performance)
+    optimize_performance.add_argument(
+        "--sample-interval-seconds",
+        type=float,
+        default=5.0,
+        help="Low-frequency resource sampling interval. Ranking should come from workload metrics when available.",
+    )
+    optimize_performance.add_argument("--system-tuning-sudo", action="store_true")
+    optimize_performance.add_argument("--gpu-tuning-sudo", action="store_true")
+    optimize_performance.add_argument("--repeat", type=int, default=2)
+    optimize_performance.add_argument("--warmup-runs", type=int, default=1)
+    optimize_performance.add_argument("--cooldown-seconds", type=float, default=8.0)
+    optimize_performance.add_argument("--max-candidates", type=int)
+    optimize_performance.add_argument("--no-gpu", action="store_true")
+    optimize_performance.add_argument("--output", default="results/reports/performance_recommendation.json")
+    optimize_performance.add_argument("--cache", default=str(LATEST_RECOMMENDATION))
+    optimize_performance.add_argument("workload", nargs=argparse.REMAINDER)
+    optimize_performance.set_defaults(handler=_cmd_optimize_performance)
+
     demo = subparsers.add_parser("demo", help="Run built-in repo demo workflows against the dummy workload.")
     _add_budget_args(demo)
     demo.add_argument(
@@ -521,6 +544,7 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
             cooldown_seconds=args.cooldown_seconds,
             include_gpu=not args.no_gpu,
             max_candidates=args.max_candidates,
+            optimization_mode="guarded",
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
@@ -531,6 +555,41 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
     print(f"HTML report: {html_path}")
     if result.get("recommendation"):
         print(f"Best recommendation: {result['recommendation'].get('label')}")
+    return 0
+
+
+def _cmd_optimize_performance(args: argparse.Namespace) -> int:
+    command = _command_after_separator(args.workload, "Usage: autotuneai optimize-performance [executor args] -- <command>")
+    try:
+        result = optimize_recommendation(
+            command,
+            ResourceBudget(enforce=False),
+            output=args.output,
+            cache_path=args.cache,
+            sample_interval_seconds=args.sample_interval_seconds,
+            hard_kill=False,
+            executor=args.executor,
+            use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
+            system_tuning_sudo=args.system_tuning_sudo,
+            gpu_tuning_sudo=args.gpu_tuning_sudo,
+            docker_image=args.docker_image,
+            repeat=args.repeat,
+            warmup_runs=args.warmup_runs,
+            cooldown_seconds=args.cooldown_seconds,
+            include_gpu=not args.no_gpu,
+            max_candidates=args.max_candidates,
+            optimization_mode="performance",
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"Wrote performance recommendation to {args.output}")
+    print(f"Cached recommendation at {args.cache}")
+    html_path = _auto_comparison_report_html(args.output)
+    print(f"HTML report: {html_path}")
+    if result.get("recommendation"):
+        print(f"Best performance recommendation: {result['recommendation'].get('label')}")
     return 0
 
 

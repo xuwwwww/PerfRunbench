@@ -75,6 +75,36 @@ class OptimizerTest(unittest.TestCase):
         self.assertEqual(result["warmups"][0]["run_id"], "warmup0")
         self.assertEqual(result["candidates"][0]["run_ids"], ["run0"])
 
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    @patch("autotune.recommendation.optimizer.analyze_run")
+    @patch("autotune.recommendation.optimizer.run_with_budget")
+    def test_performance_mode_uses_unbounded_non_enforcing_budget(self, run_with_budget, analyze_run, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": False}
+        run_with_budget.return_value = (0, Path(".autotuneai/runs/run0"))
+        analyze_run.return_value = {
+            "status": "completed",
+            "return_code": 0,
+            "workload": {"samples_per_second": 100.0, "duration_seconds": 10.0},
+            "memory": {"peak_memory_mb": 1000.0, "memory_budget_exceeded": False},
+            "cpu": {"observed_peak_process_cpu_percent": 50.0},
+        }
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            result = optimize_recommendation(
+                ["python", "train.py"],
+                ResourceBudget(memory_budget_gb=-3, reserve_cores=2, cpu_quota_percent=80),
+                output=Path(temp_dir) / "recommendation.json",
+                cache_path=Path(temp_dir) / "latest.json",
+                max_candidates=1,
+                optimization_mode="performance",
+            )
+
+        budget = run_with_budget.call_args.args[1]
+        self.assertFalse(budget.enforce)
+        self.assertFalse(budget.enabled)
+        self.assertEqual(result["optimization_mode"], "performance")
+        self.assertEqual(result["candidates"][0]["guard_mode"], "performance")
+
 
 if __name__ == "__main__":
     unittest.main()
