@@ -117,6 +117,27 @@ class CliTest(unittest.TestCase):
         self.assertEqual(compare.call_args.kwargs["repeat"], 2)
         self.assertIn("Wrote profile comparison summary", output.getvalue())
 
+    def test_compare_budgets_command_runs_summary(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.compare_budget_modes") as compare, redirect_stdout(output):
+            compare.return_value = {"kind": "budget_mode_comparison"}
+            code = main([
+                "compare-budgets",
+                "--memory-budget-gb",
+                "-3",
+                "--profile",
+                "linux-low-latency",
+                "--repeat",
+                "2",
+                "--",
+                "python",
+                "train.py",
+            ])
+        self.assertEqual(code, 0)
+        self.assertEqual(compare.call_args.kwargs["tuned_profile"], "linux-low-latency")
+        self.assertEqual(compare.call_args.args[1].memory_budget_gb, -3)
+        self.assertIn("Wrote budget comparison", output.getvalue())
+
     @patch("autotune.system_tuner.profile_selector.platform.system", return_value="Windows")
     def test_compare_tuning_auto_selects_windows_profile(self, _system) -> None:
         output = io.StringIO()

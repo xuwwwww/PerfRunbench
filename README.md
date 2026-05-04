@@ -300,6 +300,7 @@ autotuneai report --run-id <run_id>
 autotuneai report-comparison --input results/reports/tuning_comparison.json
 autotuneai report-comparison --input results/reports/tuning_comparison.json --output results/reports/tuning_comparison_report.html
 autotuneai compare-profiles --repeat 3 -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
+autotuneai compare-budgets --memory-budget-gb -3 --profile linux-low-latency --repeat 3 -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
 ```
 
 NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:

@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.comparison_runner import build_comparison_result, compare_profiles, compare_tuning
+from autotune.resource.comparison_runner import build_comparison_result, compare_budget_modes, compare_profiles, compare_tuning
 from autotune.resource.run_state import write_json
 
 
@@ -214,6 +214,38 @@ class ComparisonRunnerTest(unittest.TestCase):
 
         self.assertEqual(result["best_profile"], "linux-throughput")
         self.assertEqual(result["comparisons"][0]["samples_per_second_percent"], 3.5)
+
+    def test_compare_budget_modes_labels_unbounded_and_budgeted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runs_dir = Path(temp_dir)
+            for run_id in ["u1", "b1", "u2", "b2"]:
+                self._write_run(
+                    runs_dir,
+                    run_id,
+                    peak=80 if run_id.startswith("u") else 100,
+                    started="2026-05-02T10:00:00",
+                    finished="2026-05-02T10:00:08" if run_id.startswith("u") else "2026-05-02T10:00:10",
+                )
+            output = runs_dir / "budget.json"
+
+            with (
+                patch(
+                    "autotune.resource.comparison_runner.run_with_budget",
+                    side_effect=[(0, runs_dir / "u1"), (0, runs_dir / "b1"), (0, runs_dir / "b2"), (0, runs_dir / "u2")],
+                ),
+                patch("autotune.resource.comparison_runner.RUNS_DIR", runs_dir),
+            ):
+                result = compare_budget_modes(
+                    ["python", "train.py"],
+                    ResourceBudget(memory_budget_gb=-3),
+                    output=output,
+                    repeat=2,
+                )
+
+        self.assertEqual(result["kind"], "budget_mode_comparison")
+        self.assertEqual(result["baseline_label"], "unbounded")
+        self.assertEqual(result["tuned_label"], "budgeted")
+        self.assertEqual(result["trials"][1]["execution_order"], ["budgeted", "unbounded"])
 
     def _write_run(
         self,

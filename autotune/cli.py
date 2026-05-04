@@ -15,7 +15,7 @@ from autotune.gpu.nvidia_tuner import (
 from autotune.report.run_report import generate_run_report
 from autotune.report.comparison_report import generate_comparison_report
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.comparison_runner import compare_profiles, compare_tuning
+from autotune.resource.comparison_runner import compare_budget_modes, compare_profiles, compare_tuning
 from autotune.resource.executor_capabilities import collect_executor_capabilities
 from autotune.resource.memory_calibration import calibrate_memory
 from autotune.resource.run_analysis import analyze_run, format_analysis
@@ -132,6 +132,18 @@ def build_parser() -> argparse.ArgumentParser:
     compare_profiles_parser.add_argument("--output", default="results/reports/profile_comparison_summary.json")
     compare_profiles_parser.add_argument("workload", nargs=argparse.REMAINDER)
     compare_profiles_parser.set_defaults(handler=_cmd_compare_profiles)
+
+    compare_budgets_parser = subparsers.add_parser("compare-budgets", help="Compare the current budgeted run against an unbounded run.")
+    _add_budget_args(compare_budgets_parser)
+    compare_budgets_parser.add_argument("--profile", choices=available_profiles(), default=None)
+    compare_budgets_parser.add_argument("--workload-profile", choices=WORKLOAD_PROFILE_CHOICES, default="auto")
+    compare_budgets_parser.add_argument("--system-tuning-sudo", action="store_true")
+    compare_budgets_parser.add_argument("--repeat", type=int, default=3)
+    compare_budgets_parser.add_argument("--cooldown-seconds", type=float, default=0.0)
+    compare_budgets_parser.add_argument("--no-alternate-order", action="store_true")
+    compare_budgets_parser.add_argument("--output", default="results/reports/budget_comparison.json")
+    compare_budgets_parser.add_argument("workload", nargs=argparse.REMAINDER)
+    compare_budgets_parser.set_defaults(handler=_cmd_compare_budgets)
 
     compare_runs = subparsers.add_parser("compare-runs", help="Compare two existing runs by run id.")
     compare_runs.add_argument("--baseline-run-id", required=True)
@@ -369,6 +381,36 @@ def _cmd_compare_profiles(args: argparse.Namespace) -> int:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote profile comparison summary to {args.output}")
+    return 0
+
+
+def _cmd_compare_budgets(args: argparse.Namespace) -> int:
+    command = _command_after_separator(args.workload, "Usage: autotuneai compare-budgets [budget args] -- <command>")
+    budget = _budget_from_args(args)
+    profile = args.profile
+    if profile is None and args.workload_profile != "auto":
+        profile = select_system_profile(budget, workload_profile=args.workload_profile).profile
+    try:
+        result = compare_budget_modes(
+            command,
+            budget,
+            tuned_profile=profile,
+            output=args.output,
+            sample_interval_seconds=args.sample_interval_seconds,
+            hard_kill=args.hard_kill,
+            executor=args.executor,
+            use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
+            system_tuning_sudo=args.system_tuning_sudo,
+            docker_image=args.docker_image,
+            repeat=args.repeat,
+            alternate_order=not args.no_alternate_order,
+            cooldown_seconds=args.cooldown_seconds,
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"Wrote budget comparison to {args.output}")
     return 0
 
 

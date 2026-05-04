@@ -171,6 +171,102 @@ def compare_profiles(
     return summary
 
 
+def compare_budget_modes(
+    command: list[str],
+    budgeted: ResourceBudget,
+    *,
+    unbounded: ResourceBudget | None = None,
+    tuned_profile: str | None = None,
+    output: str | Path = "results/reports/budget_comparison.json",
+    sample_interval_seconds: float = 0.5,
+    hard_kill: bool = False,
+    executor: str = "local",
+    use_sudo: bool = False,
+    allow_sudo_auto: bool = False,
+    system_tuning_sudo: bool = False,
+    docker_image: str = "python:3.12-slim",
+    repeat: int = 3,
+    alternate_order: bool = True,
+    cooldown_seconds: float = 0.0,
+) -> dict[str, Any]:
+    if not command:
+        raise ValueError("command cannot be empty")
+    if repeat < 1:
+        raise ValueError("repeat must be >= 1")
+    unbounded_budget = unbounded or ResourceBudget()
+    runs: list[dict[str, Any]] = []
+    for index in range(repeat):
+        budgeted_first = alternate_order and index % 2 == 1
+        run_order = ["budgeted", "unbounded"] if budgeted_first else ["unbounded", "budgeted"]
+        trial: dict[str, Any] = {"execution_order": run_order}
+        for position, label in enumerate(run_order):
+            current_budget = budgeted if label == "budgeted" else unbounded_budget
+            return_code, run_dir = run_with_budget(
+                command,
+                current_budget,
+                sample_interval_seconds=sample_interval_seconds,
+                hard_kill=hard_kill,
+                executor=executor,
+                use_sudo=use_sudo,
+                allow_sudo_auto=allow_sudo_auto,
+                tune_system_profile=tuned_profile,
+                restore_system_after=bool(tuned_profile),
+                system_tuning_sudo=system_tuning_sudo,
+                docker_image=docker_image,
+            )
+            trial[f"{label}_code"] = return_code
+            trial[f"{label}_dir"] = run_dir
+            if cooldown_seconds > 0 and not (index == repeat - 1 and position == len(run_order) - 1):
+                time.sleep(cooldown_seconds)
+        runs.append(trial)
+
+    last_trial = runs[-1]
+    result = build_comparison_result(
+        last_trial["unbounded_dir"].name,
+        last_trial["budgeted_dir"].name,
+        tuned_profile=tuned_profile or "no-system-tuning",
+        baseline_return_code=last_trial["unbounded_code"],
+        tuned_return_code=last_trial["budgeted_code"],
+        runs_dir=RUNS_DIR,
+    )
+    result["kind"] = "budget_mode_comparison"
+    result["comparison_target"] = "budget"
+    result["baseline_label"] = "unbounded"
+    result["tuned_label"] = "budgeted"
+    result["execution_order"] = list(last_trial["execution_order"])
+    if repeat > 1:
+        result["repeat"] = repeat
+        result["trials"] = []
+        for trial in runs:
+            trial_result = build_comparison_result(
+                trial["unbounded_dir"].name,
+                trial["budgeted_dir"].name,
+                tuned_profile=tuned_profile or "no-system-tuning",
+                baseline_return_code=trial["unbounded_code"],
+                tuned_return_code=trial["budgeted_code"],
+                runs_dir=RUNS_DIR,
+            )
+            trial_result["kind"] = "budget_mode_comparison"
+            trial_result["comparison_target"] = "budget"
+            trial_result["baseline_label"] = "unbounded"
+            trial_result["tuned_label"] = "budgeted"
+            trial_result["execution_order"] = list(trial["execution_order"])
+            result["trials"].append(trial_result)
+        result["aggregate"] = _aggregate_trials(result["trials"])
+    write_json(Path(output), result)
+    failures = _failed_runs(result)
+    if failures:
+        details = ", ".join(
+            f"{item['label']}(run_id={item['run_id']}, return_code={item['return_code']}, status={item['status']})"
+            for item in failures
+        )
+        raise RuntimeError(
+            "compare-budgets workload failed; budget comparison is not valid. "
+            f"Failed run(s): {details}"
+        )
+    return result
+
+
 def build_comparison_result(
     baseline_run_id: str,
     tuned_run_id: str,
