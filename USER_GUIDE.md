@@ -12,6 +12,26 @@ conda activate autotuneai
 python -m pip install -e .
 ```
 
+Server benchmark/GPU environment:
+
+```bash
+conda env create -f environment-benchmark.yml
+conda activate autotuneai-benchmark
+python -m pip install -e .
+
+python - <<'PY'
+import google.protobuf
+import torch
+print("torch", torch.__version__)
+print("cuda", torch.cuda.is_available())
+print("device", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none")
+PY
+
+python -m unittest discover -s tests
+```
+
+`environment.yml` is the minimal resource-guard environment and does not install PyTorch. Use `environment-benchmark.yml` or `python -m pip install -e ".[benchmark]"` for PyTorch, ONNX, CUDA/GPU pressure benchmarks, and modules under the `google.protobuf` namespace.
+
 如果環境已存在：
 
 ```bash

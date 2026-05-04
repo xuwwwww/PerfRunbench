@@ -2,7 +2,7 @@
 numpy
 torch
 torchvision
+protobuf
 onnx
 onnxscript
 onnxruntime
-

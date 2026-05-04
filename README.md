@@ -28,6 +28,26 @@ autotuneai report-comparison --input results/reports/tuning_comparison.json
 python -m unittest discover -s tests
 ```
 
+Benchmark/GPU install for server-side performance optimization:
+
+```bash
+conda env create -f environment-benchmark.yml
+conda activate autotuneai-benchmark
+python -m pip install -e .
+
+python - <<'PY'
+import google.protobuf
+import torch
+print("torch", torch.__version__)
+print("cuda", torch.cuda.is_available())
+print("device", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none")
+PY
+
+python -m unittest discover -s tests
+```
+
+`environment.yml` is intentionally small and does not install PyTorch. Use `environment-benchmark.yml` or `python -m pip install -e ".[benchmark]"` when running PyTorch, ONNX, or GPU pressure benchmarks. If the server needs a specific CUDA wheel, install the matching `torch`/`torchvision` build from the official PyTorch selector before running GPU benchmarks.
+
 Built-in repo demo workflows:
 
 ```bash
