@@ -468,6 +468,15 @@ def _profile_beats_baseline(item: dict[str, Any]) -> bool:
     return isinstance(throughput, (int, float)) and isinstance(duration, (int, float)) and throughput > 0 and duration <= 0
 
 
+def _nested(data: dict[str, Any], *keys: str) -> Any:
+    current: Any = data
+    for key in keys:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
 def _delta(tuned: Any, baseline: Any) -> float | None:
     if not isinstance(tuned, (int, float)) or not isinstance(baseline, (int, float)):
         return None

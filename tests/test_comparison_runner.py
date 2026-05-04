@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.comparison_runner import build_comparison_result, compare_tuning
+from autotune.resource.comparison_runner import build_comparison_result, compare_profiles, compare_tuning
 from autotune.resource.run_state import write_json
 
 
@@ -187,6 +187,33 @@ class ComparisonRunnerTest(unittest.TestCase):
 
         self.assertEqual(result["trials"][0]["execution_order"], ["baseline", "tuned"])
         self.assertEqual(result["trials"][1]["execution_order"], ["tuned", "baseline"])
+
+    def test_compare_profiles_summarizes_nested_workload_deltas(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "summary.json"
+            fake_result = {
+                "aggregate": {
+                    "deltas": {
+                        "benchmark_duration_percent": -1.0,
+                        "peak_memory_percent": -2.0,
+                        "system_tuning_overhead_seconds": 0.1,
+                        "workload": {
+                            "samples_per_second": {"percent": 3.5},
+                        },
+                    }
+                }
+            }
+            with patch("autotune.resource.comparison_runner.compare_tuning", return_value=fake_result):
+                result = compare_profiles(
+                    ["python", "train.py"],
+                    ResourceBudget(),
+                    profiles=["linux-throughput"],
+                    output=output,
+                    repeat=1,
+                )
+
+        self.assertEqual(result["best_profile"], "linux-throughput")
+        self.assertEqual(result["comparisons"][0]["samples_per_second_percent"], 3.5)
 
     def _write_run(
         self,
