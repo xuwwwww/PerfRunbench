@@ -941,6 +941,16 @@ autotuneai compare-tuning --workload-profile performance -- python train.py
 
 `examples/heavy_training_pressure.py` is a synthetic workload. It runs CPU math in multiple processes, allocates/touches a large memory block, and emits throughput-like metrics. It is good for validating AutoTuneAI's wrapper, cgroup limits, monitoring, restore flow, and HTML reports. It is not a real model benchmark and will not prove GPU, DataLoader, CUDA allocator, cuDNN, or cuBLAS gains.
 
+For a local GPU-burning benchmark, use:
+
+```bash
+autotuneai run \
+  --runtime-profile runtime-pytorch-max-performance \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+```
+
+`examples/gpu_training_pressure.py` refuses to run without CUDA. It allocates GPU memory, runs CUDA matrix multiplications, and writes GPU metrics such as `gpu_tflops_estimate`, `gpu_peak_memory_allocated_mb`, and `device` into `training_metrics.json`.
+
 For a real PyTorch/CUDA benchmark, use runtime and GPU profiles:
 
 ```bash

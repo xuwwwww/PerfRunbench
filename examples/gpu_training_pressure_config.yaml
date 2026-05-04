@@ -1,0 +1,8 @@
+duration_seconds: 60
+warmup_seconds: 3
+require_cuda: true
+matrix_size: 4096
+batch_matrices: 3
+gpu_memory_target_mb: 3072
+dtype: float16
+allow_tf32: true

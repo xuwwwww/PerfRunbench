@@ -42,6 +42,7 @@ Real training workloads bundled in the repo:
 autotuneai run -- python examples/iris_train.py --config examples/iris_train_config.yaml
 autotuneai run --memory-budget-gb 1.5 --hard-kill -- python examples/stress_train.py --config examples/stress_train_config.yaml
 autotuneai run --memory-budget-gb -3 --hard-kill -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
+autotuneai run --runtime-profile runtime-pytorch-max-performance -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 autotuneai tune-training \
   --file examples/iris_train_config.yaml \
   --knob batch_size=8,16,32 \
@@ -314,6 +315,7 @@ autotuneai run \
 ```
 
 `examples/heavy_training_pressure.py` is a synthetic 60-second CPU and memory pressure workload. It is useful for validating the wrapper, cgroup guard, monitoring, restore behavior, and rough Linux runtime effects. It is not a substitute for a real PyTorch/CUDA benchmark because it does not exercise DataLoader, CUDA kernels, cuDNN/cuBLAS, or GPU memory allocation.
+For GPU pressure, use `examples/gpu_training_pressure.py`. It refuses to run when CUDA is unavailable, allocates GPU memory, runs CUDA matrix multiplications, and emits GPU metrics such as estimated TFLOPS and peak allocated GPU memory.
 
 If a run is interrupted after runtime tuning was applied, AutoTuneAI records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
 

@@ -505,6 +505,11 @@ def _workload_deltas(baseline: dict[str, Any], tuned: dict[str, Any]) -> dict[st
         "cpu_workers",
         "memory_target_mb",
         "memory_touched_mb",
+        "gpu_matmuls_per_second",
+        "gpu_tflops_estimate",
+        "gpu_peak_memory_allocated_mb",
+        "gpu_peak_memory_reserved_mb",
+        "gpu_memory_target_mb",
     ]
     deltas: dict[str, Any] = {}
     for key in keys:
@@ -531,8 +536,17 @@ def _workload_performance_metrics(workload: dict[str, Any]) -> dict[str, Any]:
         "cpu_workers",
         "memory_target_mb",
         "memory_touched_mb",
+        "gpu_matmuls_per_second",
+        "gpu_tflops_estimate",
+        "gpu_peak_memory_allocated_mb",
+        "gpu_peak_memory_reserved_mb",
+        "gpu_memory_target_mb",
         "config_path",
         "dataset",
+        "device",
+        "cuda_version",
+        "dtype",
+        "allow_tf32",
     ]
     return {key: workload[key] for key in allowed if key in workload}
 
@@ -585,6 +599,11 @@ def _aggregate_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
             "cpu_workers": _median_value(workload, "cpu_workers"),
             "memory_target_mb": _median_value(workload, "memory_target_mb"),
             "memory_touched_mb": _median_value(workload, "memory_touched_mb"),
+            "gpu_matmuls_per_second": _median_value(workload, "gpu_matmuls_per_second"),
+            "gpu_tflops_estimate": _median_value(workload, "gpu_tflops_estimate"),
+            "gpu_peak_memory_allocated_mb": _median_value(workload, "gpu_peak_memory_allocated_mb"),
+            "gpu_peak_memory_reserved_mb": _median_value(workload, "gpu_peak_memory_reserved_mb"),
+            "gpu_memory_target_mb": _median_value(workload, "gpu_memory_target_mb"),
         },
     }
 
