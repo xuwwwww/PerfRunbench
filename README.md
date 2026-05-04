@@ -373,6 +373,26 @@ autotuneai compare-tuning \
   -- /path/to/benchmark/env/bin/python train_or_benchmark.py --config config.yaml
 ```
 
+Empirical one-command recommendation search:
+
+```bash
+sudo -v
+autotuneai optimize \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --memory-budget-gb -3 \
+  --sample-interval-seconds 0.1 \
+  --repeat 1 \
+  --cooldown-seconds 8 \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+
+autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+```
+
+`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. It writes `results/reports/auto_recommendation.json` and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
+
 If the environment already exists:
 
 ```bash

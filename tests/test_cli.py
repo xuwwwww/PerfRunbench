@@ -188,6 +188,42 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Wrote run comparison", output.getvalue())
 
+    def test_optimize_command_writes_recommendation(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.optimize_recommendation") as optimize, redirect_stdout(output):
+            optimize.return_value = {"recommendation": {"label": "best"}}
+            code = main(["optimize", "--max-candidates", "2", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(optimize.call_args.kwargs["max_candidates"], 2)
+        self.assertIn("Cached recommendation", output.getvalue())
+
+    @patch("autotune.cli.run_with_budget")
+    @patch("autotune.cli.generate_run_report")
+    def test_run_command_applies_cached_recommendation(self, generate_report, run_with_budget) -> None:
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        generate_report.return_value = Path(".autotuneai/runs/run1/report.html")
+        cached = {
+            "recommendation": {
+                "system_profile": "linux-throughput",
+                "runtime_profile": "runtime-pytorch-max-performance",
+                "gpu_profile": "nvidia-performance",
+                "budget": {
+                    "memory_budget_gb": -3,
+                    "reserve_memory_gb": 0.0,
+                    "reserve_cores": 1,
+                    "cpu_quota_percent": 90,
+                    "resource_budget_enforced": True,
+                },
+            }
+        }
+        with patch("autotune.cli.load_recommendation", return_value=cached), redirect_stdout(io.StringIO()):
+            code = main(["run", "--apply-recommendation", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(run_with_budget.call_args.args[1].memory_budget_gb, -3)
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_system_profile"], "linux-throughput")
+        self.assertEqual(run_with_budget.call_args.kwargs["runtime_env_profile"], "runtime-pytorch-max-performance")
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_gpu_profile"], "nvidia-performance")
+
     @patch("autotune.cli.run_with_budget")
     def test_demo_run_executes_builtin_workload(self, run_with_budget) -> None:
         run_with_budget.return_value = (0, ".autotuneai/runs/demo1")

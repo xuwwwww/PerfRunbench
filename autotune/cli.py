@@ -14,6 +14,12 @@ from autotune.gpu.nvidia_tuner import (
 )
 from autotune.report.run_report import generate_run_report
 from autotune.report.comparison_report import generate_comparison_report
+from autotune.recommendation.optimizer import (
+    LATEST_RECOMMENDATION,
+    budget_from_recommendation,
+    load_recommendation,
+    optimize_recommendation,
+)
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.comparison_runner import compare_budget_modes, compare_profiles, compare_tuning
 from autotune.resource.executor_capabilities import collect_executor_capabilities
@@ -84,6 +90,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--gpu-tuning-sudo", action="store_true", help="Use sudo for NVIDIA runtime tuning writes.")
     run.add_argument("--no-restore-gpu-after", action="store_true")
     run.add_argument("--runtime-profile", choices=available_runtime_profiles(), help="Apply workload runtime environment variables to the child process.")
+    run.add_argument("--apply-recommendation", action="store_true", help="Apply the cached empirical tuning recommendation.")
+    run.add_argument("--recommendation", default=str(LATEST_RECOMMENDATION), help="Recommendation JSON to use with --apply-recommendation.")
     run.set_defaults(handler=_cmd_run)
 
     analyze = subparsers.add_parser("analyze", help="Analyze a run's resource guard behavior.")
@@ -162,6 +170,19 @@ def build_parser() -> argparse.ArgumentParser:
     compare_runs.add_argument("--profile", default="manual")
     compare_runs.add_argument("--output", default="results/reports/run_comparison.json")
     compare_runs.set_defaults(handler=_cmd_compare_runs)
+
+    optimize = subparsers.add_parser("optimize", help="Empirically find and cache the best guard/system/runtime/GPU configuration.")
+    _add_budget_args(optimize)
+    optimize.add_argument("--system-tuning-sudo", action="store_true")
+    optimize.add_argument("--gpu-tuning-sudo", action="store_true")
+    optimize.add_argument("--repeat", type=int, default=1)
+    optimize.add_argument("--cooldown-seconds", type=float, default=0.0)
+    optimize.add_argument("--max-candidates", type=int)
+    optimize.add_argument("--no-gpu", action="store_true")
+    optimize.add_argument("--output", default="results/reports/auto_recommendation.json")
+    optimize.add_argument("--cache", default=str(LATEST_RECOMMENDATION))
+    optimize.add_argument("workload", nargs=argparse.REMAINDER)
+    optimize.set_defaults(handler=_cmd_optimize)
 
     demo = subparsers.add_parser("demo", help="Run built-in repo demo workflows against the dummy workload.")
     _add_budget_args(demo)
@@ -273,9 +294,24 @@ def _cmd_executors(args: argparse.Namespace) -> int:
 def _cmd_run(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai run [budget args] -- <command>")
     budget = _budget_from_args(args)
-    tune_system_profile = _resolve_system_tuning_profile(args)
-    tune_gpu_profile = _resolve_gpu_tuning_profile(args)
-    runtime_env_profile = args.runtime_profile
+    recommendation = _resolve_cached_recommendation(args)
+    if recommendation is not None:
+        budget = budget_from_recommendation(recommendation, budget)
+        tune_system_profile = recommendation.get("system_profile")
+        tune_gpu_profile = recommendation.get("gpu_profile")
+        runtime_env_profile = recommendation.get("runtime_profile")
+        print(
+            "Applying cached recommendation: "
+            f"label={recommendation.get('label')} "
+            f"guard={recommendation.get('guard_mode')} "
+            f"system={tune_system_profile} "
+            f"runtime={runtime_env_profile} "
+            f"gpu={tune_gpu_profile}"
+        )
+    else:
+        tune_system_profile = _resolve_system_tuning_profile(args)
+        tune_gpu_profile = _resolve_gpu_tuning_profile(args)
+        runtime_env_profile = args.runtime_profile
     try:
         return_code, run_dir = run_with_budget(
             command,
@@ -460,6 +496,37 @@ def _cmd_compare_runs(args: argparse.Namespace) -> int:
     Path(args.output).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote run comparison to {args.output}")
+    return 0
+
+
+def _cmd_optimize(args: argparse.Namespace) -> int:
+    command = _command_after_separator(args.workload, "Usage: autotuneai optimize [budget args] -- <command>")
+    try:
+        result = optimize_recommendation(
+            command,
+            _budget_from_args(args),
+            output=args.output,
+            cache_path=args.cache,
+            sample_interval_seconds=args.sample_interval_seconds,
+            hard_kill=args.hard_kill,
+            executor=args.executor,
+            use_sudo=args.sudo,
+            allow_sudo_auto=args.allow_sudo_auto,
+            system_tuning_sudo=args.system_tuning_sudo,
+            gpu_tuning_sudo=args.gpu_tuning_sudo,
+            docker_image=args.docker_image,
+            repeat=args.repeat,
+            cooldown_seconds=args.cooldown_seconds,
+            include_gpu=not args.no_gpu,
+            max_candidates=args.max_candidates,
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"Wrote auto recommendation to {args.output}")
+    print(f"Cached recommendation at {args.cache}")
+    if result.get("recommendation"):
+        print(f"Best recommendation: {result['recommendation'].get('label')}")
     return 0
 
 
@@ -730,6 +797,19 @@ def _resolve_gpu_tuning_profile(args: argparse.Namespace) -> str | None:
             return None
         return "nvidia-performance"
     return None
+
+
+def _resolve_cached_recommendation(args: argparse.Namespace) -> dict[str, object] | None:
+    if not getattr(args, "apply_recommendation", False):
+        return None
+    try:
+        payload = load_recommendation(args.recommendation)
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+    recommendation = payload.get("recommendation")
+    if not isinstance(recommendation, dict):
+        raise SystemExit(f"recommendation cache has no recommendation: {args.recommendation}")
+    return recommendation
 
 
 def _command_after_separator(command: list[str], usage: str) -> list[str]:

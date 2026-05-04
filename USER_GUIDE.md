@@ -980,3 +980,29 @@ autotuneai compare-tuning \
 ```
 
 `runtime_env_tuning.json` records process-local environment changes. GPU tuning writes `gpu_tuning_before.json`, `gpu_tuning_after.json`, and `gpu_tuning_diff.json`; unsupported NVIDIA knobs are recorded instead of silently ignored.
+
+## One-command recommendation cache
+
+Use `optimize` when you want AutoTuneAI to empirically find a configuration instead of guessing:
+
+```bash
+sudo -v
+autotuneai optimize \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --memory-budget-gb -3 \
+  --sample-interval-seconds 0.1 \
+  --repeat 1 \
+  --cooldown-seconds 8 \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+```
+
+It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. The result is written to `results/reports/auto_recommendation.json` and cached at `.autotuneai/recommendations/latest.json`.
+
+Apply the cached recommendation later:
+
+```bash
+autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+```
