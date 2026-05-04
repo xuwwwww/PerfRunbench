@@ -936,3 +936,37 @@ Linux and Windows both now expose a dedicated `performance` workload profile:
 autotuneai run --auto-tune-system --workload-profile performance -- python train.py
 autotuneai compare-tuning --workload-profile performance -- python train.py
 ```
+
+## Aggressive formal benchmark tuning
+
+`examples/heavy_training_pressure.py` is a synthetic workload. It runs CPU math in multiple processes, allocates/touches a large memory block, and emits throughput-like metrics. It is good for validating AutoTuneAI's wrapper, cgroup limits, monitoring, restore flow, and HTML reports. It is not a real model benchmark and will not prove GPU, DataLoader, CUDA allocator, cuDNN, or cuBLAS gains.
+
+For a real PyTorch/CUDA benchmark, use runtime and GPU profiles:
+
+```bash
+autotuneai tune-runtime --profile runtime-cpu-performance
+autotuneai tune-runtime --profile runtime-pytorch-gpu-performance
+autotuneai tune-runtime --profile runtime-pytorch-max-performance
+autotuneai tune-gpu --profile nvidia-performance
+```
+
+Full aggressive A/B command:
+
+```bash
+sudo -v
+autotuneai compare-tuning \
+  --profile linux-throughput \
+  --runtime-profile runtime-pytorch-max-performance \
+  --gpu-profile nvidia-performance \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --memory-budget-gb -3 \
+  --sample-interval-seconds 0.1 \
+  --repeat 3 \
+  --cooldown-seconds 8 \
+  -- /path/to/benchmark/env/bin/python train_or_benchmark.py --config config.yaml
+```
+
+`runtime_env_tuning.json` records process-local environment changes. GPU tuning writes `gpu_tuning_before.json`, `gpu_tuning_after.json`, and `gpu_tuning_diff.json`; unsupported NVIDIA knobs are recorded instead of silently ignored.

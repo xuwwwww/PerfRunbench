@@ -24,16 +24,25 @@ QUERY_FIELDS = [
     "power.max_limit",
     "clocks.current.graphics",
     "clocks.current.memory",
+    "clocks.applications.graphics",
+    "clocks.applications.memory",
 ]
 
 PROFILES = {
     "nvidia-throughput": {
         "persistence_mode": "1",
         "power_limit": "max",
+        "application_clocks": False,
+    },
+    "nvidia-performance": {
+        "persistence_mode": "1",
+        "power_limit": "max",
+        "application_clocks": True,
     },
     "nvidia-safe": {
         "persistence_mode": "1",
         "power_limit": None,
+        "application_clocks": False,
     },
 }
 
@@ -54,6 +63,7 @@ def recommend_nvidia_tuning(profile: str = "nvidia-throughput", runner: CommandR
             "NVIDIA runtime tuning uses nvidia-smi and may require sudo/admin privileges.",
             "Only runtime settings are changed; no driver config files are edited.",
             "Power-limit restore uses the before snapshot captured in the run directory.",
+            "Application clocks are attempted only when nvidia-smi reports supported clock pairs.",
         ],
     }
 
@@ -122,10 +132,22 @@ def restore_nvidia_tuning(
         index = str(gpu.get("index"))
         persistence = gpu.get("persistence_mode")
         power_limit = gpu.get("power.limit")
+        application_memory_clock = gpu.get("clocks.applications.memory")
+        application_graphics_clock = gpu.get("clocks.applications.graphics")
         if persistence not in {None, "", "N/A", "[N/A]"}:
             restored.append(_run_change(["nvidia-smi", "-i", index, "-pm", _persistence_value(persistence)], use_sudo, runner))
         if power_limit not in {None, "", "N/A", "[N/A]"}:
             restored.append(_run_change(["nvidia-smi", "-i", index, "-pl", str(power_limit)], use_sudo, runner))
+        if _setting_available(application_memory_clock) and _setting_available(application_graphics_clock):
+            restored.append(
+                _run_change(
+                    ["nvidia-smi", "-i", index, "-ac", f"{application_memory_clock},{application_graphics_clock}"],
+                    use_sudo,
+                    runner,
+                )
+            )
+        else:
+            restored.append(_run_change(["nvidia-smi", "-i", index, "-rac"], use_sudo, runner))
     after = snapshot_nvidia(runner=runner)
     write_json(Path(run_dir) / "gpu_tuning_restore_after.json", {"changes": restored, "after": after})
     return restored
@@ -182,6 +204,20 @@ def _apply_profile(
                         before=gpu.get("power.limit"),
                     )
                 )
+        if config.get("application_clocks"):
+            supported = _max_supported_clocks(index, runner)
+            if supported is not None:
+                memory_clock, graphics_clock = supported
+                changes.append(
+                    _run_change(
+                        ["nvidia-smi", "-i", index, "-ac", f"{memory_clock},{graphics_clock}"],
+                        use_sudo,
+                        runner,
+                        key="applications.clocks",
+                        target=f"{memory_clock},{graphics_clock}",
+                        before=f"{gpu.get('clocks.applications.memory')},{gpu.get('clocks.applications.graphics')}",
+                    )
+                )
     return changes
 
 
@@ -221,6 +257,8 @@ def _planned_changes(profile: str) -> list[dict[str, Any]]:
     changes = [{"key": "persistence_mode", "target": config["persistence_mode"]}]
     if config.get("power_limit") == "max":
         changes.append({"key": "power.limit", "target": "power.max_limit"})
+    if config.get("application_clocks"):
+        changes.append({"key": "applications.clocks", "target": "max supported memory,graphics clocks"})
     return changes
 
 
@@ -242,6 +280,38 @@ def _persistence_value(value: str) -> str:
 
 def _setting_available(value: str | None) -> bool:
     return value not in {None, "", "N/A", "[N/A]"}
+
+
+def _max_supported_clocks(index: str, runner: CommandRunner) -> tuple[str, str] | None:
+    result = runner(
+        [
+            "nvidia-smi",
+            "-i",
+            index,
+            "--query-supported-clocks=mem,gr",
+            "--format=csv,noheader,nounits",
+        ]
+    )
+    if result.returncode != 0:
+        return None
+    best: tuple[int, int] | None = None
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) < 2:
+            continue
+        try:
+            memory_clock = int(float(parts[0]))
+            graphics_clock = int(float(parts[1]))
+        except ValueError:
+            continue
+        candidate = (memory_clock, graphics_clock)
+        if best is None or candidate[0] * candidate[1] > best[0] * best[1]:
+            best = candidate
+    if best is None:
+        return None
+    return str(best[0]), str(best[1])
 
 
 def _require_nvidia_smi() -> None:

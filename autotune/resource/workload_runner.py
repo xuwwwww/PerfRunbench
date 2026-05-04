@@ -25,6 +25,7 @@ from autotune.resource.run_state import (
     write_json,
 )
 from autotune.resource.systemd_executor import build_systemd_run_command, make_systemd_scope_name
+from autotune.runtime_tuner.env import apply_runtime_env_profile
 from autotune.system_tuner.runtime import apply_system_tuning_to_run, restore_system_tuning
 
 
@@ -60,6 +61,7 @@ def run_with_budget(
     tune_gpu_profile: str | None = None,
     restore_gpu_after: bool = True,
     gpu_tuning_sudo: bool = False,
+    runtime_env_profile: str | None = None,
 ) -> tuple[int, Path]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -75,6 +77,15 @@ def run_with_budget(
     child_env = os.environ.copy()
     child_env["AUTOTUNEAI_RUN_DIR"] = str(run_dir.resolve())
     child_env["AUTOTUNEAI_RUN_ID"] = manifest.run_id
+    runtime_env_result = apply_runtime_env_profile(
+        child_env,
+        runtime_env_profile,
+        budget,
+        total_cores=_visible_cpu_count(),
+    )
+    if runtime_env_result is not None:
+        write_json(run_dir / "runtime_env_tuning.json", runtime_env_result)
+        manifest.notes.extend(runtime_env_result["notes"])
     timeline: list[ChildSample] = []
     process = None
     return_code = 1
@@ -132,8 +143,12 @@ def run_with_budget(
                 use_sudo=selected_use_sudo,
                 unit_name=unit_name,
                 environment={
-                    "AUTOTUNEAI_RUN_DIR": child_env["AUTOTUNEAI_RUN_DIR"],
-                    "AUTOTUNEAI_RUN_ID": child_env["AUTOTUNEAI_RUN_ID"],
+                    key: child_env[key]
+                    for key in [
+                        "AUTOTUNEAI_RUN_DIR",
+                        "AUTOTUNEAI_RUN_ID",
+                        *list((runtime_env_result or {}).get("env", {}).keys()),
+                    ]
                 },
             )
             command_to_run = systemd_command.command

@@ -101,9 +101,21 @@ class CliTest(unittest.TestCase):
         with patch("autotune.cli.compare_tuning") as compare, patch("autotune.cli.generate_comparison_report") as report, redirect_stdout(output):
             compare.return_value = {"deltas": {}}
             report.return_value = Path("results/reports/tuning_comparison.html")
-            code = main(["compare-tuning", "--profile", "linux-throughput", "--repeat", "3", "--", "python", "train.py"])
+            code = main([
+                "compare-tuning",
+                "--profile",
+                "linux-throughput",
+                "--runtime-profile",
+                "runtime-cpu-performance",
+                "--repeat",
+                "3",
+                "--",
+                "python",
+                "train.py",
+            ])
         self.assertEqual(code, 0)
         self.assertEqual(compare.call_args.kwargs["tuned_profile"], "linux-throughput")
+        self.assertEqual(compare.call_args.kwargs["tuned_runtime_env_profile"], "runtime-cpu-performance")
         self.assertEqual(compare.call_args.kwargs["repeat"], 3)
         self.assertTrue(compare.call_args.kwargs["alternate_order"])
         report.assert_called_once()
@@ -296,10 +308,27 @@ class CliTest(unittest.TestCase):
     def test_run_command_auto_tunes_gpu(self, run_with_budget, recommend_gpu) -> None:
         recommend_gpu.return_value = {"supported": True}
         run_with_budget.return_value = (0, ".autotuneai/runs/run1")
-        with redirect_stdout(io.StringIO()):
+        with patch("autotune.cli.generate_run_report") as generate_report, redirect_stdout(io.StringIO()):
+            generate_report.return_value = Path(".autotuneai/runs/run1/report.html")
             code = main(["run", "--auto-tune-gpu", "--", "python", "train.py"])
         self.assertEqual(code, 0)
-        self.assertEqual(run_with_budget.call_args.kwargs["tune_gpu_profile"], "nvidia-throughput")
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_gpu_profile"], "nvidia-performance")
+
+    @patch("autotune.cli.run_with_budget")
+    def test_run_command_applies_runtime_profile(self, run_with_budget) -> None:
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        with patch("autotune.cli.generate_run_report") as generate_report, redirect_stdout(io.StringIO()):
+            generate_report.return_value = Path(".autotuneai/runs/run1/report.html")
+            code = main(["run", "--runtime-profile", "runtime-pytorch-max-performance", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(run_with_budget.call_args.kwargs["runtime_env_profile"], "runtime-pytorch-max-performance")
+
+    def test_tune_runtime_command_prints_env(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["tune-runtime", "--profile", "runtime-cpu-performance"])
+        self.assertEqual(code, 0)
+        self.assertIn("OMP_NUM_THREADS", output.getvalue())
 
     def test_run_command_rejects_conflicting_system_tuning_options(self) -> None:
         with self.assertRaises(SystemExit):

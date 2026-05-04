@@ -21,7 +21,7 @@ class NvidiaTunerTest(unittest.TestCase):
             return subprocess.CompletedProcess(
                 command,
                 0,
-                stdout="0, RTX 4090, Disabled, 300, 100, 450, 1200, 10000\n",
+                stdout="0, RTX 4090, Disabled, 300, 100, 450, 1200, 10000, 1200, 10000\n",
                 stderr="",
             )
 
@@ -43,11 +43,11 @@ class NvidiaTunerTest(unittest.TestCase):
 
         def runner(command):
             commands.append(command)
-            if "--query-gpu=index,name,persistence_mode,power.limit,power.min_limit,power.max_limit,clocks.current.graphics,clocks.current.memory" in command:
+            if "--query-gpu=index,name,persistence_mode,power.limit,power.min_limit,power.max_limit,clocks.current.graphics,clocks.current.memory,clocks.applications.graphics,clocks.applications.memory" in command:
                 return subprocess.CompletedProcess(
                     command,
                     0,
-                    stdout="0, RTX 4090, Disabled, 300, 100, 450, 1200, 10000\n",
+                    stdout="0, RTX 4090, Disabled, 300, 100, 450, 1200, 10000, 1200, 10000\n",
                     stderr="",
                 )
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
@@ -63,6 +63,29 @@ class NvidiaTunerTest(unittest.TestCase):
         self.assertTrue(restored)
         self.assertTrue(any("-pm" in command for command in commands))
         self.assertTrue(any("-pl" in command for command in commands))
+
+    @patch("autotune.gpu.nvidia_tuner.shutil.which", return_value="/usr/bin/nvidia-smi")
+    def test_performance_profile_attempts_application_clocks(self, _which) -> None:
+        commands = []
+
+        def runner(command):
+            commands.append(command)
+            if "--query-gpu=index,name,persistence_mode,power.limit,power.min_limit,power.max_limit,clocks.current.graphics,clocks.current.memory,clocks.applications.graphics,clocks.applications.memory" in command:
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout="0, RTX 4090, Disabled, 300, 100, 450, 1200, 10000, 1200, 10000\n",
+                    stderr="",
+                )
+            if "--query-supported-clocks=mem,gr" in command:
+                return subprocess.CompletedProcess(command, 0, stdout="10000, 1200\n11000, 1500\n", stderr="")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _run_dir, result = apply_nvidia_tuning("nvidia-performance", runner=runner, runs_dir=Path(temp_dir))
+
+        self.assertTrue(any("-ac" in command for command in commands))
+        self.assertTrue(any(change["key"] == "applications.clocks" for change in result["changes"]))
 
 
 if __name__ == "__main__":

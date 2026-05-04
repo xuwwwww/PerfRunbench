@@ -86,6 +86,8 @@ autotuneai tune-system --profile linux-low-latency
 autotuneai tune-system --profile windows-throughput
 autotuneai tune-system --profile windows-performance
 autotuneai tune-system --recommend-all
+autotuneai tune-runtime --profile runtime-pytorch-max-performance
+autotuneai tune-gpu --profile nvidia-performance
 ```
 
 On Linux/WSL, applying writes before/after/diff snapshots under `.autotuneai/runs/<run_id>/`:
@@ -111,6 +113,7 @@ You can also let a workload automatically apply the recommended runtime tuning p
 sudo -v
 autotuneai run \
   --auto-tune-system \
+  --runtime-profile runtime-pytorch-max-performance \
   --system-tuning-sudo \
   --executor systemd \
   --sudo \
@@ -119,6 +122,7 @@ autotuneai run \
 ```
 
 Runs that apply runtime tuning write `system_tuning_before.json`, `system_tuning_after.json`, and `system_tuning_diff.json` under `.autotuneai/runs/<run_id>/`.
+Runs that apply process-level runtime environment tuning write `runtime_env_tuning.json` under the run directory. These changes are child-process environment variables, so they do not need machine-level restore.
 
 Available runtime tuning profiles:
 
@@ -158,6 +162,15 @@ windows-low-latency
 
 windows-cpu-conservative
   CPU/thermal conservative Windows profile using a temporary balanced power scheme.
+
+runtime-cpu-performance
+  Set OpenMP/BLAS thread counts and CPU binding hints for CPU-heavy PyTorch/NumPy/BLAS workloads.
+
+runtime-pytorch-gpu-performance
+  Limit CPU helper thread oversubscription and enable PyTorch CUDA throughput-oriented environment variables.
+
+runtime-pytorch-max-performance
+  Combine CPU thread tuning and PyTorch CUDA throughput variables for aggressive benchmark runs.
 ```
 
 Resource guard smoke test with CPU and memory load:
@@ -300,6 +313,8 @@ autotuneai run \
   -- python examples/heavy_training_pressure.py --config examples/heavy_training_pressure_config.yaml
 ```
 
+`examples/heavy_training_pressure.py` is a synthetic 60-second CPU and memory pressure workload. It is useful for validating the wrapper, cgroup guard, monitoring, restore behavior, and rough Linux runtime effects. It is not a substitute for a real PyTorch/CUDA benchmark because it does not exercise DataLoader, CUDA kernels, cuDNN/cuBLAS, or GPU memory allocation.
+
 If a run is interrupted after runtime tuning was applied, AutoTuneAI records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
 
 Visual reports are available for both single runs and tuning comparisons:
@@ -317,7 +332,7 @@ NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:
 ```bash
 autotuneai tune-gpu
 sudo -v
-autotuneai tune-gpu --apply --sudo --profile nvidia-throughput
+autotuneai tune-gpu --apply --sudo --profile nvidia-performance
 autotuneai restore --run-id <run_id> --gpu-sudo
 ```
 
@@ -328,12 +343,32 @@ sudo -v
 autotuneai run \
   --auto-tune-system \
   --auto-tune-gpu \
+  --runtime-profile runtime-pytorch-max-performance \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
   --executor systemd \
   --sudo \
   --memory-budget-gb -3 \
   -- python train.py
+```
+
+Aggressive A/B comparison for a formal benchmark:
+
+```bash
+sudo -v
+autotuneai compare-tuning \
+  --profile linux-throughput \
+  --runtime-profile runtime-pytorch-max-performance \
+  --gpu-profile nvidia-performance \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --memory-budget-gb -3 \
+  --sample-interval-seconds 0.1 \
+  --repeat 3 \
+  --cooldown-seconds 8 \
+  -- /path/to/benchmark/env/bin/python train_or_benchmark.py --config config.yaml
 ```
 
 If the environment already exists:

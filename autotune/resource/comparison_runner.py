@@ -26,6 +26,9 @@ def compare_tuning(
     use_sudo: bool = False,
     allow_sudo_auto: bool = False,
     system_tuning_sudo: bool = False,
+    tuned_gpu_profile: str | None = None,
+    gpu_tuning_sudo: bool = False,
+    tuned_runtime_env_profile: str | None = None,
     docker_image: str = "python:3.12-slim",
     repeat: int = 1,
     alternate_order: bool = True,
@@ -64,6 +67,10 @@ def compare_tuning(
                     tune_system_profile=tuned_profile,
                     restore_system_after=True,
                     system_tuning_sudo=system_tuning_sudo,
+                    tune_gpu_profile=tuned_gpu_profile,
+                    restore_gpu_after=bool(tuned_gpu_profile),
+                    gpu_tuning_sudo=gpu_tuning_sudo,
+                    runtime_env_profile=tuned_runtime_env_profile,
                     docker_image=docker_image,
                 )
             trial[f"{label}_code"] = return_code
@@ -81,6 +88,8 @@ def compare_tuning(
         baseline_dir.name,
         tuned_dir.name,
         tuned_profile=tuned_profile,
+        tuned_runtime_env_profile=tuned_runtime_env_profile,
+        tuned_gpu_profile=tuned_gpu_profile,
         baseline_return_code=baseline_code,
         tuned_return_code=tuned_code,
         runs_dir=RUNS_DIR,
@@ -89,7 +98,12 @@ def compare_tuning(
     if repeat > 1:
         result["repeat"] = repeat
         result["trials"] = [
-            _trial_result_from_record(trial, tuned_profile=tuned_profile)
+            _trial_result_from_record(
+                trial,
+                tuned_profile=tuned_profile,
+                tuned_runtime_env_profile=tuned_runtime_env_profile,
+                tuned_gpu_profile=tuned_gpu_profile,
+            )
             for trial in runs
         ]
         result["aggregate"] = _aggregate_trials(result["trials"])
@@ -119,6 +133,9 @@ def compare_profiles(
     use_sudo: bool = False,
     allow_sudo_auto: bool = False,
     system_tuning_sudo: bool = False,
+    tuned_gpu_profile: str | None = None,
+    gpu_tuning_sudo: bool = False,
+    tuned_runtime_env_profile: str | None = None,
     docker_image: str = "python:3.12-slim",
     repeat: int = 3,
     alternate_order: bool = True,
@@ -141,6 +158,9 @@ def compare_profiles(
             use_sudo=use_sudo,
             allow_sudo_auto=allow_sudo_auto,
             system_tuning_sudo=system_tuning_sudo,
+            tuned_gpu_profile=tuned_gpu_profile,
+            gpu_tuning_sudo=gpu_tuning_sudo,
+            tuned_runtime_env_profile=tuned_runtime_env_profile,
             docker_image=docker_image,
             repeat=repeat,
             alternate_order=alternate_order,
@@ -156,6 +176,8 @@ def compare_profiles(
                 "benchmark_duration_percent": deltas.get("benchmark_duration_percent"),
                 "peak_memory_percent": deltas.get("peak_memory_percent"),
                 "system_tuning_overhead_seconds": deltas.get("system_tuning_overhead_seconds"),
+                "runtime_env_profile": tuned_runtime_env_profile,
+                "gpu_profile": tuned_gpu_profile,
             }
         )
     ranked = sorted(comparisons, key=_profile_rank_key, reverse=True)
@@ -184,6 +206,9 @@ def compare_budget_modes(
     use_sudo: bool = False,
     allow_sudo_auto: bool = False,
     system_tuning_sudo: bool = False,
+    tuned_gpu_profile: str | None = None,
+    gpu_tuning_sudo: bool = False,
+    tuned_runtime_env_profile: str | None = None,
     docker_image: str = "python:3.12-slim",
     repeat: int = 3,
     alternate_order: bool = True,
@@ -212,6 +237,10 @@ def compare_budget_modes(
                 tune_system_profile=tuned_profile,
                 restore_system_after=bool(tuned_profile),
                 system_tuning_sudo=system_tuning_sudo,
+                tune_gpu_profile=tuned_gpu_profile,
+                restore_gpu_after=bool(tuned_gpu_profile),
+                gpu_tuning_sudo=gpu_tuning_sudo,
+                runtime_env_profile=tuned_runtime_env_profile,
                 docker_image=docker_image,
             )
             trial[f"{label}_code"] = return_code
@@ -225,6 +254,8 @@ def compare_budget_modes(
         last_trial["unbounded_dir"].name,
         last_trial["budgeted_dir"].name,
         tuned_profile=tuned_profile or "no-system-tuning",
+        tuned_runtime_env_profile=tuned_runtime_env_profile,
+        tuned_gpu_profile=tuned_gpu_profile,
         baseline_return_code=last_trial["unbounded_code"],
         tuned_return_code=last_trial["budgeted_code"],
         runs_dir=RUNS_DIR,
@@ -242,6 +273,8 @@ def compare_budget_modes(
                 trial["unbounded_dir"].name,
                 trial["budgeted_dir"].name,
                 tuned_profile=tuned_profile or "no-system-tuning",
+                tuned_runtime_env_profile=tuned_runtime_env_profile,
+                tuned_gpu_profile=tuned_gpu_profile,
                 baseline_return_code=trial["unbounded_code"],
                 tuned_return_code=trial["budgeted_code"],
                 runs_dir=RUNS_DIR,
@@ -272,6 +305,8 @@ def build_comparison_result(
     tuned_run_id: str,
     *,
     tuned_profile: str,
+    tuned_runtime_env_profile: str | None = None,
+    tuned_gpu_profile: str | None = None,
     baseline_return_code: int | None = None,
     tuned_return_code: int | None = None,
     runs_dir: Path = RUNS_DIR,
@@ -281,6 +316,8 @@ def build_comparison_result(
     return {
         "kind": "tuning_comparison",
         "tuned_profile": tuned_profile,
+        "tuned_runtime_env_profile": tuned_runtime_env_profile,
+        "tuned_gpu_profile": tuned_gpu_profile,
         "baseline": baseline,
         "tuned": tuned,
         "return_codes": {
@@ -432,11 +469,19 @@ def _failed_runs(result: dict[str, Any]) -> list[dict[str, Any]]:
     return failures
 
 
-def _trial_result_from_record(trial: dict[str, Any], *, tuned_profile: str) -> dict[str, Any]:
+def _trial_result_from_record(
+    trial: dict[str, Any],
+    *,
+    tuned_profile: str,
+    tuned_runtime_env_profile: str | None = None,
+    tuned_gpu_profile: str | None = None,
+) -> dict[str, Any]:
     result = build_comparison_result(
         trial["baseline_dir"].name,
         trial["tuned_dir"].name,
         tuned_profile=tuned_profile,
+        tuned_runtime_env_profile=tuned_runtime_env_profile,
+        tuned_gpu_profile=tuned_gpu_profile,
         baseline_return_code=trial["baseline_code"],
         tuned_return_code=trial["tuned_code"],
         runs_dir=RUNS_DIR,

@@ -37,6 +37,8 @@ def format_comparison_report(data: dict[str, Any], source: Path | None = None) -
         "",
         f"- Source: `{source}`" if source else "- Source: in-memory comparison",
         f"- Profile: `{data.get('tuned_profile')}`",
+        f"- Runtime env profile: `{data.get('tuned_runtime_env_profile')}`",
+        f"- GPU profile: `{data.get('tuned_gpu_profile')}`",
         f"- Repeat: {data.get('repeat', 1)}",
         f"- {baseline_label.title()} run: `{_run_ids(baseline)}`",
         f"- {tuned_label.title()} run: `{_run_ids(tuned)}`",
@@ -107,6 +109,8 @@ def format_comparison_report_html(data: dict[str, Any], source: Path | None = No
     summary_rows = [
         ("Source", str(source) if source else "in-memory comparison"),
         ("Profile", str(data.get("tuned_profile"))),
+        ("Runtime env profile", str(data.get("tuned_runtime_env_profile"))),
+        ("GPU profile", str(data.get("tuned_gpu_profile"))),
         ("Repeat", str(data.get("repeat", 1))),
         (f"{baseline_label.title()} run", _run_ids(baseline)),
         (f"{tuned_label.title()} run", _run_ids(tuned)),

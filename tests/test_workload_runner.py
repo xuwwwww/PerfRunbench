@@ -41,6 +41,18 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertEqual(return_code, 0)
         self.assertTrue((Path(run_dir) / "training_metrics.json").exists())
 
+    def test_run_with_budget_applies_runtime_env_profile(self) -> None:
+        return_code, run_dir = run_with_budget(
+            ["python", "tests/fixtures/write_metrics_workload.py"],
+            ResourceBudget(cpu_quota_percent=50),
+            sample_interval_seconds=0.05,
+            runtime_env_profile="runtime-cpu-performance",
+        )
+        self.assertEqual(return_code, 0)
+        self.assertTrue((Path(run_dir) / "runtime_env_tuning.json").exists())
+        manifest = load_manifest(Path(run_dir))
+        self.assertTrue(any("runtime_env_profile=runtime-cpu-performance" in note for note in manifest["notes"]))
+
     def test_summary_includes_cgroup_fields_when_samples_have_them(self) -> None:
         summary = _summarize_timeline(
             [
