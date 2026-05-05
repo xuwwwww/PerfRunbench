@@ -141,7 +141,7 @@ class OptimizerTest(unittest.TestCase):
     @patch("autotune.recommendation.optimizer._deadline_expired")
     def test_time_budget_flushes_partial_summary(self, deadline_expired, run_with_budget, analyze_run, recommend_gpu) -> None:
         recommend_gpu.return_value = {"supported": False}
-        deadline_expired.side_effect = [False, True]
+        deadline_expired.side_effect = [False, True, True]
         run_with_budget.return_value = (0, Path(".autotuneai/runs/run0"))
         analyze_run.return_value = {
             "status": "completed",
@@ -164,6 +164,45 @@ class OptimizerTest(unittest.TestCase):
 
         self.assertGreaterEqual(len(result["candidates"]), 1)
         self.assertLess(len(result["candidates"]), 3)
+
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    @patch("autotune.recommendation.optimizer.analyze_run")
+    @patch("autotune.recommendation.optimizer.run_with_budget")
+    def test_repeats_use_rotated_interleaved_order(self, run_with_budget, analyze_run, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": False}
+        run_dirs = [Path(f".autotuneai/runs/run{i}") for i in range(6)]
+        run_with_budget.side_effect = [(0, path) for path in run_dirs]
+        analyze_run.return_value = {
+            "status": "completed",
+            "return_code": 0,
+            "workload": {"samples_per_second": 100.0, "duration_seconds": 10.0},
+            "memory": {"memory_budget_exceeded": False},
+            "cpu": {},
+        }
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            result = optimize_recommendation(
+                ["python", "train.py"],
+                ResourceBudget(),
+                output=Path(temp_dir) / "recommendation.json",
+                cache_path=Path(temp_dir) / "latest.json",
+                max_candidates=3,
+                repeat=2,
+            )
+
+        labels = [item["label"] for item in result["execution_order"]]
+        self.assertEqual(
+            labels,
+            [
+                "unbounded:baseline",
+                "unbounded:runtime-cpu",
+                "unbounded:runtime-gpu",
+                "unbounded:runtime-cpu",
+                "unbounded:runtime-gpu",
+                "unbounded:baseline",
+            ],
+        )
+        self.assertEqual(result["schedule"], "interleaved-rotating")
 
 
 if __name__ == "__main__":

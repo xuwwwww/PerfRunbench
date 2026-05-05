@@ -99,12 +99,13 @@ def optimize_recommendation(
             if cooldown_seconds > 0:
                 time.sleep(cooldown_seconds)
 
-    results = []
-    for candidate in candidates:
-        if _deadline_expired(deadline):
-            break
-        trials = []
-        for trial_index in range(repeat):
+    trial_map: dict[str, list[dict[str, Any]]] = {candidate.label: [] for candidate in candidates}
+    execution_order: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    for trial_index in range(repeat):
+        for order_index, candidate in enumerate(_rotated_execution_order(candidates, trial_index)):
+            if _deadline_expired(deadline):
+                break
             return_code, run_dir = _run_candidate(
                 command,
                 candidate,
@@ -120,11 +121,46 @@ def optimize_recommendation(
                 optimization_mode=optimization_mode,
             )
             metrics = _run_metrics(run_dir.name)
-            trials.append({"run_id": run_dir.name, "return_code": return_code, **metrics})
-            if cooldown_seconds > 0 and not (candidate == candidates[-1] and trial_index == repeat - 1):
+            trial = {
+                "run_id": run_dir.name,
+                "return_code": return_code,
+                "trial_index": trial_index,
+                "order_index": order_index,
+                **metrics,
+            }
+            trial_map[candidate.label].append(trial)
+            execution_order.append(
+                {
+                    "trial_index": trial_index,
+                    "order_index": order_index,
+                    "label": candidate.label,
+                    "run_id": run_dir.name,
+                    "return_code": return_code,
+                }
+            )
+            results = _results_from_trials(candidates, trial_map)
+            if cooldown_seconds > 0 and not (trial_index == repeat - 1 and order_index == len(candidates) - 1):
                 time.sleep(cooldown_seconds)
-        results.append(_candidate_result(candidate, trials))
-        summary = _write_summary(
+            _write_summary(
+                output=output,
+                cache_path=cache_path,
+                fingerprint=fingerprint,
+                command=command,
+                executor=executor,
+                repeat=repeat,
+                warmup_runs=warmup_runs,
+                warmups=warmups,
+                optimization_mode=optimization_mode,
+                monitor_mode=monitor_mode,
+                time_budget_hours=time_budget_hours,
+                results=results,
+                execution_order=execution_order,
+                complete=False,
+            )
+        if _deadline_expired(deadline):
+            break
+
+    return _write_summary(
             output=output,
             cache_path=cache_path,
             fingerprint=fingerprint,
@@ -137,23 +173,8 @@ def optimize_recommendation(
             monitor_mode=monitor_mode,
             time_budget_hours=time_budget_hours,
             results=results,
-            complete=False,
-        )
-
-    return _write_summary(
-        output=output,
-        cache_path=cache_path,
-        fingerprint=fingerprint,
-        command=command,
-        executor=executor,
-        repeat=repeat,
-        warmup_runs=warmup_runs,
-        warmups=warmups,
-        optimization_mode=optimization_mode,
-        monitor_mode=monitor_mode,
-        time_budget_hours=time_budget_hours,
-        results=results,
-        complete=True,
+            execution_order=execution_order,
+            complete=all(len(trial_map[candidate.label]) >= repeat for candidate in candidates),
     )
 
 
@@ -221,6 +242,7 @@ def _write_summary(
     monitor_mode: str,
     time_budget_hours: float | None,
     results: list[dict[str, Any]],
+    execution_order: list[dict[str, Any]],
     complete: bool,
 ) -> dict[str, Any]:
     ranked = sorted(results, key=_rank_key, reverse=True)
@@ -236,12 +258,20 @@ def _write_summary(
         "warmups": warmups,
         "optimization_mode": optimization_mode,
         "monitor_mode": monitor_mode,
+        "schedule": "interleaved-rotating",
         "time_budget_hours": time_budget_hours,
         "complete": complete,
         "goal": _goal_text(optimization_mode),
+        "diagnostics": _summary_diagnostics(
+            optimization_mode=optimization_mode,
+            complete=complete,
+            results=ranked,
+            execution_order=execution_order,
+        ),
         "best_label": best["label"] if best else None,
         "recommendation": _recommendation_from_result(best) if best else None,
         "candidates": ranked,
+        "execution_order": execution_order,
         "cache_path": str(cache_path),
     }
     write_json(Path(output), summary)
@@ -249,6 +279,24 @@ def _write_summary(
     fingerprint_path = Path(cache_path).parent / f"{fingerprint}.json"
     write_json(fingerprint_path, summary)
     return summary
+
+
+def _rotated_execution_order(candidates: list[RecommendationCandidate], trial_index: int) -> list[RecommendationCandidate]:
+    if not candidates:
+        return []
+    offset = trial_index % len(candidates)
+    return [*candidates[offset:], *candidates[:offset]]
+
+
+def _results_from_trials(
+    candidates: list[RecommendationCandidate],
+    trial_map: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    return [
+        _candidate_result(candidate, trial_map[candidate.label])
+        for candidate in candidates
+        if trial_map.get(candidate.label)
+    ]
 
 
 def load_recommendation(path: str | Path = LATEST_RECOMMENDATION) -> dict[str, Any]:
@@ -474,6 +522,18 @@ def _candidate_result(candidate: RecommendationCandidate, trials: list[dict[str,
         "budget": candidate.budget.to_record(),
         "run_ids": [trial.get("run_id") for trial in trials],
         "return_codes": [trial.get("return_code") for trial in trials],
+        "trials": [
+            {
+                "run_id": trial.get("run_id"),
+                "return_code": trial.get("return_code"),
+                "trial_index": trial.get("trial_index"),
+                "order_index": trial.get("order_index"),
+                "samples_per_second": trial.get("samples_per_second"),
+                "duration_seconds": trial.get("duration_seconds"),
+                "gpu_tflops_estimate": trial.get("gpu_tflops_estimate"),
+            }
+            for trial in trials
+        ],
         "status": "completed" if all(trial.get("status") == "completed" and trial.get("return_code") == 0 for trial in trials) else "failed",
         "metrics": {
             "samples_per_second": _median(trials, "samples_per_second"),
@@ -527,6 +587,26 @@ def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float]:
         float(gpu_tflops if gpu_tflops is not None else 0.0),
         -float(duration if duration is not None else float("inf")),
     )
+
+
+def _summary_diagnostics(
+    *,
+    optimization_mode: str,
+    complete: bool,
+    results: list[dict[str, Any]],
+    execution_order: list[dict[str, Any]],
+) -> list[str]:
+    diagnostics = []
+    if optimization_mode == "performance":
+        diagnostics.append("Performance sweeps use rotated interleaving so baseline does not always get cold-machine priority.")
+        diagnostics.append("Formal launch should use launch-performance to avoid resource-monitoring overhead after recommendation selection.")
+    if not complete:
+        diagnostics.append("Time budget or interrupt stopped the sweep before all requested trials completed; recommendation is based on partial results.")
+    if results and str(results[0].get("label", "")).endswith(":baseline") and len(results) > 1:
+        diagnostics.append("Baseline is currently ranked best; this can be valid, but inspect per-trial execution order before treating it as a tuning failure.")
+    if execution_order:
+        diagnostics.append(f"Recorded {len(execution_order)} measured trial(s) in execution_order for auditability.")
+    return diagnostics
 
 
 def _score(trials: list[dict[str, Any]]) -> float | None:

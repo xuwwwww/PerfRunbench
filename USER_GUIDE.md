@@ -1031,7 +1031,7 @@ autotuneai optimize-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-It only runs unbounded candidates, does not apply memory/CPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+It only runs unbounded candidates, does not apply memory/CPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. Candidates are measured with a rotated interleaved schedule so baseline does not always get cold-machine priority. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
 
 Use `optimize` when you want AutoTuneAI to empirically find a guarded configuration instead of guessing:
 

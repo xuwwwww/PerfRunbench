@@ -314,6 +314,8 @@ def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None
         f"- Best label: `{data.get('best_label')}`",
         f"- Cache path: `{data.get('cache_path')}`",
         f"- Fingerprint: `{data.get('fingerprint')}`",
+        f"- Monitor mode: `{data.get('monitor_mode')}`",
+        f"- Schedule: `{data.get('schedule')}`",
         f"- Repeat: {data.get('repeat', 1)}",
         f"- Warmup runs: {data.get('warmup_runs', 0)}",
         "",
@@ -333,6 +335,11 @@ def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None
         ),
         "",
     ]
+    diagnostics = data.get("diagnostics", [])
+    if diagnostics:
+        lines.extend(["## Diagnostics", ""])
+        lines.extend(f"- {item}" for item in diagnostics)
+        lines.append("")
     for item in candidates:
         metrics = item.get("metrics", {})
         lines.append(
@@ -356,6 +363,9 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         ("Best label", data.get("best_label")),
         ("Cache path", data.get("cache_path")),
         ("Fingerprint", data.get("fingerprint")),
+        ("Monitor mode", data.get("monitor_mode")),
+        ("Schedule", data.get("schedule")),
+        ("Complete", data.get("complete")),
         ("Repeat", data.get("repeat", 1)),
         ("Warmup runs", data.get("warmup_runs", 0)),
     ]
@@ -383,12 +393,25 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         f"<td>{_html_escape(_nested(item, 'metrics', 'gpu_tflops_estimate'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'peak_system_cpu_percent'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'per_cpu_peak_max_percent'))}</td>"
+        f"<td>{_html_escape(len(item.get('trials', [])))}</td>"
         f"<td>{_html_escape(item.get('system_profile'))}</td>"
         f"<td>{_html_escape(item.get('runtime_profile'))}</td>"
         f"<td>{_html_escape(item.get('gpu_profile'))}</td>"
         "</tr>"
         for item in candidates
-    ) or "<tr><td colspan=\"10\">No candidates recorded.</td></tr>"
+    ) or "<tr><td colspan=\"11\">No candidates recorded.</td></tr>"
+    diagnostics = data.get("diagnostics", [])
+    diagnostics_html = "".join(f"<li>{_html_escape(item)}</li>" for item in diagnostics) or "<li>No diagnostics recorded.</li>"
+    execution_rows = "".join(
+        "<tr>"
+        f"<td>{_html_escape(item.get('trial_index'))}</td>"
+        f"<td>{_html_escape(item.get('order_index'))}</td>"
+        f"<td>{_html_escape(item.get('label'))}</td>"
+        f"<td>{_html_escape(item.get('run_id'))}</td>"
+        f"<td>{_html_escape(item.get('return_code'))}</td>"
+        "</tr>"
+        for item in data.get("execution_order", [])
+    ) or "<tr><td colspan=\"5\">No execution order recorded.</td></tr>"
     return "\n".join(
         [
             "<!doctype html>",
@@ -415,6 +438,10 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             _simple_table(current_rows),
             "</section>",
             "<section class=\"card\">",
+            "<h2>Diagnostics</h2>",
+            f"<ul>{diagnostics_html}</ul>",
+            "</section>",
+            "<section class=\"card\">",
             "<h2>Throughput Ranking</h2>",
             metric_bar_chart(
                 "Candidate samples/sec",
@@ -423,8 +450,14 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             "</section>",
             "<section class=\"card wide\">",
             "<h2>Candidate Details</h2>",
-            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Duration sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
+            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Duration sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>Trials</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
             f"<tbody>{table_rows}</tbody></table>",
+            "</section>",
+            "<section class=\"card wide\">",
+            "<h2>Execution Order</h2>",
+            "<p class=\"muted\">Rotated order makes the sweep auditable and reduces cold-start or thermal bias.</p>",
+            "<table><thead><tr><th>Repeat</th><th>Order</th><th>Label</th><th>Run ID</th><th>Return code</th></tr></thead>",
+            f"<tbody>{execution_rows}</tbody></table>",
             "</section>",
             "</main>",
             "</body>",
