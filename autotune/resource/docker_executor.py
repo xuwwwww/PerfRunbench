@@ -33,9 +33,13 @@ def build_docker_run_command(
     host_workdir = Path(workdir or Path.cwd()).resolve()
     container_workdir = "/workspace"
     total_cores = total_cores or os.cpu_count()
-    memory_budget = budget.effective_memory_budget_mb(total_memory_mb if total_memory_mb is not None else _visible_memory_mb())
-    allowed_threads = budget.allowed_threads(total_cores)
-    cpu_limit = _docker_cpu_limit(total_cores, allowed_threads, budget.cpu_quota_percent)
+    memory_budget = (
+        budget.effective_memory_budget_mb(total_memory_mb if total_memory_mb is not None else _visible_memory_mb())
+        if budget.enforce and budget.enabled
+        else None
+    )
+    allowed_threads = budget.allowed_threads(total_cores) if budget.enforce and budget.enabled else None
+    cpu_limit = _docker_cpu_limit(total_cores, allowed_threads, budget.cpu_quota_percent) if budget.enforce and budget.enabled else None
     normalized_command = _normalize_python_command(command)
 
     wrapped = [
@@ -48,6 +52,8 @@ def build_docker_run_command(
         container_workdir,
     ]
     notes = [f"docker image={image}", f"docker workdir={host_workdir} mounted at {container_workdir}"]
+    if not budget.enforce:
+        notes.append("Docker resource limits disabled because resource budget enforcement is false.")
     if memory_budget is not None and memory_budget > 0:
         memory_mb = int(memory_budget)
         wrapped.extend(["--memory", f"{memory_mb}m", "--memory-swap", f"{memory_mb}m"])
@@ -56,7 +62,10 @@ def build_docker_run_command(
         wrapped.extend(["--cpus", _format_cpus(cpu_limit)])
         notes.append(f"docker cpus={_format_cpus(cpu_limit)}")
     wrapped.extend([image, *normalized_command])
-    notes.append("Docker executor enforces limits inside the container; host process sampling observes the docker client.")
+    if budget.enforce and budget.enabled:
+        notes.append("Docker executor enforces limits inside the container; host process sampling observes the docker client.")
+    else:
+        notes.append("Docker executor launches without AutoTuneAI resource guard limits.")
     return DockerCommand(command=wrapped, notes=notes)
 
 

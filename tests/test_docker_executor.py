@@ -41,6 +41,22 @@ class DockerExecutorTest(unittest.TestCase):
 
         self.assertIn("19456m", command.command)
 
+    @patch("autotune.resource.docker_executor.shutil.which", return_value="/usr/bin/docker")
+    def test_build_docker_run_command_skips_limits_when_enforcement_disabled(self, _which) -> None:
+        command = build_docker_run_command(
+            ["python", "train.py"],
+            ResourceBudget(memory_budget_gb=2, reserve_cores=1, cpu_quota_percent=50, enforce=False),
+            image="example/train:latest",
+            workdir=".",
+            total_cores=8,
+            total_memory_mb=24 * 1024,
+        )
+
+        self.assertNotIn("--memory", command.command)
+        self.assertNotIn("--memory-swap", command.command)
+        self.assertNotIn("--cpus", command.command)
+        self.assertTrue(any("resource guard limits" in note for note in command.notes))
+
 
 if __name__ == "__main__":
     unittest.main()

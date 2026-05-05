@@ -52,6 +52,20 @@ class SystemdExecutorTest(unittest.TestCase):
         )
         self.assertIn("MemoryMax=9952M", command.command)
 
+    @patch("autotune.resource.systemd_executor._visible_memory_mb")
+    @patch("autotune.resource.systemd_executor.shutil.which")
+    def test_build_systemd_run_command_skips_limits_when_enforcement_disabled(self, which, visible_memory) -> None:
+        which.side_effect = lambda name: f"/usr/bin/{name}"
+        visible_memory.return_value = 12000.0
+        command = build_systemd_run_command(
+            ["python", "train.py"],
+            ResourceBudget(memory_budget_gb=2, cpu_quota_percent=50, enforce=False),
+        )
+
+        self.assertNotIn("MemoryMax=2048M", command.command)
+        self.assertNotIn("CPUQuota=50%", command.command)
+        self.assertTrue(any("resource limits disabled" in note for note in command.notes))
+
     @patch("autotune.resource.systemd_executor.read_systemd_state")
     @patch("autotune.resource.systemd_executor.shutil.which")
     def test_preflight_reports_missing_systemd_run(self, which, read_state) -> None:
@@ -99,6 +113,21 @@ class SystemdExecutorTest(unittest.TestCase):
         self.assertFalse(result.runnable)
         self.assertFalse(result.probe_succeeded)
         self.assertTrue(any("probe failed" in error for error in result.errors))
+
+    @patch("autotune.resource.systemd_executor.read_systemd_state")
+    @patch("autotune.resource.systemd_executor.shutil.which")
+    def test_preflight_does_not_report_limits_when_enforcement_disabled(self, which, read_state) -> None:
+        which.side_effect = lambda name: f"/usr/bin/{name}"
+        read_state.return_value = "running"
+        result = preflight_systemd_executor(
+            ["python", "train.py"],
+            ResourceBudget(memory_budget_gb=1, cpu_quota_percent=50, enforce=False),
+        )
+
+        self.assertTrue(result.runnable)
+        self.assertFalse(any("MemoryMax would be set" in note for note in result.notes))
+        self.assertFalse(any("CPUQuota would be set" in note for note in result.notes))
+        self.assertTrue(any("enforcement is disabled" in note for note in result.notes))
 
 
 if __name__ == "__main__":

@@ -181,11 +181,14 @@ def preflight_systemd_executor(
         if not probe_succeeded:
             errors.append(f"systemd scope probe failed: {probe_output}")
 
-    memory_budget = budget.memory_budget_mb
-    if memory_budget is not None:
-        notes.append(f"MemoryMax would be set to {int(memory_budget)}M.")
-    if budget.cpu_quota_percent is not None:
-        notes.append(f"CPUQuota would be set to {budget.cpu_quota_percent}%.")
+    if budget.enforce:
+        memory_budget = budget.memory_budget_mb
+        if memory_budget is not None:
+            notes.append(f"MemoryMax would be set to {int(memory_budget)}M.")
+        if budget.cpu_quota_percent is not None:
+            notes.append(f"CPUQuota would be set to {budget.cpu_quota_percent}%.")
+    elif budget.enabled:
+        notes.append("Resource budget values were supplied, but enforcement is disabled.")
     if use_sudo:
         notes.append(f"sudo mode will request the systemd scope as root and run the workload as user {user}.")
 
@@ -241,12 +244,14 @@ def build_systemd_run_command(
         wrapped.extend(["--uid", user])
         notes.append(f"systemd-run will be invoked through sudo and run workload as user {user}.")
 
-    memory_budget = budget.effective_memory_budget_mb(_visible_memory_mb())
+    if not budget.enforce:
+        notes.append("systemd resource limits disabled because resource budget enforcement is false.")
+    memory_budget = budget.effective_memory_budget_mb(_visible_memory_mb()) if budget.enforce and budget.enabled else None
     if memory_budget is not None:
         wrapped.extend(["-p", f"MemoryMax={int(memory_budget)}M"])
         notes.append(f"systemd MemoryMax={int(memory_budget)}M")
 
-    if budget.cpu_quota_percent is not None:
+    if budget.enforce and budget.cpu_quota_percent is not None:
         wrapped.extend(["-p", f"CPUQuota={budget.cpu_quota_percent}%"])
         notes.append(f"systemd CPUQuota={budget.cpu_quota_percent}%")
 
