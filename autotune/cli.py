@@ -221,6 +221,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum wall-clock hours for the sweep; completed candidates are flushed as partial results.",
     )
     optimize_performance.add_argument("--monitor-mode", choices=["minimal", "full"], default="minimal")
+    optimize_performance.add_argument(
+        "--no-thermal-control",
+        action="store_true",
+        help="Disable paired baseline controls; faster but less reliable when GPU clocks or thermals drift.",
+    )
     optimize_performance.add_argument("--max-candidates", type=int)
     optimize_performance.add_argument("--no-gpu", action="store_true")
     optimize_performance.add_argument("--output", default="results/reports/performance_recommendation.json")
@@ -604,6 +609,7 @@ def _cmd_optimize_performance(args: argparse.Namespace) -> int:
             optimization_mode="performance",
             monitor_mode=args.monitor_mode,
             time_budget_hours=args.time_budget_hours,
+            thermal_control=not args.no_thermal_control,
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc

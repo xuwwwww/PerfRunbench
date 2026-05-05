@@ -365,6 +365,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         ("Fingerprint", data.get("fingerprint")),
         ("Monitor mode", data.get("monitor_mode")),
         ("Schedule", data.get("schedule")),
+        ("Thermal control", data.get("thermal_control")),
         ("Complete", data.get("complete")),
         ("Repeat", data.get("repeat", 1)),
         ("Warmup runs", data.get("warmup_runs", 0)),
@@ -389,6 +390,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         f"<td>{_html_escape(item.get('label'))}</td>"
         f"<td>{_html_escape(item.get('status'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'samples_per_second'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'normalized_samples_per_second_percent'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'duration_seconds'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'gpu_tflops_estimate'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'peak_system_cpu_percent'))}</td>"
@@ -399,7 +401,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         f"<td>{_html_escape(item.get('gpu_profile'))}</td>"
         "</tr>"
         for item in candidates
-    ) or "<tr><td colspan=\"11\">No candidates recorded.</td></tr>"
+    ) or "<tr><td colspan=\"12\">No candidates recorded.</td></tr>"
     diagnostics = data.get("diagnostics", [])
     diagnostics_html = "".join(f"<li>{_html_escape(item)}</li>" for item in diagnostics) or "<li>No diagnostics recorded.</li>"
     execution_rows = "".join(
@@ -450,7 +452,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             "</section>",
             "<section class=\"card wide\">",
             "<h2>Candidate Details</h2>",
-            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Duration sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>Trials</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
+            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Thermal-normalized %</th><th>Duration sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>Trials</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
             f"<tbody>{table_rows}</tbody></table>",
             "</section>",
             "<section class=\"card wide\">",

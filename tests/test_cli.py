@@ -210,6 +210,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(optimize.call_args.kwargs["optimization_mode"], "performance")
         self.assertEqual(optimize.call_args.kwargs["monitor_mode"], "minimal")
         self.assertEqual(optimize.call_args.kwargs["time_budget_hours"], 8)
+        self.assertTrue(optimize.call_args.kwargs["thermal_control"])
         self.assertFalse(optimize.call_args.args[1].enforce)
         self.assertEqual(optimize.call_args.kwargs["sample_interval_seconds"], 5.0)
         self.assertFalse(optimize.call_args.kwargs["hard_kill"])

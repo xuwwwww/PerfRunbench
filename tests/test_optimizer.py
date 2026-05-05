@@ -204,6 +204,43 @@ class OptimizerTest(unittest.TestCase):
         )
         self.assertEqual(result["schedule"], "interleaved-rotating")
 
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    @patch("autotune.recommendation.optimizer.analyze_run")
+    @patch("autotune.recommendation.optimizer.launch_performance")
+    def test_thermal_control_ranks_by_paired_baseline_ratio(self, launch_performance, analyze_run, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": False}
+        launch_performance.side_effect = [
+            (0, Path(".autotuneai/runs/baseline0")),
+            (0, Path(".autotuneai/runs/candidate0")),
+        ]
+
+        def fake_analyze(run_id: str, _runs_dir):
+            throughput = 100.0 if run_id == "baseline0" else 120.0
+            return {
+                "status": "completed",
+                "return_code": 0,
+                "workload": {"samples_per_second": throughput, "duration_seconds": 10.0},
+                "memory": {"memory_budget_exceeded": False},
+                "cpu": {},
+            }
+
+        analyze_run.side_effect = fake_analyze
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            result = optimize_recommendation(
+                ["python", "train.py"],
+                ResourceBudget(),
+                output=Path(temp_dir) / "recommendation.json",
+                cache_path=Path(temp_dir) / "latest.json",
+                max_candidates=2,
+                optimization_mode="performance",
+                monitor_mode="minimal",
+                thermal_control=True,
+            )
+
+        self.assertEqual(result["schedule"], "thermal-controlled-pairs")
+        self.assertEqual(result["best_label"], "performance:runtime-cpu")
+        self.assertEqual(result["recommendation"]["metrics"]["normalized_samples_per_second_ratio"], 1.2)
+
 
 if __name__ == "__main__":
     unittest.main()

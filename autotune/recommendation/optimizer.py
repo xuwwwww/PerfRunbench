@@ -53,6 +53,7 @@ def optimize_recommendation(
     optimization_mode: str = "guarded",
     monitor_mode: str = "full",
     time_budget_hours: float | None = None,
+    thermal_control: bool | None = None,
 ) -> dict[str, Any]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -68,6 +69,8 @@ def optimize_recommendation(
         raise ValueError("minimal monitor_mode is only supported for performance optimization")
     if time_budget_hours is not None and time_budget_hours <= 0:
         raise ValueError("time_budget_hours must be > 0")
+    if thermal_control is None:
+        thermal_control = optimization_mode == "performance" and monitor_mode == "minimal"
     effective_budget = ResourceBudget(enforce=False) if optimization_mode == "performance" else budget
     fingerprint = _fingerprint(command, effective_budget, executor, optimization_mode=optimization_mode)
     candidates = _candidate_plan(effective_budget, include_gpu=include_gpu, optimization_mode=optimization_mode)
@@ -102,6 +105,50 @@ def optimize_recommendation(
     trial_map: dict[str, list[dict[str, Any]]] = {candidate.label: [] for candidate in candidates}
     execution_order: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
+    if thermal_control and optimization_mode == "performance" and len(candidates) > 1:
+        results, execution_order = _run_thermal_controlled_trials(
+            command,
+            candidates,
+            trial_map,
+            deadline=deadline,
+            output=output,
+            cache_path=cache_path,
+            fingerprint=fingerprint,
+            executor=executor,
+            repeat=repeat,
+            warmup_runs=warmup_runs,
+            warmups=warmups,
+            optimization_mode=optimization_mode,
+            monitor_mode=monitor_mode,
+            time_budget_hours=time_budget_hours,
+            thermal_control=thermal_control,
+            sample_interval_seconds=sample_interval_seconds,
+            hard_kill=hard_kill,
+            use_sudo=use_sudo,
+            allow_sudo_auto=allow_sudo_auto,
+            system_tuning_sudo=system_tuning_sudo,
+            gpu_tuning_sudo=gpu_tuning_sudo,
+            docker_image=docker_image,
+            cooldown_seconds=cooldown_seconds,
+        )
+        return _write_summary(
+            output=output,
+            cache_path=cache_path,
+            fingerprint=fingerprint,
+            command=command,
+            executor=executor,
+            repeat=repeat,
+            warmup_runs=warmup_runs,
+            warmups=warmups,
+            optimization_mode=optimization_mode,
+            monitor_mode=monitor_mode,
+            time_budget_hours=time_budget_hours,
+            thermal_control=thermal_control,
+            results=results,
+            execution_order=execution_order,
+            complete=all(len(trial_map[candidate.label]) >= repeat for candidate in candidates if candidate.label != candidates[0].label),
+        )
+
     for trial_index in range(repeat):
         for order_index, candidate in enumerate(_rotated_execution_order(candidates, trial_index)):
             if _deadline_expired(deadline):
@@ -153,6 +200,7 @@ def optimize_recommendation(
                 optimization_mode=optimization_mode,
                 monitor_mode=monitor_mode,
                 time_budget_hours=time_budget_hours,
+                thermal_control=thermal_control,
                 results=results,
                 execution_order=execution_order,
                 complete=False,
@@ -172,6 +220,7 @@ def optimize_recommendation(
             optimization_mode=optimization_mode,
             monitor_mode=monitor_mode,
             time_budget_hours=time_budget_hours,
+            thermal_control=thermal_control,
             results=results,
             execution_order=execution_order,
             complete=all(len(trial_map[candidate.label]) >= repeat for candidate in candidates),
@@ -228,6 +277,259 @@ def _run_candidate(
     )
 
 
+def _run_thermal_controlled_trials(
+    command: list[str],
+    candidates: list[RecommendationCandidate],
+    trial_map: dict[str, list[dict[str, Any]]],
+    *,
+    deadline: float | None,
+    output: str | Path,
+    cache_path: str | Path,
+    fingerprint: str,
+    executor: str,
+    repeat: int,
+    warmup_runs: int,
+    warmups: list[dict[str, Any]],
+    optimization_mode: str,
+    monitor_mode: str,
+    time_budget_hours: float | None,
+    thermal_control: bool,
+    sample_interval_seconds: float,
+    hard_kill: bool,
+    use_sudo: bool,
+    allow_sudo_auto: bool,
+    system_tuning_sudo: bool,
+    gpu_tuning_sudo: bool,
+    docker_image: str,
+    cooldown_seconds: float,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    baseline = candidates[0]
+    candidates_to_test = candidates[1:]
+    execution_order: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    pair_index = 0
+    for trial_index in range(repeat):
+        for order_index, candidate in enumerate(_rotated_execution_order(candidates_to_test, trial_index)):
+            if _deadline_expired(deadline):
+                break
+            pair_id = f"trial{trial_index}_pair{pair_index}"
+            baseline_first = (trial_index + order_index) % 2 == 0
+            if baseline_first:
+                baseline_trial = _run_measured_trial(
+                    command,
+                    baseline,
+                    sample_interval_seconds=sample_interval_seconds,
+                    hard_kill=hard_kill,
+                    executor=executor,
+                    use_sudo=use_sudo,
+                    allow_sudo_auto=allow_sudo_auto,
+                    system_tuning_sudo=system_tuning_sudo,
+                    gpu_tuning_sudo=gpu_tuning_sudo,
+                    docker_image=docker_image,
+                    monitor_mode=monitor_mode,
+                    optimization_mode=optimization_mode,
+                    trial_index=trial_index,
+                    order_index=order_index * 2,
+                    pair_id=pair_id,
+                    paired_label=candidate.label,
+                    role="baseline_control",
+                )
+                trial_map[baseline.label].append(baseline_trial)
+                execution_order.append(_execution_record(baseline, baseline_trial))
+                candidate_trial = _run_measured_trial(
+                    command,
+                    candidate,
+                    sample_interval_seconds=sample_interval_seconds,
+                    hard_kill=hard_kill,
+                    executor=executor,
+                    use_sudo=use_sudo,
+                    allow_sudo_auto=allow_sudo_auto,
+                    system_tuning_sudo=system_tuning_sudo,
+                    gpu_tuning_sudo=gpu_tuning_sudo,
+                    docker_image=docker_image,
+                    monitor_mode=monitor_mode,
+                    optimization_mode=optimization_mode,
+                    trial_index=trial_index,
+                    order_index=order_index * 2 + 1,
+                    pair_id=pair_id,
+                    paired_label=baseline.label,
+                    role="candidate",
+                    baseline_trial=baseline_trial,
+                )
+            else:
+                candidate_trial = _run_measured_trial(
+                    command,
+                    candidate,
+                    sample_interval_seconds=sample_interval_seconds,
+                    hard_kill=hard_kill,
+                    executor=executor,
+                    use_sudo=use_sudo,
+                    allow_sudo_auto=allow_sudo_auto,
+                    system_tuning_sudo=system_tuning_sudo,
+                    gpu_tuning_sudo=gpu_tuning_sudo,
+                    docker_image=docker_image,
+                    monitor_mode=monitor_mode,
+                    optimization_mode=optimization_mode,
+                    trial_index=trial_index,
+                    order_index=order_index * 2,
+                    pair_id=pair_id,
+                    paired_label=baseline.label,
+                    role="candidate",
+                )
+                baseline_trial = _run_measured_trial(
+                    command,
+                    baseline,
+                    sample_interval_seconds=sample_interval_seconds,
+                    hard_kill=hard_kill,
+                    executor=executor,
+                    use_sudo=use_sudo,
+                    allow_sudo_auto=allow_sudo_auto,
+                    system_tuning_sudo=system_tuning_sudo,
+                    gpu_tuning_sudo=gpu_tuning_sudo,
+                    docker_image=docker_image,
+                    monitor_mode=monitor_mode,
+                    optimization_mode=optimization_mode,
+                    trial_index=trial_index,
+                    order_index=order_index * 2 + 1,
+                    pair_id=pair_id,
+                    paired_label=candidate.label,
+                    role="baseline_control",
+                )
+                candidate_trial = _add_paired_baseline(candidate_trial, baseline_trial)
+                trial_map[baseline.label].append(baseline_trial)
+                execution_order.append(_execution_record(candidate, candidate_trial))
+                execution_order.append(_execution_record(baseline, baseline_trial))
+                trial_map[candidate.label].append(candidate_trial)
+                results = _results_from_trials(candidates, trial_map)
+                _write_summary(
+                    output=output,
+                    cache_path=cache_path,
+                    fingerprint=fingerprint,
+                    command=command,
+                    executor=executor,
+                    repeat=repeat,
+                    warmup_runs=warmup_runs,
+                    warmups=warmups,
+                    optimization_mode=optimization_mode,
+                    monitor_mode=monitor_mode,
+                    time_budget_hours=time_budget_hours,
+                    thermal_control=thermal_control,
+                    results=results,
+                    execution_order=execution_order,
+                    complete=False,
+                )
+                pair_index += 1
+                if cooldown_seconds > 0:
+                    time.sleep(cooldown_seconds)
+                continue
+
+            candidate_trial = _add_paired_baseline(candidate_trial, baseline_trial)
+            trial_map[candidate.label].append(candidate_trial)
+            execution_order.append(_execution_record(candidate, candidate_trial))
+            results = _results_from_trials(candidates, trial_map)
+            _write_summary(
+                output=output,
+                cache_path=cache_path,
+                fingerprint=fingerprint,
+                command=command,
+                executor=executor,
+                repeat=repeat,
+                warmup_runs=warmup_runs,
+                warmups=warmups,
+                optimization_mode=optimization_mode,
+                monitor_mode=monitor_mode,
+                time_budget_hours=time_budget_hours,
+                thermal_control=thermal_control,
+                results=results,
+                execution_order=execution_order,
+                complete=False,
+            )
+            pair_index += 1
+            if cooldown_seconds > 0:
+                time.sleep(cooldown_seconds)
+        if _deadline_expired(deadline):
+            break
+    return results, execution_order
+
+
+def _run_measured_trial(
+    command: list[str],
+    candidate: RecommendationCandidate,
+    *,
+    sample_interval_seconds: float,
+    hard_kill: bool,
+    executor: str,
+    use_sudo: bool,
+    allow_sudo_auto: bool,
+    system_tuning_sudo: bool,
+    gpu_tuning_sudo: bool,
+    docker_image: str,
+    monitor_mode: str,
+    optimization_mode: str,
+    trial_index: int,
+    order_index: int,
+    pair_id: str,
+    paired_label: str,
+    role: str,
+    baseline_trial: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return_code, run_dir = _run_candidate(
+        command,
+        candidate,
+        sample_interval_seconds=sample_interval_seconds,
+        hard_kill=hard_kill,
+        executor=executor,
+        use_sudo=use_sudo,
+        allow_sudo_auto=allow_sudo_auto,
+        system_tuning_sudo=system_tuning_sudo,
+        gpu_tuning_sudo=gpu_tuning_sudo,
+        docker_image=docker_image,
+        monitor_mode=monitor_mode,
+        optimization_mode=optimization_mode,
+    )
+    trial = {
+        "run_id": run_dir.name,
+        "return_code": return_code,
+        "trial_index": trial_index,
+        "order_index": order_index,
+        "pair_id": pair_id,
+        "paired_label": paired_label,
+        "thermal_role": role,
+        **_run_metrics(run_dir.name),
+    }
+    if baseline_trial is not None:
+        trial = _add_paired_baseline(trial, baseline_trial)
+    return trial
+
+
+def _add_paired_baseline(trial: dict[str, Any], baseline_trial: dict[str, Any]) -> dict[str, Any]:
+    trial["paired_baseline_run_id"] = baseline_trial.get("run_id")
+    trial["paired_baseline_samples_per_second"] = baseline_trial.get("samples_per_second")
+    trial["paired_baseline_gpu_tflops_estimate"] = baseline_trial.get("gpu_tflops_estimate")
+    trial["normalized_samples_per_second_ratio"] = _ratio(
+        trial.get("samples_per_second"),
+        baseline_trial.get("samples_per_second"),
+    )
+    trial["normalized_gpu_tflops_ratio"] = _ratio(
+        trial.get("gpu_tflops_estimate"),
+        baseline_trial.get("gpu_tflops_estimate"),
+    )
+    return trial
+
+
+def _execution_record(candidate: RecommendationCandidate, trial: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "trial_index": trial.get("trial_index"),
+        "order_index": trial.get("order_index"),
+        "label": candidate.label,
+        "run_id": trial.get("run_id"),
+        "return_code": trial.get("return_code"),
+        "pair_id": trial.get("pair_id"),
+        "thermal_role": trial.get("thermal_role"),
+        "paired_label": trial.get("paired_label"),
+    }
+
+
 def _write_summary(
     *,
     output: str | Path,
@@ -241,6 +543,7 @@ def _write_summary(
     optimization_mode: str,
     monitor_mode: str,
     time_budget_hours: float | None,
+    thermal_control: bool,
     results: list[dict[str, Any]],
     execution_order: list[dict[str, Any]],
     complete: bool,
@@ -258,12 +561,14 @@ def _write_summary(
         "warmups": warmups,
         "optimization_mode": optimization_mode,
         "monitor_mode": monitor_mode,
-        "schedule": "interleaved-rotating",
+        "schedule": "thermal-controlled-pairs" if thermal_control else "interleaved-rotating",
+        "thermal_control": thermal_control,
         "time_budget_hours": time_budget_hours,
         "complete": complete,
         "goal": _goal_text(optimization_mode),
         "diagnostics": _summary_diagnostics(
             optimization_mode=optimization_mode,
+            thermal_control=thermal_control,
             complete=complete,
             results=ranked,
             execution_order=execution_order,
@@ -513,6 +818,33 @@ def _run_metrics(run_id: str) -> dict[str, Any]:
 
 
 def _candidate_result(candidate: RecommendationCandidate, trials: list[dict[str, Any]]) -> dict[str, Any]:
+    normalized_samples = _median(trials, "normalized_samples_per_second_ratio")
+    normalized_tflops = _median(trials, "normalized_gpu_tflops_ratio")
+    if normalized_samples is None and any(trial.get("thermal_role") == "baseline_control" for trial in trials):
+        normalized_samples = 1.0
+    if normalized_tflops is None and any(trial.get("thermal_role") == "baseline_control" for trial in trials):
+        normalized_tflops = 1.0
+    metrics = {
+        "samples_per_second": _median(trials, "samples_per_second"),
+        "duration_seconds": _median(trials, "duration_seconds"),
+        "gpu_tflops_estimate": _median(trials, "gpu_tflops_estimate"),
+        "gpu_matmuls_per_second": _median(trials, "gpu_matmuls_per_second"),
+        "gpu_peak_memory_allocated_mb": _median(trials, "gpu_peak_memory_allocated_mb"),
+        "normalized_samples_per_second_ratio": normalized_samples,
+        "normalized_samples_per_second_percent": _ratio_to_percent(normalized_samples),
+        "normalized_gpu_tflops_ratio": normalized_tflops,
+        "normalized_gpu_tflops_percent": _ratio_to_percent(normalized_tflops),
+        "peak_memory_mb": _median(trials, "peak_memory_mb"),
+        "peak_process_cpu_percent": _median(trials, "peak_process_cpu_percent"),
+        "average_process_cpu_percent": _median(trials, "average_process_cpu_percent"),
+        "peak_system_cpu_percent": _median(trials, "peak_system_cpu_percent"),
+        "average_system_cpu_percent": _median(trials, "average_system_cpu_percent"),
+        "system_cpu_percent_p50": _median(trials, "system_cpu_percent_p50"),
+        "system_cpu_percent_p95": _median(trials, "system_cpu_percent_p95"),
+        "per_cpu_average_max_percent": _median(trials, "per_cpu_average_max_percent"),
+        "per_cpu_peak_max_percent": _median(trials, "per_cpu_peak_max_percent"),
+        "memory_budget_exceeded": any(trial.get("memory_budget_exceeded") for trial in trials),
+    }
     return {
         "label": candidate.label,
         "guard_mode": candidate.guard_mode,
@@ -528,31 +860,20 @@ def _candidate_result(candidate: RecommendationCandidate, trials: list[dict[str,
                 "return_code": trial.get("return_code"),
                 "trial_index": trial.get("trial_index"),
                 "order_index": trial.get("order_index"),
+                "pair_id": trial.get("pair_id"),
+                "thermal_role": trial.get("thermal_role"),
+                "paired_baseline_run_id": trial.get("paired_baseline_run_id"),
                 "samples_per_second": trial.get("samples_per_second"),
                 "duration_seconds": trial.get("duration_seconds"),
                 "gpu_tflops_estimate": trial.get("gpu_tflops_estimate"),
+                "paired_baseline_samples_per_second": trial.get("paired_baseline_samples_per_second"),
+                "normalized_samples_per_second_ratio": trial.get("normalized_samples_per_second_ratio"),
             }
             for trial in trials
         ],
         "status": "completed" if all(trial.get("status") == "completed" and trial.get("return_code") == 0 for trial in trials) else "failed",
-        "metrics": {
-            "samples_per_second": _median(trials, "samples_per_second"),
-            "duration_seconds": _median(trials, "duration_seconds"),
-            "gpu_tflops_estimate": _median(trials, "gpu_tflops_estimate"),
-            "gpu_matmuls_per_second": _median(trials, "gpu_matmuls_per_second"),
-            "gpu_peak_memory_allocated_mb": _median(trials, "gpu_peak_memory_allocated_mb"),
-            "peak_memory_mb": _median(trials, "peak_memory_mb"),
-            "peak_process_cpu_percent": _median(trials, "peak_process_cpu_percent"),
-            "average_process_cpu_percent": _median(trials, "average_process_cpu_percent"),
-            "peak_system_cpu_percent": _median(trials, "peak_system_cpu_percent"),
-            "average_system_cpu_percent": _median(trials, "average_system_cpu_percent"),
-            "system_cpu_percent_p50": _median(trials, "system_cpu_percent_p50"),
-            "system_cpu_percent_p95": _median(trials, "system_cpu_percent_p95"),
-            "per_cpu_average_max_percent": _median(trials, "per_cpu_average_max_percent"),
-            "per_cpu_peak_max_percent": _median(trials, "per_cpu_peak_max_percent"),
-            "memory_budget_exceeded": any(trial.get("memory_budget_exceeded") for trial in trials),
-        },
-        "score": _score(trials),
+        "metrics": metrics,
+        "score": _score(metrics),
         "reason": _reason(candidate, trials),
     }
 
@@ -576,9 +897,17 @@ def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float]:
     if item.get("status") != "completed" or item.get("metrics", {}).get("memory_budget_exceeded"):
         return (float("-inf"), float("-inf"), float("-inf"), float("-inf"))
     metrics = item.get("metrics", {})
+    normalized = metrics.get("normalized_samples_per_second_ratio")
     throughput = metrics.get("samples_per_second")
     gpu_tflops = metrics.get("gpu_tflops_estimate")
     duration = metrics.get("duration_seconds")
+    if normalized is not None:
+        return (
+            2.0,
+            float(normalized),
+            float(throughput if throughput is not None else 0.0),
+            float(gpu_tflops if gpu_tflops is not None else 0.0),
+        )
     memory = metrics.get("peak_memory_mb")
     has_throughput = 1.0 if throughput is not None else 0.0
     return (
@@ -592,13 +921,17 @@ def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float]:
 def _summary_diagnostics(
     *,
     optimization_mode: str,
+    thermal_control: bool,
     complete: bool,
     results: list[dict[str, Any]],
     execution_order: list[dict[str, Any]],
 ) -> list[str]:
     diagnostics = []
     if optimization_mode == "performance":
-        diagnostics.append("Performance sweeps use rotated interleaving so baseline does not always get cold-machine priority.")
+        if thermal_control:
+            diagnostics.append("Performance sweeps use paired baseline controls and rank by candidate speed divided by nearby baseline speed.")
+        else:
+            diagnostics.append("Performance sweeps use rotated interleaving so baseline does not always get cold-machine priority.")
         diagnostics.append("Formal launch should use launch-performance to avoid resource-monitoring overhead after recommendation selection.")
     if not complete:
         diagnostics.append("Time budget or interrupt stopped the sweep before all requested trials completed; recommendation is based on partial results.")
@@ -609,18 +942,25 @@ def _summary_diagnostics(
     return diagnostics
 
 
-def _score(trials: list[dict[str, Any]]) -> float | None:
-    throughput = _median(trials, "samples_per_second")
+def _score(metrics: dict[str, Any]) -> float | None:
+    normalized = metrics.get("normalized_samples_per_second_ratio")
+    if normalized is not None:
+        return round(float(normalized), 6)
+    throughput = metrics.get("samples_per_second")
     if throughput is None:
         return None
     return round(float(throughput), 6)
 
 
 def _reason(candidate: RecommendationCandidate, trials: list[dict[str, Any]]) -> list[str]:
+    normalized = _median(trials, "normalized_samples_per_second_ratio")
+    if normalized is None and any(trial.get("thermal_role") == "baseline_control" for trial in trials):
+        normalized = 1.0
     metrics = {
         "samples_per_second": _median(trials, "samples_per_second"),
         "duration_seconds": _median(trials, "duration_seconds"),
         "gpu_tflops_estimate": _median(trials, "gpu_tflops_estimate"),
+        "normalized_samples_per_second_ratio": normalized,
         "peak_memory_mb": _median(trials, "peak_memory_mb"),
     }
     reasons = [
@@ -630,6 +970,9 @@ def _reason(candidate: RecommendationCandidate, trials: list[dict[str, Any]]) ->
     ]
     if metrics["gpu_tflops_estimate"] is not None:
         reasons.append(f"gpu_tflops_estimate={metrics['gpu_tflops_estimate']}")
+    if metrics["normalized_samples_per_second_ratio"] is not None:
+        reasons.append(f"thermal_normalized_speed={metrics['normalized_samples_per_second_ratio']}")
+        reasons.append(f"thermal_normalized_delta_percent={_ratio_to_percent(metrics['normalized_samples_per_second_ratio'])}")
     if metrics["peak_memory_mb"] is not None:
         reasons.append(f"peak_memory_mb={metrics['peak_memory_mb']}")
     if candidate.system_profile:
@@ -677,6 +1020,21 @@ def _number(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _ratio(value: Any, baseline: Any) -> float | None:
+    value_number = _number(value)
+    baseline_number = _number(baseline)
+    if value_number is None or baseline_number is None or baseline_number == 0:
+        return None
+    return round(value_number / baseline_number, 6)
+
+
+def _ratio_to_percent(ratio: Any) -> float | None:
+    ratio_number = _number(ratio)
+    if ratio_number is None:
+        return None
+    return round((ratio_number - 1.0) * 100.0, 3)
 
 
 def _goal_text(optimization_mode: str) -> str:
