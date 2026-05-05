@@ -19,6 +19,7 @@ from autotune.system_tuner.runtime import available_profiles
 
 RECOMMENDATIONS_DIR = Path(".autotuneai") / "recommendations"
 LATEST_RECOMMENDATION = RECOMMENDATIONS_DIR / "latest.json"
+OPTIMIZATION_TARGETS = {"auto", "cpu", "memory", "gpu", "mixed"}
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ def optimize_recommendation(
     include_gpu: bool = True,
     max_candidates: int | None = None,
     optimization_mode: str = "guarded",
+    optimization_target: str = "auto",
     monitor_mode: str = "full",
     time_budget_hours: float | None = None,
     thermal_control: bool | None = None,
@@ -63,6 +65,8 @@ def optimize_recommendation(
         raise ValueError("warmup_runs must be >= 0")
     if optimization_mode not in {"guarded", "performance"}:
         raise ValueError("optimization_mode must be 'guarded' or 'performance'")
+    if optimization_target not in OPTIMIZATION_TARGETS:
+        raise ValueError(f"optimization_target must be one of {sorted(OPTIMIZATION_TARGETS)}")
     if monitor_mode not in {"full", "minimal"}:
         raise ValueError("monitor_mode must be 'full' or 'minimal'")
     if monitor_mode == "minimal" and optimization_mode != "performance":
@@ -72,8 +76,13 @@ def optimize_recommendation(
     if thermal_control is None:
         thermal_control = optimization_mode == "performance" and monitor_mode == "minimal"
     effective_budget = ResourceBudget(enforce=False) if optimization_mode == "performance" else budget
-    fingerprint = _fingerprint(command, effective_budget, executor, optimization_mode=optimization_mode)
-    candidates = _candidate_plan(effective_budget, include_gpu=include_gpu, optimization_mode=optimization_mode)
+    fingerprint = _fingerprint(command, effective_budget, executor, optimization_mode=optimization_mode, optimization_target=optimization_target)
+    candidates = _candidate_plan(
+        effective_budget,
+        include_gpu=include_gpu,
+        optimization_mode=optimization_mode,
+        optimization_target=optimization_target,
+    )
     if max_candidates is not None:
         candidates = candidates[: max(1, max_candidates)]
 
@@ -119,6 +128,7 @@ def optimize_recommendation(
             warmup_runs=warmup_runs,
             warmups=warmups,
             optimization_mode=optimization_mode,
+            optimization_target=optimization_target,
             monitor_mode=monitor_mode,
             time_budget_hours=time_budget_hours,
             thermal_control=thermal_control,
@@ -141,6 +151,7 @@ def optimize_recommendation(
             warmup_runs=warmup_runs,
             warmups=warmups,
             optimization_mode=optimization_mode,
+            optimization_target=optimization_target,
             monitor_mode=monitor_mode,
             time_budget_hours=time_budget_hours,
             thermal_control=thermal_control,
@@ -198,6 +209,7 @@ def optimize_recommendation(
                 warmup_runs=warmup_runs,
                 warmups=warmups,
                 optimization_mode=optimization_mode,
+                optimization_target=optimization_target,
                 monitor_mode=monitor_mode,
                 time_budget_hours=time_budget_hours,
                 thermal_control=thermal_control,
@@ -218,6 +230,7 @@ def optimize_recommendation(
             warmup_runs=warmup_runs,
             warmups=warmups,
             optimization_mode=optimization_mode,
+            optimization_target=optimization_target,
             monitor_mode=monitor_mode,
             time_budget_hours=time_budget_hours,
             thermal_control=thermal_control,
@@ -291,6 +304,7 @@ def _run_thermal_controlled_trials(
     warmup_runs: int,
     warmups: list[dict[str, Any]],
     optimization_mode: str,
+    optimization_target: str,
     monitor_mode: str,
     time_budget_hours: float | None,
     thermal_control: bool,
@@ -411,6 +425,7 @@ def _run_thermal_controlled_trials(
                     warmup_runs=warmup_runs,
                     warmups=warmups,
                     optimization_mode=optimization_mode,
+                    optimization_target=optimization_target,
                     monitor_mode=monitor_mode,
                     time_budget_hours=time_budget_hours,
                     thermal_control=thermal_control,
@@ -437,6 +452,7 @@ def _run_thermal_controlled_trials(
                 warmup_runs=warmup_runs,
                 warmups=warmups,
                 optimization_mode=optimization_mode,
+                optimization_target=optimization_target,
                 monitor_mode=monitor_mode,
                 time_budget_hours=time_budget_hours,
                 thermal_control=thermal_control,
@@ -541,6 +557,7 @@ def _write_summary(
     warmup_runs: int,
     warmups: list[dict[str, Any]],
     optimization_mode: str,
+    optimization_target: str,
     monitor_mode: str,
     time_budget_hours: float | None,
     thermal_control: bool,
@@ -560,14 +577,16 @@ def _write_summary(
         "warmup_runs": warmup_runs,
         "warmups": warmups,
         "optimization_mode": optimization_mode,
+        "optimization_target": optimization_target,
         "monitor_mode": monitor_mode,
         "schedule": "thermal-controlled-pairs" if thermal_control else "interleaved-rotating",
         "thermal_control": thermal_control,
         "time_budget_hours": time_budget_hours,
         "complete": complete,
-        "goal": _goal_text(optimization_mode),
+        "goal": _goal_text(optimization_mode, optimization_target),
         "diagnostics": _summary_diagnostics(
             optimization_mode=optimization_mode,
+            optimization_target=optimization_target,
             thermal_control=thermal_control,
             complete=complete,
             results=ranked,
@@ -629,25 +648,24 @@ def _candidate_plan(
     *,
     include_gpu: bool,
     optimization_mode: str = "guarded",
+    optimization_target: str = "auto",
 ) -> list[RecommendationCandidate]:
     guard_modes = [("performance", ResourceBudget(enforce=False))] if optimization_mode == "performance" else _guard_modes(budget)
     system_profiles = _default_system_profiles()
     runtime_profiles = [None, *_default_runtime_profiles()]
-    gpu_profiles = [None]
-    if include_gpu and _nvidia_supported():
-        gpu_profiles.append("nvidia-performance")
+    gpu_profiles = _default_gpu_profiles(include_gpu=include_gpu, optimization_mode=optimization_mode)
 
     candidates: list[RecommendationCandidate] = []
     for guard_mode, candidate_budget in guard_modes:
         candidates.append(RecommendationCandidate(f"{guard_mode}:baseline", guard_mode, candidate_budget))
         candidates.append(RecommendationCandidate(f"{guard_mode}:runtime-cpu", guard_mode, candidate_budget, runtime_profile="runtime-cpu-performance"))
-        if "nvidia-performance" in gpu_profiles:
+        for gpu_profile in gpu_profiles:
             candidates.append(
                 RecommendationCandidate(
-                    f"{guard_mode}:gpu",
+                    f"{guard_mode}:{_gpu_label(gpu_profile)}",
                     guard_mode,
                     candidate_budget,
-                    gpu_profile="nvidia-performance",
+                    gpu_profile=gpu_profile,
                 )
             )
         if "runtime-pytorch-gpu-performance" in runtime_profiles and "nvidia-performance" in gpu_profiles:
@@ -697,14 +715,24 @@ def _candidate_plan(
                     system_profile=system_profile,
                 )
             )
-            if "nvidia-performance" in gpu_profiles:
+            if "runtime-cpu-performance" in runtime_profiles:
                 candidates.append(
                     RecommendationCandidate(
-                        f"{guard_mode}:{system_profile}+gpu",
+                        f"{guard_mode}:{system_profile}+runtime-cpu",
                         guard_mode,
                         candidate_budget,
                         system_profile=system_profile,
-                        gpu_profile="nvidia-performance",
+                        runtime_profile="runtime-cpu-performance",
+                    )
+                )
+            for gpu_profile in gpu_profiles:
+                candidates.append(
+                    RecommendationCandidate(
+                        f"{guard_mode}:{system_profile}+{_gpu_label(gpu_profile)}",
+                        guard_mode,
+                        candidate_budget,
+                        system_profile=system_profile,
+                        gpu_profile=gpu_profile,
                     )
                 )
             candidates.append(
@@ -731,7 +759,7 @@ def _candidate_plan(
                         gpu_profile="nvidia-performance",
                     )
                 )
-    return _dedupe_candidates(candidates)
+    return _order_candidates(_dedupe_candidates(candidates), optimization_target)
 
 
 def _guard_modes(budget: ResourceBudget) -> list[tuple[str, ResourceBudget]]:
@@ -763,11 +791,91 @@ def _default_runtime_profiles() -> list[str]:
     return [profile for profile in preferred if profile in available]
 
 
+def _default_gpu_profiles(*, include_gpu: bool, optimization_mode: str) -> list[str]:
+    if not include_gpu:
+        return []
+    preferred = ["nvidia-performance"] if optimization_mode == "performance" else ["nvidia-balanced", "nvidia-guard", "nvidia-performance"]
+    return [profile for profile in preferred if _nvidia_supported_profile(profile)]
+
+
+def _gpu_label(profile: str) -> str:
+    if profile == "nvidia-performance":
+        return "gpu"
+    if profile == "nvidia-balanced":
+        return "gpu-balanced"
+    if profile == "nvidia-guard":
+        return "gpu-guard"
+    return profile.replace("nvidia-", "gpu-")
+
+
 def _nvidia_supported() -> bool:
+    return _nvidia_supported_profile("nvidia-performance")
+
+
+def _nvidia_supported_profile(profile: str) -> bool:
     try:
-        return bool(recommend_nvidia_tuning("nvidia-performance").get("supported"))
+        return bool(recommend_nvidia_tuning(profile).get("supported"))
     except Exception:
         return False
+
+
+def _order_candidates(candidates: list[RecommendationCandidate], optimization_target: str) -> list[RecommendationCandidate]:
+    if optimization_target in {"auto", "mixed"}:
+        return candidates
+    baselines = [candidate for candidate in candidates if candidate.system_profile is None and candidate.runtime_profile is None and candidate.gpu_profile is None]
+    rest = [candidate for candidate in candidates if candidate not in baselines]
+    ordered_rest = [
+        candidate
+        for _, candidate in sorted(
+            enumerate(rest),
+            key=lambda item: (_target_priority(item[1], optimization_target), item[0]),
+        )
+    ]
+    return [*baselines, *ordered_rest]
+
+
+def _target_priority(candidate: RecommendationCandidate, optimization_target: str) -> int:
+    if optimization_target == "gpu":
+        if candidate.guard_mode != "performance" and candidate.gpu_profile in {"nvidia-balanced", "nvidia-guard"} and candidate.system_profile is None and candidate.runtime_profile is None:
+            return 0
+        if candidate.gpu_profile == "nvidia-performance" and candidate.system_profile is None and candidate.runtime_profile is None:
+            return 1
+        if candidate.gpu_profile == "nvidia-performance" and candidate.runtime_profile is not None:
+            return 2
+        if candidate.gpu_profile == "nvidia-performance":
+            return 3
+        if candidate.runtime_profile == "runtime-pytorch-gpu-performance":
+            return 4
+        if candidate.gpu_profile is not None:
+            return 5
+        return 8
+    if optimization_target == "cpu":
+        if candidate.gpu_profile is not None:
+            return 9
+        if candidate.runtime_profile == "runtime-cpu-performance" and candidate.system_profile is None:
+            return 0
+        if candidate.system_profile and "performance" in candidate.system_profile and candidate.runtime_profile is None:
+            return 1
+        if candidate.system_profile and "throughput" in candidate.system_profile and candidate.runtime_profile is None:
+            return 2
+        if candidate.system_profile and candidate.runtime_profile == "runtime-cpu-performance":
+            return 3
+        if candidate.runtime_profile == "runtime-pytorch-max-performance":
+            return 4
+        return 8
+    if optimization_target == "memory":
+        if candidate.gpu_profile is not None:
+            return 9
+        if candidate.system_profile and "memory-conservative" in candidate.system_profile:
+            return 0
+        if candidate.system_profile and "performance" in candidate.system_profile:
+            return 1
+        if candidate.system_profile and "throughput" in candidate.system_profile:
+            return 2
+        if candidate.runtime_profile == "runtime-cpu-performance":
+            return 3
+        return 8
+    return 8
 
 
 def _deadline_expired(deadline: float | None) -> bool:
@@ -921,6 +1029,7 @@ def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float]:
 def _summary_diagnostics(
     *,
     optimization_mode: str,
+    optimization_target: str,
     thermal_control: bool,
     complete: bool,
     results: list[dict[str, Any]],
@@ -933,6 +1042,8 @@ def _summary_diagnostics(
         else:
             diagnostics.append("Performance sweeps use rotated interleaving so baseline does not always get cold-machine priority.")
         diagnostics.append("Formal launch should use launch-performance to avoid resource-monitoring overhead after recommendation selection.")
+    if optimization_target != "auto":
+        diagnostics.append(f"Candidate order was prioritized for target={optimization_target}.")
     if not complete:
         diagnostics.append("Time budget or interrupt stopped the sweep before all requested trials completed; recommendation is based on partial results.")
     if results and str(results[0].get("label", "")).endswith(":baseline") and len(results) > 1:
@@ -990,12 +1101,14 @@ def _fingerprint(
     executor: str,
     *,
     optimization_mode: str = "guarded",
+    optimization_target: str = "auto",
 ) -> str:
     payload = {
         "command": command,
         "budget": budget.to_record(),
         "executor": executor,
         "optimization_mode": optimization_mode,
+        "optimization_target": optimization_target,
         "platform": platform.platform(),
     }
     encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
@@ -1037,7 +1150,10 @@ def _ratio_to_percent(ratio: Any) -> float | None:
     return round((ratio_number - 1.0) * 100.0, 3)
 
 
-def _goal_text(optimization_mode: str) -> str:
+def _goal_text(optimization_mode: str, optimization_target: str) -> str:
     if optimization_mode == "performance":
-        return "maximize raw throughput without resource guard limits; use low-frequency monitoring and workload metrics for ranking"
-    return "maximize throughput with duration and memory tie-breakers"
+        return (
+            "maximize raw throughput without resource guard limits; use low-frequency monitoring and workload metrics "
+            f"for ranking; candidate priority target={optimization_target}"
+        )
+    return f"maximize throughput with duration and memory tie-breakers; candidate priority target={optimization_target}"

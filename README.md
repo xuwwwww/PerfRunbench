@@ -355,8 +355,15 @@ NVIDIA runtime tuning is available when `nvidia-smi` is on PATH:
 autotuneai tune-gpu
 sudo -v
 autotuneai tune-gpu --apply --sudo --profile nvidia-performance
+autotuneai tune-gpu --apply --sudo --profile nvidia-guard
 autotuneai restore --run-id <run_id> --gpu-sudo
 ```
+
+GPU profiles are reversible runtime controls:
+
+- `nvidia-performance` chases throughput with persistence mode, max power limit, and max supported application clocks when the driver allows it.
+- `nvidia-balanced` caps power around 80% of the min/max range and chooses mid-high supported application clocks for lower heat with less throughput loss.
+- `nvidia-guard` is the resource-guard profile: it attempts the minimum reported power limit and lowest supported application clocks. This is the GPU-side counterpart to CPU/memory guard limits.
 
 Linux `linux-performance` also attempts reversible cpufreq tuning when the kernel exposes it: `scaling_governor=performance`, energy performance preference, and an aggressive minimum frequency during the run. AutoTuneAI does not perform voltage increases or BIOS/firmware overclocking as a generic runtime action; it only uses OS/driver controls that can be snapshotted and restored.
 
@@ -404,6 +411,7 @@ autotuneai optimize-performance \
   --sudo \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
+  --target gpu \
   --monitor-mode minimal \
   --time-budget-hours 0.5 \
   --max-candidates 8 \
@@ -421,7 +429,7 @@ autotuneai launch-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without AutoTuneAI's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. It writes `results/reports/performance_recommendation.json`, generates `results/reports/performance_recommendation.html`, and caches the recommendation at `.autotuneai/recommendations/latest.json`.
+`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without AutoTuneAI's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want the early candidate set to focus on one bottleneck. It writes `results/reports/performance_recommendation.json`, generates `results/reports/performance_recommendation.html`, and caches the recommendation at `.autotuneai/recommendations/latest.json`.
 
 The sweep command above is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If a short sweep finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
@@ -436,6 +444,7 @@ autotuneai optimize \
   --sudo \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
+  --target gpu \
   --memory-budget-gb -3 \
   --sample-interval-seconds 0.1 \
   --repeat 1 \
@@ -446,7 +455,7 @@ autotuneai optimize \
 autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. Use it when the goal includes resource guard behavior. It writes `results/reports/auto_recommendation.json`, automatically generates `results/reports/auto_recommendation.html`, and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
+`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. In guarded mode, NVIDIA candidates include `nvidia-balanced` and `nvidia-guard`, so GPU power/clocks can be capped and restored with the same lifecycle as CPU/memory guard. Use it when the goal includes resource guard behavior. It writes `results/reports/auto_recommendation.json`, automatically generates `results/reports/auto_recommendation.html`, and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
 
 Open `results/reports/auto_recommendation.html` to see the current baseline, the recommended configuration, per-candidate throughput, GPU throughput, CPU peaks, and deltas.
 

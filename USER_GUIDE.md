@@ -640,6 +640,12 @@ nvidia-throughput
 
 nvidia-performance
   在 driver 支援時嘗試 persistence mode、最大 power limit，以及可用的 performance-oriented NVIDIA runtime controls。
+
+nvidia-balanced
+  GPU guard 的溫和版本；嘗試把 power limit 壓到 min/max 區間約 80%，並選擇中高段 application clocks。
+
+nvidia-guard
+  GPU guard 的強制版本；嘗試套用 nvidia-smi 回報的最低 power limit，以及最低 supported application clocks。
 ```
 
 套用 GPU runtime tuning：
@@ -647,6 +653,7 @@ nvidia-performance
 ```bash
 sudo -v
 autotuneai tune-gpu --apply --sudo --profile nvidia-throughput
+autotuneai tune-gpu --apply --sudo --profile nvidia-guard
 ```
 
 輸出會包含：
@@ -1023,6 +1030,7 @@ autotuneai optimize-performance \
   --sudo \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
+  --target gpu \
   --monitor-mode minimal \
   --time-budget-hours 0.5 \
   --max-candidates 8 \
@@ -1032,7 +1040,7 @@ autotuneai optimize-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_sweep_config.yaml
 ```
 
-It only runs unbounded candidates, does not apply memory/CPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+It only runs unbounded candidates, does not apply memory/CPU/GPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want early candidates to focus on one bottleneck. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
 
 The sweep command is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If it finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
@@ -1045,6 +1053,7 @@ autotuneai optimize \
   --sudo \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
+  --target gpu \
   --memory-budget-gb -3 \
   --sample-interval-seconds 0.1 \
   --repeat 1 \
@@ -1053,7 +1062,7 @@ autotuneai optimize \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. Use this path when the goal includes resource guard behavior. The result is written to `results/reports/auto_recommendation.json`, a browser-ready report is generated at `results/reports/auto_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. In guarded mode, NVIDIA candidates include `nvidia-balanced` and `nvidia-guard`, so GPU power/clocks can be capped and restored together with CPU/memory guard settings. Use this path when the goal includes resource guard behavior. The result is written to `results/reports/auto_recommendation.json`, a browser-ready report is generated at `results/reports/auto_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
 
 Open `results/reports/auto_recommendation.html` to inspect the current baseline, recommended configuration, candidate ranking, and measured deltas. `--warmup-runs` executes discarded baseline trial(s) before measurement so cold-start effects are less likely to bias the recommendation.
 

@@ -16,6 +16,7 @@ from autotune.report.run_report import generate_run_report
 from autotune.report.comparison_report import generate_comparison_report
 from autotune.recommendation.optimizer import (
     LATEST_RECOMMENDATION,
+    OPTIMIZATION_TARGETS,
     budget_from_recommendation,
     load_recommendation,
     optimize_recommendation,
@@ -192,6 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--warmup-runs", type=int, default=0, help="Run unbounded baseline warmup trial(s) before measurement and discard them.")
     optimize.add_argument("--cooldown-seconds", type=float, default=0.0)
     optimize.add_argument("--max-candidates", type=int)
+    optimize.add_argument("--target", choices=sorted(OPTIMIZATION_TARGETS), default="auto", help="Prioritize candidate order for a CPU, memory, GPU, mixed, or auto sweep target.")
     optimize.add_argument("--no-gpu", action="store_true")
     optimize.add_argument("--output", default="results/reports/auto_recommendation.json")
     optimize.add_argument("--cache", default=str(LATEST_RECOMMENDATION))
@@ -227,6 +229,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable paired baseline controls; faster but less reliable when GPU clocks or thermals drift.",
     )
     optimize_performance.add_argument("--max-candidates", type=int)
+    optimize_performance.add_argument("--target", choices=sorted(OPTIMIZATION_TARGETS), default="auto", help="Prioritize candidate order for a CPU, memory, GPU, mixed, or auto performance target.")
     optimize_performance.add_argument("--no-gpu", action="store_true")
     optimize_performance.add_argument("--output", default="results/reports/performance_recommendation.json")
     optimize_performance.add_argument("--cache", default=str(LATEST_RECOMMENDATION))
@@ -570,6 +573,7 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
             include_gpu=not args.no_gpu,
             max_candidates=args.max_candidates,
             optimization_mode="guarded",
+            optimization_target=args.target,
             monitor_mode="full",
             time_budget_hours=None,
         )
@@ -607,6 +611,7 @@ def _cmd_optimize_performance(args: argparse.Namespace) -> int:
             include_gpu=not args.no_gpu,
             max_candidates=args.max_candidates,
             optimization_mode="performance",
+            optimization_target=args.target,
             monitor_mode=args.monitor_mode,
             time_budget_hours=args.time_budget_hours,
             thermal_control=not args.no_thermal_control,
@@ -925,9 +930,10 @@ def _resolve_gpu_tuning_profile(args: argparse.Namespace) -> str | None:
     if args.tune_gpu:
         return args.tune_gpu
     if args.auto_tune_gpu:
-        if not recommend_nvidia_tuning("nvidia-performance").get("supported"):
+        profile = "nvidia-guard" if _budget_from_args(args).enabled else "nvidia-performance"
+        if not recommend_nvidia_tuning(profile).get("supported"):
             return None
-        return "nvidia-performance"
+        return profile
     return None
 
 

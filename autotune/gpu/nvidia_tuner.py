@@ -39,6 +39,16 @@ PROFILES = {
         "power_limit": "max",
         "application_clocks": True,
     },
+    "nvidia-balanced": {
+        "persistence_mode": "1",
+        "power_limit": {"mode": "fraction", "fraction": 0.8},
+        "application_clocks": "balanced",
+    },
+    "nvidia-guard": {
+        "persistence_mode": "1",
+        "power_limit": "min",
+        "application_clocks": "min",
+    },
     "nvidia-safe": {
         "persistence_mode": "1",
         "power_limit": None,
@@ -191,21 +201,21 @@ def _apply_profile(
                     before=gpu.get("persistence_mode"),
                 )
             )
-        if config.get("power_limit") == "max":
-            max_limit = gpu.get("power.max_limit")
-            if _setting_available(max_limit):
-                changes.append(
-                    _run_change(
-                        ["nvidia-smi", "-i", index, "-pl", str(max_limit)],
-                        use_sudo,
-                        runner,
-                        key="power.limit",
-                        target=str(max_limit),
-                        before=gpu.get("power.limit"),
-                    )
+        power_limit = _target_power_limit(gpu, config.get("power_limit"))
+        if power_limit is not None:
+            changes.append(
+                _run_change(
+                    ["nvidia-smi", "-i", index, "-pl", power_limit],
+                    use_sudo,
+                    runner,
+                    key="power.limit",
+                    target=power_limit,
+                    before=gpu.get("power.limit"),
                 )
-        if config.get("application_clocks"):
-            supported = _max_supported_clocks(index, runner)
+            )
+        clock_mode = _clock_mode(config.get("application_clocks"))
+        if clock_mode:
+            supported = _select_supported_clocks(index, runner, mode=clock_mode)
             if supported is not None:
                 memory_clock, graphics_clock = supported
                 changes.append(
@@ -256,10 +266,12 @@ def _parse_gpu_rows(stdout: str) -> list[dict[str, str]]:
 def _planned_changes(profile: str) -> list[dict[str, Any]]:
     config = _profile(profile)
     changes = [{"key": "persistence_mode", "target": config["persistence_mode"]}]
-    if config.get("power_limit") == "max":
-        changes.append({"key": "power.limit", "target": "power.max_limit"})
-    if config.get("application_clocks"):
-        changes.append({"key": "applications.clocks", "target": "max supported memory,graphics clocks"})
+    power_limit = config.get("power_limit")
+    if power_limit is not None:
+        changes.append({"key": "power.limit", "target": _power_limit_target_label(power_limit)})
+    clock_mode = _clock_mode(config.get("application_clocks"))
+    if clock_mode:
+        changes.append({"key": "applications.clocks", "target": f"{clock_mode} supported memory,graphics clocks"})
     return changes
 
 
@@ -284,6 +296,10 @@ def _setting_available(value: str | None) -> bool:
 
 
 def _max_supported_clocks(index: str, runner: CommandRunner) -> tuple[str, str] | None:
+    return _select_supported_clocks(index, runner, mode="max")
+
+
+def _select_supported_clocks(index: str, runner: CommandRunner, *, mode: str) -> tuple[str, str] | None:
     result = runner(
         [
             _nvidia_smi_path(),
@@ -295,7 +311,7 @@ def _max_supported_clocks(index: str, runner: CommandRunner) -> tuple[str, str] 
     )
     if result.returncode != 0:
         return None
-    best: tuple[int, int] | None = None
+    candidates: list[tuple[int, int]] = []
     for line in result.stdout.splitlines():
         if not line.strip():
             continue
@@ -307,12 +323,73 @@ def _max_supported_clocks(index: str, runner: CommandRunner) -> tuple[str, str] 
             graphics_clock = int(float(parts[1]))
         except ValueError:
             continue
-        candidate = (memory_clock, graphics_clock)
-        if best is None or candidate[0] * candidate[1] > best[0] * best[1]:
-            best = candidate
-    if best is None:
+        candidates.append((memory_clock, graphics_clock))
+    if not candidates:
         return None
-    return str(best[0]), str(best[1])
+    ordered = sorted(candidates, key=lambda item: item[0] * item[1])
+    if mode == "min":
+        selected = ordered[0]
+    elif mode == "balanced":
+        selected = ordered[round((len(ordered) - 1) * 0.65)]
+    else:
+        selected = ordered[-1]
+    return str(selected[0]), str(selected[1])
+
+
+def _clock_mode(value: object) -> str | None:
+    if value in {None, False}:
+        return None
+    if value is True:
+        return "max"
+    text = str(value).strip().lower()
+    if text in {"min", "balanced", "max"}:
+        return text
+    return "max"
+
+
+def _target_power_limit(gpu: dict[str, str], config: object) -> str | None:
+    if config is None:
+        return None
+    if config == "max":
+        value = gpu.get("power.max_limit")
+        return str(value) if _setting_available(value) else None
+    if config == "min":
+        value = gpu.get("power.min_limit")
+        return str(value) if _setting_available(value) else None
+    if isinstance(config, dict) and config.get("mode") == "fraction":
+        min_limit = _float_or_none(gpu.get("power.min_limit"))
+        max_limit = _float_or_none(gpu.get("power.max_limit"))
+        if min_limit is None or max_limit is None:
+            return None
+        fraction = max(0.0, min(1.0, float(config.get("fraction", 1.0))))
+        return _format_power_limit(min_limit + (max_limit - min_limit) * fraction)
+    return None
+
+
+def _power_limit_target_label(config: object) -> str:
+    if config == "max":
+        return "power.max_limit"
+    if config == "min":
+        return "power.min_limit"
+    if isinstance(config, dict) and config.get("mode") == "fraction":
+        return f"{float(config.get('fraction', 1.0)):.0%} between power.min_limit and power.max_limit"
+    return str(config)
+
+
+def _float_or_none(value: object) -> float | None:
+    if not _setting_available(None if value is None else str(value)):
+        return None
+    try:
+        return float(str(value))
+    except ValueError:
+        return None
+
+
+def _format_power_limit(value: float) -> str:
+    rounded = round(value, 2)
+    if rounded.is_integer():
+        return str(int(rounded))
+    return str(rounded)
 
 
 def _require_nvidia_smi() -> None:

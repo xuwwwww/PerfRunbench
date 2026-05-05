@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from autotune.recommendation.optimizer import optimize_recommendation
+from autotune.recommendation.optimizer import _candidate_plan, optimize_recommendation
 from autotune.resource.budget import ResourceBudget
 
 
@@ -240,6 +240,72 @@ class OptimizerTest(unittest.TestCase):
         self.assertEqual(result["schedule"], "thermal-controlled-pairs")
         self.assertEqual(result["best_label"], "performance:runtime-cpu")
         self.assertEqual(result["recommendation"]["metrics"]["normalized_samples_per_second_ratio"], 1.2)
+
+    @patch("autotune.recommendation.optimizer.platform.system", return_value="Linux")
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    def test_candidate_plan_prioritizes_cpu_target(self, recommend_gpu, _system) -> None:
+        recommend_gpu.return_value = {"supported": False}
+
+        candidates = _candidate_plan(
+            ResourceBudget(enforce=False),
+            include_gpu=True,
+            optimization_mode="performance",
+            optimization_target="cpu",
+        )
+
+        self.assertEqual(
+            [candidate.label for candidate in candidates[:4]],
+            [
+                "performance:baseline",
+                "performance:runtime-cpu",
+                "performance:linux-performance",
+                "performance:linux-throughput",
+            ],
+        )
+
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    def test_guarded_candidate_plan_includes_gpu_guard_profiles(self, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": True}
+
+        candidates = _candidate_plan(
+            ResourceBudget(memory_budget_gb=-3),
+            include_gpu=True,
+            optimization_mode="guarded",
+        )
+
+        by_label = {candidate.label: candidate for candidate in candidates}
+        self.assertEqual(by_label["unbounded:gpu-guard"].gpu_profile, "nvidia-guard")
+        self.assertEqual(by_label["budgeted:gpu-guard"].gpu_profile, "nvidia-guard")
+        self.assertEqual(by_label["unbounded:gpu-balanced"].gpu_profile, "nvidia-balanced")
+
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    def test_performance_candidate_plan_omits_guard_gpu_profiles(self, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": True}
+
+        candidates = _candidate_plan(
+            ResourceBudget(enforce=False),
+            include_gpu=True,
+            optimization_mode="performance",
+        )
+
+        gpu_profiles = {candidate.gpu_profile for candidate in candidates if candidate.gpu_profile}
+        self.assertEqual(gpu_profiles, {"nvidia-performance"})
+
+    @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
+    def test_guarded_gpu_target_prioritizes_gpu_guard_profiles(self, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": True}
+
+        candidates = _candidate_plan(
+            ResourceBudget(memory_budget_gb=-3),
+            include_gpu=True,
+            optimization_mode="guarded",
+            optimization_target="gpu",
+        )
+
+        self.assertEqual(
+            [candidate.label for candidate in candidates[:4]],
+            ["unbounded:baseline", "budgeted:baseline", "unbounded:gpu-balanced", "unbounded:gpu-guard"],
+        )
 
 
 if __name__ == "__main__":

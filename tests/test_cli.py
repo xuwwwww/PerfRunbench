@@ -197,6 +197,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(optimize.call_args.kwargs["max_candidates"], 2)
         self.assertEqual(optimize.call_args.kwargs["warmup_runs"], 1)
+        self.assertEqual(optimize.call_args.kwargs["optimization_target"], "auto")
         report.assert_called_once()
         self.assertIn("Cached recommendation", output.getvalue())
 
@@ -208,6 +209,7 @@ class CliTest(unittest.TestCase):
             code = main(["optimize-performance", "--max-candidates", "2", "--time-budget-hours", "8", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(optimize.call_args.kwargs["optimization_mode"], "performance")
+        self.assertEqual(optimize.call_args.kwargs["optimization_target"], "auto")
         self.assertEqual(optimize.call_args.kwargs["monitor_mode"], "minimal")
         self.assertEqual(optimize.call_args.kwargs["time_budget_hours"], 8)
         self.assertTrue(optimize.call_args.kwargs["thermal_control"])
@@ -216,6 +218,15 @@ class CliTest(unittest.TestCase):
         self.assertFalse(optimize.call_args.kwargs["hard_kill"])
         report.assert_called_once()
         self.assertIn("Best performance recommendation", output.getvalue())
+
+    def test_optimize_performance_command_accepts_target(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.optimize_recommendation") as optimize, patch("autotune.cli.generate_comparison_report") as report, redirect_stdout(output):
+            optimize.return_value = {"recommendation": {"label": "performance:runtime-cpu"}}
+            report.return_value = Path("results/reports/performance_recommendation.html")
+            code = main(["optimize-performance", "--target", "cpu", "--max-candidates", "2", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(optimize.call_args.kwargs["optimization_target"], "cpu")
 
     @patch("autotune.cli.launch_performance")
     @patch("autotune.cli.generate_run_report")
@@ -393,6 +404,18 @@ class CliTest(unittest.TestCase):
             code = main(["run", "--auto-tune-gpu", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(run_with_budget.call_args.kwargs["tune_gpu_profile"], "nvidia-performance")
+
+    @patch("autotune.cli.recommend_nvidia_tuning")
+    @patch("autotune.cli.run_with_budget")
+    def test_run_command_auto_tunes_gpu_guard_when_budgeted(self, run_with_budget, recommend_gpu) -> None:
+        recommend_gpu.return_value = {"supported": True}
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        with patch("autotune.cli.generate_run_report") as generate_report, redirect_stdout(io.StringIO()):
+            generate_report.return_value = Path(".autotuneai/runs/run1/report.html")
+            code = main(["run", "--auto-tune-gpu", "--memory-budget-gb", "-3", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        recommend_gpu.assert_called_once_with("nvidia-guard")
+        self.assertEqual(run_with_budget.call_args.kwargs["tune_gpu_profile"], "nvidia-guard")
 
     @patch("autotune.cli.run_with_budget")
     def test_run_command_applies_runtime_profile(self, run_with_budget) -> None:
