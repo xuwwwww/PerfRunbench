@@ -87,6 +87,32 @@ class NvidiaTunerTest(unittest.TestCase):
         self.assertTrue(any("-ac" in command for command in commands))
         self.assertTrue(any(change["key"] == "applications.clocks" for change in result["changes"]))
 
+    @patch("autotune.gpu.nvidia_tuner.shutil.which", return_value="/usr/bin/nvidia-smi")
+    def test_sudo_uses_absolute_nvidia_smi_path(self, _which) -> None:
+        commands = []
+
+        def runner(command):
+            commands.append(command)
+            if "--query-gpu=index,name,persistence_mode,power.limit,power.min_limit,power.max_limit,clocks.current.graphics,clocks.current.memory,clocks.applications.graphics,clocks.applications.memory" in command:
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout="0, RTX 4090, Disabled, 300, 100, 450, 1200, 10000, 1200, 10000\n",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _run_dir, result = apply_nvidia_tuning(
+                "nvidia-throughput",
+                use_sudo=True,
+                runner=runner,
+                runs_dir=Path(temp_dir),
+            )
+
+        self.assertTrue(result["changes"])
+        self.assertTrue(any(command[:2] == ["sudo", "/usr/bin/nvidia-smi"] for command in commands))
+
 
 if __name__ == "__main__":
     unittest.main()

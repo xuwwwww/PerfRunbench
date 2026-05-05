@@ -159,7 +159,7 @@ def snapshot_nvidia(runner: CommandRunner | None = None) -> dict[str, Any]:
         return {"available": False, "gpus": [], "error": "nvidia-smi was not found on PATH"}
     result = runner(
         [
-            "nvidia-smi",
+            _nvidia_smi_path(),
             f"--query-gpu={','.join(QUERY_FIELDS)}",
             "--format=csv,noheader,nounits",
         ]
@@ -230,6 +230,7 @@ def _run_change(
     target: str | None = None,
     before: str | None = None,
 ) -> dict[str, Any]:
+    command = _resolve_nvidia_smi_command(command)
     actual = ["sudo", *command] if use_sudo else command
     result = runner(actual)
     return {
@@ -285,7 +286,7 @@ def _setting_available(value: str | None) -> bool:
 def _max_supported_clocks(index: str, runner: CommandRunner) -> tuple[str, str] | None:
     result = runner(
         [
-            "nvidia-smi",
+            _nvidia_smi_path(),
             "-i",
             index,
             "--query-supported-clocks=mem,gr",
@@ -317,6 +318,16 @@ def _max_supported_clocks(index: str, runner: CommandRunner) -> tuple[str, str] 
 def _require_nvidia_smi() -> None:
     if shutil.which("nvidia-smi") is None:
         raise NvidiaTuningError("nvidia-smi was not found on PATH")
+
+
+def _nvidia_smi_path() -> str:
+    return shutil.which("nvidia-smi") or "nvidia-smi"
+
+
+def _resolve_nvidia_smi_command(command: list[str]) -> list[str]:
+    if command and command[0] == "nvidia-smi":
+        return [_nvidia_smi_path(), *command[1:]]
+    return command
 
 
 def _run_command(command: list[str]) -> subprocess.CompletedProcess[str]:
