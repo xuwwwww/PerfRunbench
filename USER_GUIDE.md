@@ -980,7 +980,7 @@ autotuneai run \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`examples/gpu_training_pressure.py` refuses to run without CUDA. It allocates GPU memory, runs CUDA matrix multiplications, and writes GPU metrics such as `gpu_tflops_estimate`, `gpu_peak_memory_allocated_mb`, and `device` into `training_metrics.json`.
+`examples/gpu_training_pressure.py` refuses to run without CUDA. It allocates GPU memory, runs CUDA matrix multiplications, and writes GPU metrics such as `gpu_tflops_estimate`, `gpu_peak_memory_allocated_mb`, and `device` into `training_metrics.json`. Use `examples/gpu_training_pressure_sweep_config.yaml` for fast recommendation sweeps and `examples/gpu_training_pressure_config.yaml` for longer confirmation runs.
 
 For a real PyTorch/CUDA benchmark, use runtime and GPU profiles:
 
@@ -1024,14 +1024,17 @@ autotuneai optimize-performance \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
   --monitor-mode minimal \
-  --time-budget-hours 8 \
-  --repeat 3 \
+  --time-budget-hours 0.5 \
+  --max-candidates 8 \
+  --repeat 2 \
   --warmup-runs 1 \
-  --cooldown-seconds 8 \
-  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+  --cooldown-seconds 2 \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_sweep_config.yaml
 ```
 
 It only runs unbounded candidates, does not apply memory/CPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. Candidates are measured with a rotated interleaved schedule so baseline does not always get cold-machine priority. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+
+The sweep command is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If it finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
 Use `optimize` when you want AutoTuneAI to empirically find a guarded configuration instead of guessing:
 

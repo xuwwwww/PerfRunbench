@@ -335,7 +335,7 @@ autotuneai run \
 ```
 
 `examples/heavy_training_pressure.py` is a synthetic 60-second CPU and memory pressure workload. It is useful for validating the wrapper, cgroup guard, monitoring, restore behavior, and rough Linux runtime effects. It is not a substitute for a real PyTorch/CUDA benchmark because it does not exercise DataLoader, CUDA kernels, cuDNN/cuBLAS, or GPU memory allocation.
-For GPU pressure, use `examples/gpu_training_pressure.py`. It refuses to run when CUDA is unavailable, allocates GPU memory, runs CUDA matrix multiplications, and emits GPU metrics such as estimated TFLOPS and peak allocated GPU memory.
+For GPU pressure, use `examples/gpu_training_pressure.py`. It refuses to run when CUDA is unavailable, allocates GPU memory, runs CUDA matrix multiplications, and emits GPU metrics such as estimated TFLOPS and peak allocated GPU memory. Use `examples/gpu_training_pressure_sweep_config.yaml` for fast recommendation sweeps and `examples/gpu_training_pressure_config.yaml` for longer confirmation runs.
 
 If a run is interrupted after runtime tuning was applied, AutoTuneAI records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
 
@@ -405,11 +405,12 @@ autotuneai optimize-performance \
   --system-tuning-sudo \
   --gpu-tuning-sudo \
   --monitor-mode minimal \
-  --time-budget-hours 8 \
-  --repeat 3 \
+  --time-budget-hours 0.5 \
+  --max-candidates 8 \
+  --repeat 2 \
   --warmup-runs 1 \
-  --cooldown-seconds 8 \
-  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
+  --cooldown-seconds 2 \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_sweep_config.yaml
 
 autotuneai launch-performance \
   --apply-recommendation \
@@ -421,6 +422,8 @@ autotuneai launch-performance \
 ```
 
 `optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without AutoTuneAI's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. Candidates are measured with a rotated interleaved schedule so baseline does not always get cold-machine priority. It writes `results/reports/performance_recommendation.json`, generates `results/reports/performance_recommendation.html`, and caches the recommendation at `.autotuneai/recommendations/latest.json`.
+
+The sweep command above is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If a short sweep finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
 `launch-performance --apply-recommendation` applies the cached `system_profile`, `runtime_profile`, and `gpu_profile`, starts the real workload without resource monitoring, waits for it to finish, and restores the original system/GPU settings even on nonzero exit or Ctrl+C. If baseline is still the fastest candidate, the cached recommendation can still be launched this way to avoid measurement overhead during the real run.
 
