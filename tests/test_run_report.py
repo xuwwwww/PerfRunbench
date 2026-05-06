@@ -50,7 +50,44 @@ class RunReportTest(unittest.TestCase):
             self.assertIn("## CPU", report)
             self.assertIn("Observed system CPU p95 percent", report)
             self.assertIn("## Memory", report)
+            self.assertIn("## GPU Tuning", report)
             self.assertIn("## Diagnostics", report)
+
+    def test_generate_run_report_surfaces_gpu_tuning_status(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            runs_dir = Path(temp_dir)
+            run_dir = runs_dir / "run1"
+            run_dir.mkdir()
+            write_json(
+                run_dir / "manifest.json",
+                {
+                    "run_id": "run1",
+                    "status": "completed",
+                    "return_code": 0,
+                    "command": ["python", "train.py"],
+                    "budget": {},
+                    "notes": ["selected_executor=local"],
+                },
+            )
+            write_json(run_dir / "resource_summary.json", {"memory_budget_exceeded": False})
+            write_json(run_dir / "resource_timeline.json", [])
+            write_json(run_dir / "gpu_tuning_plan.json", {"profile": "nvidia-guard"})
+            write_json(
+                run_dir / "gpu_tuning_diff.json",
+                [
+                    {"key": "persistence_mode", "command": ["nvidia-smi", "-pm", "1"], "return_code": 0},
+                    {"key": "power.limit", "command": ["nvidia-smi", "-pl", "60"], "return_code": 1},
+                ],
+            )
+            write_json(run_dir / "gpu_tuning_restore_after.json", {"changes": [{"key": "power.limit", "return_code": 0}]})
+
+            report_path = generate_run_report("run1", run_dir / "report.html", runs_dir=runs_dir)
+
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("GPU Tuning", report)
+            self.assertIn("nvidia-guard", report)
+            self.assertIn("1/2", report)
+            self.assertIn("power.limit", report)
 
     def test_generate_comparison_report_writes_visual_markdown(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
@@ -70,6 +107,7 @@ class RunReportTest(unittest.TestCase):
             report = report_path.read_text(encoding="utf-8")
             self.assertIn("AutoTuneAI Tuning Comparison", report)
             self.assertIn("Performance Deltas", report)
+            self.assertIn("GPU Tuning Effectiveness", report)
             self.assertIn("<svg", report)
 
     def test_generate_comparison_report_writes_html_when_requested(self) -> None:

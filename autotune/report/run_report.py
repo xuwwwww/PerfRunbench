@@ -23,6 +23,7 @@ def generate_run_report(run_id: str, output: str | Path | None = None, runs_dir:
 
 
 def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
+    gpu_tuning = analysis.get("gpu_tuning", {})
     lines = [
         f"# AutoTuneAI Run Report: {analysis['run_id']}",
         "",
@@ -42,6 +43,10 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Memory budget exceeded: {analysis['memory'].get('memory_budget_exceeded')}",
         f"- Training metrics captured: {bool(analysis.get('workload'))}",
         f"- System tuning snapshots: {_system_tuning_snapshot_status(run_dir)}",
+        f"- GPU tuning snapshots: {_gpu_tuning_snapshot_status(run_dir)}",
+        f"- GPU tuning profile: {gpu_tuning.get('profile')}",
+        f"- GPU tuning applied commands: {_count_pair(gpu_tuning.get('applied_settings'), gpu_tuning.get('attempted_settings'))}",
+        f"- GPU tuning blocked commands: {gpu_tuning.get('failed_settings')}",
         f"- Source/config changes recorded: {_changed_file_count(run_dir)}",
         "",
         "## Visual Summary",
@@ -105,6 +110,15 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Peak cgroup memory MB: {analysis['cgroup'].get('peak_memory_mb')}",
         f"- Peak cgroup CPU percent: {analysis['cgroup'].get('peak_cpu_percent')}",
         "",
+        "## GPU Tuning",
+        "",
+        f"- Profile: {gpu_tuning.get('profile')}",
+        f"- Attempted commands: {gpu_tuning.get('attempted_settings')}",
+        f"- Applied commands: {gpu_tuning.get('applied_settings')}",
+        f"- Blocked commands: {gpu_tuning.get('failed_settings')}",
+        f"- Blocked keys: {gpu_tuning.get('failed_keys')}",
+        f"- Restore successful commands: {_count_pair(gpu_tuning.get('restore_successful_settings'), gpu_tuning.get('restored_settings'))}",
+        "",
         "## Workload",
         "",
     ]
@@ -154,6 +168,7 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
 
 def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
     workload = analysis.get("workload", {})
+    gpu_tuning = analysis.get("gpu_tuning", {})
     diagnostics = analysis.get("diagnostics", [])
     workload_items = "".join(
         f"<tr><th>{_html_escape(key)}</th><td>{_html_escape(workload.get(key))}</td></tr>"
@@ -174,6 +189,10 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
         ("Memory budget exceeded", analysis["memory"].get("memory_budget_exceeded")),
         ("Training metrics captured", bool(workload)),
         ("System tuning snapshots", _system_tuning_snapshot_status(run_dir)),
+        ("GPU tuning snapshots", _gpu_tuning_snapshot_status(run_dir)),
+        ("GPU tuning profile", gpu_tuning.get("profile")),
+        ("GPU tuning applied commands", _count_pair(gpu_tuning.get("applied_settings"), gpu_tuning.get("attempted_settings"))),
+        ("GPU tuning blocked commands", gpu_tuning.get("failed_settings")),
         ("Source/config changes recorded", _changed_file_count(run_dir)),
     ]
     return "\n".join(
@@ -264,6 +283,20 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
                     ("Peak cgroup CPU percent", analysis["cgroup"].get("peak_cpu_percent")),
                 ],
             ),
+            _html_table_card(
+                "GPU Tuning",
+                [
+                    ("Profile", gpu_tuning.get("profile")),
+                    ("Attempted commands", gpu_tuning.get("attempted_settings")),
+                    ("Applied commands", gpu_tuning.get("applied_settings")),
+                    ("Blocked commands", gpu_tuning.get("failed_settings")),
+                    ("Blocked keys", gpu_tuning.get("failed_keys")),
+                    (
+                        "Restore successful commands",
+                        _count_pair(gpu_tuning.get("restore_successful_settings"), gpu_tuning.get("restored_settings")),
+                    ),
+                ],
+            ),
             "<section class=\"card\">",
             "<h2>Workload</h2>",
             f"<table><tbody>{workload_items}</tbody></table>",
@@ -298,9 +331,28 @@ def _system_tuning_snapshot_status(run_dir: Path) -> str:
     return ", ".join(present)
 
 
+def _gpu_tuning_snapshot_status(run_dir: Path) -> str:
+    required = [
+        "gpu_tuning_before.json",
+        "gpu_tuning_after.json",
+        "gpu_tuning_diff.json",
+        "gpu_tuning_restore_after.json",
+    ]
+    present = [name for name in required if (run_dir / name).exists()]
+    if not present:
+        return "none"
+    return ", ".join(present)
+
+
 def _changed_file_count(run_dir: Path) -> int:
     manifest = _load_json(run_dir / "manifest.json", default={})
     return len(manifest.get("changed_files", []))
+
+
+def _count_pair(value: object, total: object) -> str:
+    if value is None and total is None:
+        return "n/a"
+    return f"{value}/{total}"
 
 
 def _shell_join(command: list[str]) -> str:

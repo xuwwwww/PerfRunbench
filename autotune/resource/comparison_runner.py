@@ -355,6 +355,7 @@ def _run_metrics(run_id: str, runs_dir: Path) -> dict[str, Any]:
         "peak_process_cpu_percent": analysis["cpu"].get("observed_peak_process_cpu_percent"),
         "peak_system_cpu_percent": analysis["cpu"].get("observed_peak_system_cpu_percent"),
         "system_tuning": analysis.get("system_tuning", {}),
+        "gpu_tuning": analysis.get("gpu_tuning", {}),
         "workload": workload,
         "diagnostics": analysis.get("diagnostics", []),
     }

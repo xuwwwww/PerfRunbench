@@ -105,7 +105,60 @@ class RunAnalysisTest(unittest.TestCase):
         self.assertIn("CPU", output)
         self.assertIn("Memory", output)
         self.assertIn("System Tuning", output)
+        self.assertIn("GPU Tuning", output)
         self.assertIn("Diagnostics", output)
+
+    def test_analyze_run_reports_gpu_tuning_effectiveness(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runs_dir = Path(temp_dir)
+            run_dir = runs_dir / "run1"
+            run_dir.mkdir()
+            write_json(
+                run_dir / "manifest.json",
+                {
+                    "run_id": "run1",
+                    "status": "completed",
+                    "return_code": 0,
+                    "command": ["python", "train.py"],
+                    "budget": {},
+                    "notes": ["selected_executor=local", "gpu_tuning_lifecycle_applied=True", "gpu_tuning_lifecycle_restored=2"],
+                },
+            )
+            write_json(run_dir / "resource_summary.json", {"memory_budget_exceeded": False})
+            write_json(run_dir / "resource_timeline.json", [])
+            write_json(run_dir / "gpu_tuning_plan.json", {"profile": "nvidia-guard"})
+            write_json(
+                run_dir / "gpu_tuning_diff.json",
+                [
+                    {"key": "persistence_mode", "command": ["nvidia-smi", "-pm", "1"], "return_code": 0},
+                    {
+                        "key": "power.limit",
+                        "command": ["nvidia-smi", "-pl", "60"],
+                        "return_code": 1,
+                        "error": "Changing power management limit is not supported",
+                    },
+                ],
+            )
+            write_json(
+                run_dir / "gpu_tuning_restore_after.json",
+                {
+                    "changes": [
+                        {"key": "persistence_mode", "return_code": 0},
+                        {"key": "power.limit", "return_code": 0},
+                    ]
+                },
+            )
+
+            analysis = analyze_run("run1", runs_dir)
+
+        self.assertEqual(analysis["gpu_tuning"]["profile"], "nvidia-guard")
+        self.assertEqual(analysis["gpu_tuning"]["attempted_settings"], 2)
+        self.assertEqual(analysis["gpu_tuning"]["applied_settings"], 1)
+        self.assertEqual(analysis["gpu_tuning"]["failed_settings"], 1)
+        self.assertEqual(analysis["gpu_tuning"]["failed_keys"], ["power.limit"])
+        self.assertEqual(analysis["gpu_tuning"]["restore_successful_settings"], 2)
+        self.assertTrue(any("GPU tuning applied 1/2" in item for item in analysis["diagnostics"]))
+        self.assertTrue(any("power-limit tuning was blocked" in item for item in analysis["diagnostics"]))
 
     def test_analyze_run_reports_discovered_systemd_control_group_without_stats(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

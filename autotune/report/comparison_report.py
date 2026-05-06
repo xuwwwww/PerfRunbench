@@ -81,6 +81,21 @@ def format_comparison_report(data: dict[str, Any], source: Path | None = None) -
             ],
         ),
         "",
+        "## GPU Tuning Effectiveness",
+        "",
+        metric_bar_chart(
+            "GPU Tuning Commands",
+            [
+                (f"{baseline_label} applied", _nested(baseline, "gpu_tuning", "applied_settings")),
+                (f"{tuned_label} applied", _nested(tuned, "gpu_tuning", "applied_settings")),
+                (f"{baseline_label} blocked", _nested(baseline, "gpu_tuning", "failed_settings")),
+                (f"{tuned_label} blocked", _nested(tuned, "gpu_tuning", "failed_settings")),
+            ],
+        ),
+        "",
+        f"- {baseline_label}: {_gpu_tuning_summary(baseline)}",
+        f"- {tuned_label}: {_gpu_tuning_summary(tuned)}",
+        "",
         "## Diagnostics",
         "",
     ]
@@ -177,6 +192,19 @@ def format_comparison_report_html(data: dict[str, Any], source: Path | None = No
                     (f"{tuned_label} system CPU %", tuned.get("peak_system_cpu_percent")),
                 ],
             ),
+            "</section>",
+            "<section class=\"card\">",
+            "<h2>GPU Tuning Effectiveness</h2>",
+            metric_bar_chart(
+                "GPU Tuning Commands",
+                [
+                    (f"{baseline_label} applied", _nested(baseline, "gpu_tuning", "applied_settings")),
+                    (f"{tuned_label} applied", _nested(tuned, "gpu_tuning", "applied_settings")),
+                    (f"{baseline_label} blocked", _nested(baseline, "gpu_tuning", "failed_settings")),
+                    (f"{tuned_label} blocked", _nested(tuned, "gpu_tuning", "failed_settings")),
+                ],
+            ),
+            _simple_table(_gpu_tuning_rows(baseline_label, baseline, tuned_label, tuned)),
             "</section>",
             "<section class=\"card\">",
             "<h2>Diagnostics</h2>",
@@ -499,6 +527,66 @@ def _simple_table(rows: list[tuple[str, object]]) -> str:
         for label, value in rows
     )
     return f"<table><tbody>{body}</tbody></table>"
+
+
+def _gpu_tuning_summary(group: dict[str, Any]) -> str:
+    profile = _nested(group, "gpu_tuning", "profile")
+    applied = _nested(group, "gpu_tuning", "applied_settings")
+    attempted = _nested(group, "gpu_tuning", "attempted_settings")
+    failed = _nested(group, "gpu_tuning", "failed_settings")
+    failed_keys = _nested(group, "gpu_tuning", "failed_keys")
+    restored = _nested(group, "gpu_tuning", "restored_settings")
+    restore_success = _nested(group, "gpu_tuning", "restore_successful_settings")
+    if profile is None and attempted is None:
+        return "no GPU tuning recorded"
+    return (
+        f"profile={profile}, applied={applied}/{attempted}, blocked={failed}, "
+        f"blocked_keys={failed_keys}, restored={restore_success}/{restored}"
+    )
+
+
+def _gpu_tuning_rows(
+    baseline_label: str,
+    baseline: dict[str, Any],
+    tuned_label: str,
+    tuned: dict[str, Any],
+) -> list[tuple[str, object]]:
+    return [
+        (f"{baseline_label} profile", _nested(baseline, "gpu_tuning", "profile")),
+        (f"{tuned_label} profile", _nested(tuned, "gpu_tuning", "profile")),
+        (
+            f"{baseline_label} applied commands",
+            _format_count(_nested(baseline, "gpu_tuning", "applied_settings"), _nested(baseline, "gpu_tuning", "attempted_settings")),
+        ),
+        (
+            f"{tuned_label} applied commands",
+            _format_count(_nested(tuned, "gpu_tuning", "applied_settings"), _nested(tuned, "gpu_tuning", "attempted_settings")),
+        ),
+        (f"{baseline_label} blocked commands", _nested(baseline, "gpu_tuning", "failed_settings")),
+        (f"{tuned_label} blocked commands", _nested(tuned, "gpu_tuning", "failed_settings")),
+        (f"{baseline_label} blocked keys", _nested(baseline, "gpu_tuning", "failed_keys")),
+        (f"{tuned_label} blocked keys", _nested(tuned, "gpu_tuning", "failed_keys")),
+        (
+            f"{baseline_label} restored commands",
+            _format_count(
+                _nested(baseline, "gpu_tuning", "restore_successful_settings"),
+                _nested(baseline, "gpu_tuning", "restored_settings"),
+            ),
+        ),
+        (
+            f"{tuned_label} restored commands",
+            _format_count(
+                _nested(tuned, "gpu_tuning", "restore_successful_settings"),
+                _nested(tuned, "gpu_tuning", "restored_settings"),
+            ),
+        ),
+    ]
+
+
+def _format_count(value: Any, total: Any) -> str:
+    if value is None and total is None:
+        return "n/a"
+    return f"{value}/{total}"
 
 
 def _preferred_group(data: dict[str, Any], key: str, *, aggregate: bool = True) -> dict[str, Any]:

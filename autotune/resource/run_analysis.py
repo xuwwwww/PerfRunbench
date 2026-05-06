@@ -23,8 +23,15 @@ def analyze_run(run_id: str, runs_dir: Path = RUNS_DIR) -> dict[str, Any]:
     cpu = _analyze_cpu(budget, summary, timeline, affinity)
     cgroup = _analyze_cgroup(summary, timeline, notes)
     system_tuning = _analyze_system_tuning(run_dir, notes)
+    gpu_tuning = _analyze_gpu_tuning(run_dir, notes)
     workload = _load_json(run_dir / "training_metrics.json", default={})
-    diagnostics = [*cpu["diagnostics"], *memory["diagnostics"], *cgroup["diagnostics"], *system_tuning["diagnostics"]]
+    diagnostics = [
+        *cpu["diagnostics"],
+        *memory["diagnostics"],
+        *cgroup["diagnostics"],
+        *system_tuning["diagnostics"],
+        *gpu_tuning["diagnostics"],
+    ]
     if workload:
         diagnostics.append("Workload wrote training metrics to training_metrics.json.")
     return {
@@ -37,6 +44,7 @@ def analyze_run(run_id: str, runs_dir: Path = RUNS_DIR) -> dict[str, Any]:
         "memory": memory,
         "cgroup": cgroup,
         "system_tuning": system_tuning,
+        "gpu_tuning": gpu_tuning,
         "workload": workload,
         "diagnostics": diagnostics,
         "paths": {
@@ -46,6 +54,9 @@ def analyze_run(run_id: str, runs_dir: Path = RUNS_DIR) -> dict[str, Any]:
             "resource_timeline": str(run_dir / "resource_timeline.json"),
             "system_tuning_diff": str(run_dir / "system_tuning_diff.json"),
             "system_tuning_restore_after": str(run_dir / "system_tuning_restore_after.json"),
+            "gpu_tuning_plan": str(run_dir / "gpu_tuning_plan.json"),
+            "gpu_tuning_diff": str(run_dir / "gpu_tuning_diff.json"),
+            "gpu_tuning_restore_after": str(run_dir / "gpu_tuning_restore_after.json"),
             "training_metrics": str(run_dir / "training_metrics.json"),
         },
     }
@@ -96,6 +107,14 @@ def format_analysis(analysis: dict[str, Any]) -> str:
         f"  profile: {analysis.get('system_tuning', {}).get('profile')}",
         f"  changed_settings: {analysis.get('system_tuning', {}).get('changed_settings')}",
         f"  restored_settings: {analysis.get('system_tuning', {}).get('restored_settings')}",
+        "",
+        "GPU Tuning",
+        f"  profile: {analysis.get('gpu_tuning', {}).get('profile')}",
+        f"  attempted_settings: {analysis.get('gpu_tuning', {}).get('attempted_settings')}",
+        f"  applied_settings: {analysis.get('gpu_tuning', {}).get('applied_settings')}",
+        f"  failed_settings: {analysis.get('gpu_tuning', {}).get('failed_settings')}",
+        f"  restored_settings: {analysis.get('gpu_tuning', {}).get('restored_settings')}",
+        f"  failed_keys: {analysis.get('gpu_tuning', {}).get('failed_keys')}",
         "",
         "Workload",
         "",
@@ -254,6 +273,51 @@ def _analyze_system_tuning(run_dir: Path, notes: list[str]) -> dict[str, Any]:
     }
 
 
+def _analyze_gpu_tuning(run_dir: Path, notes: list[str]) -> dict[str, Any]:
+    plan = _load_json(run_dir / "gpu_tuning_plan.json", default={})
+    diff = _change_list(_load_json(run_dir / "gpu_tuning_diff.json", default=[]))
+    restore_record = _load_json(run_dir / "gpu_tuning_restore_after.json", default={})
+    restored = _change_list(restore_record)
+    profile = _note_value(notes, "gpu_tuning_profile=") or plan.get("profile")
+    attempted = [item for item in diff if item.get("command") or item.get("key")]
+    applied = [item for item in attempted if item.get("return_code") == 0]
+    failed = [item for item in attempted if item.get("return_code") not in {0, None}]
+    failed_restores = [item for item in restored if item.get("return_code") not in {0, None}]
+    failed_keys = sorted({str(item.get("key") or "unknown") for item in failed})
+    diagnostics = []
+    if profile:
+        diagnostics.append(f"GPU tuning profile {profile} was selected for this run.")
+    if attempted:
+        diagnostics.append(f"GPU tuning applied {len(applied)}/{len(attempted)} command(s).")
+    elif profile:
+        diagnostics.append("GPU tuning profile was selected, but no GPU tuning command was recorded.")
+    if restored:
+        diagnostics.append(f"GPU tuning restore attempted {len(restored) - len(failed_restores)}/{len(restored)} command(s).")
+    if failed:
+        diagnostics.append(f"GPU tuning had {len(failed)} blocked/failed command(s); inspect gpu_tuning_diff.json.")
+    if "power.limit" in failed_keys:
+        diagnostics.append(
+            "GPU power-limit tuning was blocked by the driver, OEM firmware, permissions, or WSL/NVIDIA support limits."
+        )
+    if "applications.clocks" in failed_keys:
+        diagnostics.append(
+            "GPU application-clock tuning was blocked or unsupported; this host may not allow runtime clock control."
+        )
+    return {
+        "profile": profile,
+        "settings": diff,
+        "restore": restored,
+        "attempted_settings": len(attempted),
+        "applied_settings": len(applied),
+        "failed_settings": len(failed),
+        "failed_keys": failed_keys,
+        "restored_settings": len(restored),
+        "restore_failed_settings": len(failed_restores),
+        "restore_successful_settings": len(restored) - len(failed_restores),
+        "diagnostics": diagnostics,
+    }
+
+
 def _parse_executor(notes: list[str]) -> dict[str, Any]:
     result = {"requested": None, "selected": None, "sudo_used": None, "platform": None}
     for note in notes:
@@ -274,6 +338,14 @@ def _note_value(notes: list[str], prefix: str) -> str | None:
         if note.startswith(prefix):
             return note[len(prefix) :]
     return None
+
+
+def _change_list(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict) and isinstance(value.get("changes"), list):
+        return [item for item in value["changes"] if isinstance(item, dict)]
+    return []
 
 
 def _control_group_path(control_group: str) -> str:
