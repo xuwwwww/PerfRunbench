@@ -32,6 +32,24 @@ python scripts/run_tests.py --fast
 
 `environment.yml` is the minimal resource-guard environment and does not install PyTorch. Use `environment-benchmark.yml` or `python -m pip install -e ".[benchmark]"` for PyTorch, ONNX, CUDA/GPU pressure benchmarks, and modules under the `google.protobuf` namespace.
 
+Fresh Linux server bootstrap:
+
+```bash
+git clone -b feature/performance-optimizer https://github.com/xuwwwww/PerfRunbench.git
+cd PerfRunbench
+
+# If conda/mamba already exists:
+bash scripts/bootstrap_server_env.sh
+
+# If conda is missing on the server:
+bash scripts/bootstrap_server_env.sh --install-miniforge
+
+# Optional: replace torch/torchvision with a specific CUDA wheel index.
+bash scripts/bootstrap_server_env.sh --update --pytorch-index-url https://download.pytorch.org/whl/cu121
+```
+
+The bootstrap script does not require `conda activate`; it uses `conda run`, installs the editable package, checks `torch`, `google.protobuf`, CUDA visibility, `nvidia-smi`, executor capabilities, and the fast test suite.
+
 如果環境已存在：
 
 ```bash

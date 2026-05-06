@@ -48,6 +48,24 @@ python scripts/run_tests.py --fast
 
 `environment.yml` is intentionally small and does not install PyTorch. Use `environment-benchmark.yml` or `python -m pip install -e ".[benchmark]"` when running PyTorch, ONNX, or GPU pressure benchmarks. If the server needs a specific CUDA wheel, install the matching `torch`/`torchvision` build from the official PyTorch selector before running GPU benchmarks.
 
+Fresh Linux server bootstrap:
+
+```bash
+git clone -b feature/performance-optimizer https://github.com/xuwwwww/PerfRunbench.git
+cd PerfRunbench
+
+# If conda/mamba already exists:
+bash scripts/bootstrap_server_env.sh
+
+# If conda is missing on the server:
+bash scripts/bootstrap_server_env.sh --install-miniforge
+
+# Optional: replace torch/torchvision with a specific CUDA wheel index.
+bash scripts/bootstrap_server_env.sh --update --pytorch-index-url https://download.pytorch.org/whl/cu121
+```
+
+The bootstrap script does not require `conda activate`; it uses `conda run`, installs the editable package, checks `torch`, `google.protobuf`, CUDA visibility, `nvidia-smi`, executor capabilities, and the fast test suite.
+
 Built-in repo demo workflows:
 
 ```bash
