@@ -1040,7 +1040,7 @@ autotuneai optimize-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_sweep_config.yaml
 ```
 
-It only runs unbounded candidates, does not apply memory/CPU/GPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want early candidates to focus on one bottleneck. The result is written to `results/reports/performance_recommendation.json`, a browser-ready report is generated at `results/reports/performance_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+It only runs unbounded candidates, does not apply memory/CPU/GPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want early candidates to focus on one bottleneck. Targeted sweeps use target-specific defaults, for example `results/reports/performance_recommendation_gpu.json` and `.autotuneai/recommendations/latest_performance_gpu.json`; `--target auto` keeps the legacy `performance_recommendation.json` and `latest.json` paths.
 
 The sweep command is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If it finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
@@ -1062,7 +1062,7 @@ autotuneai optimize \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. In guarded mode, NVIDIA candidates include `nvidia-balanced` and `nvidia-guard`, so GPU power/clocks can be capped and restored together with CPU/memory guard settings. Use this path when the goal includes resource guard behavior. The result is written to `results/reports/auto_recommendation.json`, a browser-ready report is generated at `results/reports/auto_recommendation.html`, and the latest recommendation is cached at `.autotuneai/recommendations/latest.json`.
+It tests curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. In guarded mode, NVIDIA candidates include `nvidia-balanced` and `nvidia-guard`, so GPU power/clocks can be capped and restored together with CPU/memory guard settings. Use this path when the goal includes resource guard behavior. Targeted guarded sweeps use paths such as `results/reports/auto_recommendation_gpu.json` and `.autotuneai/recommendations/latest_guarded_gpu.json`; `--target auto` keeps the legacy `auto_recommendation.json` and `latest.json` paths.
 
 Open `results/reports/auto_recommendation.html` to inspect the current baseline, recommended configuration, candidate ranking, and measured deltas. `--warmup-runs` executes discarded baseline trial(s) before measurement so cold-start effects are less likely to bias the recommendation.
 
@@ -1072,6 +1072,7 @@ Apply the cached performance recommendation later without resource monitoring:
 sudo -v
 autotuneai launch-performance \
   --apply-recommendation \
+  --recommendation .autotuneai/recommendations/latest_performance_gpu.json \
   --executor systemd \
   --sudo \
   --system-tuning-sudo \

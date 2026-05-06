@@ -195,8 +195,8 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--max-candidates", type=int)
     optimize.add_argument("--target", choices=sorted(OPTIMIZATION_TARGETS), default="auto", help="Prioritize candidate order for a CPU, memory, GPU, mixed, or auto sweep target.")
     optimize.add_argument("--no-gpu", action="store_true")
-    optimize.add_argument("--output", default="results/reports/auto_recommendation.json")
-    optimize.add_argument("--cache", default=str(LATEST_RECOMMENDATION))
+    optimize.add_argument("--output", help="Recommendation JSON path. Defaults to a target-specific path when --target is not auto.")
+    optimize.add_argument("--cache", help="Recommendation cache path. Defaults to a target-specific cache when --target is not auto.")
     optimize.add_argument("workload", nargs=argparse.REMAINDER)
     optimize.set_defaults(handler=_cmd_optimize)
 
@@ -231,8 +231,8 @@ def build_parser() -> argparse.ArgumentParser:
     optimize_performance.add_argument("--max-candidates", type=int)
     optimize_performance.add_argument("--target", choices=sorted(OPTIMIZATION_TARGETS), default="auto", help="Prioritize candidate order for a CPU, memory, GPU, mixed, or auto performance target.")
     optimize_performance.add_argument("--no-gpu", action="store_true")
-    optimize_performance.add_argument("--output", default="results/reports/performance_recommendation.json")
-    optimize_performance.add_argument("--cache", default=str(LATEST_RECOMMENDATION))
+    optimize_performance.add_argument("--output", help="Recommendation JSON path. Defaults to a target-specific path when --target is not auto.")
+    optimize_performance.add_argument("--cache", help="Recommendation cache path. Defaults to a target-specific cache when --target is not auto.")
     optimize_performance.add_argument("workload", nargs=argparse.REMAINDER)
     optimize_performance.set_defaults(handler=_cmd_optimize_performance)
 
@@ -553,12 +553,17 @@ def _cmd_compare_runs(args: argparse.Namespace) -> int:
 
 def _cmd_optimize(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai optimize [budget args] -- <command>")
+    output_path, cache_path = _recommendation_paths(
+        args,
+        default_output="results/reports/auto_recommendation.json",
+        cache_kind="guarded",
+    )
     try:
         result = optimize_recommendation(
             command,
             _budget_from_args(args),
-            output=args.output,
-            cache_path=args.cache,
+            output=output_path,
+            cache_path=cache_path,
             sample_interval_seconds=args.sample_interval_seconds,
             hard_kill=args.hard_kill,
             executor=args.executor,
@@ -580,9 +585,9 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
-    print(f"Wrote auto recommendation to {args.output}")
-    print(f"Cached recommendation at {args.cache}")
-    html_path = _auto_comparison_report_html(args.output)
+    print(f"Wrote auto recommendation to {output_path}")
+    print(f"Cached recommendation at {cache_path}")
+    html_path = _auto_comparison_report_html(output_path)
     print(f"HTML report: {html_path}")
     if result.get("recommendation"):
         print(f"Best recommendation: {result['recommendation'].get('label')}")
@@ -591,12 +596,17 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
 
 def _cmd_optimize_performance(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai optimize-performance [executor args] -- <command>")
+    output_path, cache_path = _recommendation_paths(
+        args,
+        default_output="results/reports/performance_recommendation.json",
+        cache_kind="performance",
+    )
     try:
         result = optimize_recommendation(
             command,
             ResourceBudget(enforce=False),
-            output=args.output,
-            cache_path=args.cache,
+            output=output_path,
+            cache_path=cache_path,
             sample_interval_seconds=args.sample_interval_seconds,
             hard_kill=False,
             executor=args.executor,
@@ -619,9 +629,9 @@ def _cmd_optimize_performance(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
-    print(f"Wrote performance recommendation to {args.output}")
-    print(f"Cached recommendation at {args.cache}")
-    html_path = _auto_comparison_report_html(args.output)
+    print(f"Wrote performance recommendation to {output_path}")
+    print(f"Cached recommendation at {cache_path}")
+    html_path = _auto_comparison_report_html(output_path)
     print(f"HTML report: {html_path}")
     if result.get("recommendation"):
         print(f"Best performance recommendation: {result['recommendation'].get('label')}")
@@ -912,6 +922,25 @@ def _budget_from_args(args: argparse.Namespace) -> ResourceBudget:
         cpu_quota_percent=args.cpu_quota_percent,
         enforce=True,
     )
+
+
+def _recommendation_paths(args: argparse.Namespace, *, default_output: str, cache_kind: str) -> tuple[str, str]:
+    output = args.output or _targeted_report_path(default_output, args.target)
+    cache = args.cache or _targeted_cache_path(cache_kind, args.target)
+    return output, cache
+
+
+def _targeted_report_path(default_output: str, target: str) -> str:
+    if target == "auto":
+        return default_output
+    path = Path(default_output)
+    return str(path.with_name(f"{path.stem}_{target}{path.suffix}"))
+
+
+def _targeted_cache_path(cache_kind: str, target: str) -> str:
+    if target == "auto":
+        return str(LATEST_RECOMMENDATION)
+    return str(LATEST_RECOMMENDATION.with_name(f"latest_{cache_kind}_{target}.json"))
 
 
 def _resolve_system_tuning_profile(args: argparse.Namespace) -> str | None:

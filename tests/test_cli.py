@@ -198,6 +198,8 @@ class CliTest(unittest.TestCase):
         self.assertEqual(optimize.call_args.kwargs["max_candidates"], 2)
         self.assertEqual(optimize.call_args.kwargs["warmup_runs"], 1)
         self.assertEqual(optimize.call_args.kwargs["optimization_target"], "auto")
+        self.assertEqual(optimize.call_args.kwargs["output"], "results/reports/auto_recommendation.json")
+        self.assertEqual(optimize.call_args.kwargs["cache_path"], str(Path(".autotuneai") / "recommendations" / "latest.json"))
         report.assert_called_once()
         self.assertIn("Cached recommendation", output.getvalue())
 
@@ -216,6 +218,8 @@ class CliTest(unittest.TestCase):
         self.assertFalse(optimize.call_args.args[1].enforce)
         self.assertEqual(optimize.call_args.kwargs["sample_interval_seconds"], 5.0)
         self.assertFalse(optimize.call_args.kwargs["hard_kill"])
+        self.assertEqual(optimize.call_args.kwargs["output"], "results/reports/performance_recommendation.json")
+        self.assertEqual(optimize.call_args.kwargs["cache_path"], str(Path(".autotuneai") / "recommendations" / "latest.json"))
         report.assert_called_once()
         self.assertIn("Best performance recommendation", output.getvalue())
 
@@ -227,6 +231,22 @@ class CliTest(unittest.TestCase):
             code = main(["optimize-performance", "--target", "cpu", "--max-candidates", "2", "--", "python", "train.py"])
         self.assertEqual(code, 0)
         self.assertEqual(optimize.call_args.kwargs["optimization_target"], "cpu")
+        self.assertEqual(optimize.call_args.kwargs["output"], str(Path("results/reports/performance_recommendation_cpu.json")))
+        self.assertEqual(optimize.call_args.kwargs["cache_path"], str(Path(".autotuneai") / "recommendations" / "latest_performance_cpu.json"))
+        self.assertEqual(report.call_args.args[0], Path("results/reports/performance_recommendation_cpu.json"))
+        self.assertIn("performance_recommendation_cpu.json", output.getvalue())
+
+    def test_optimize_command_uses_target_specific_defaults(self) -> None:
+        output = io.StringIO()
+        with patch("autotune.cli.optimize_recommendation") as optimize, patch("autotune.cli.generate_comparison_report") as report, redirect_stdout(output):
+            optimize.return_value = {"recommendation": {"label": "budgeted:gpu-guard"}}
+            report.return_value = Path("results/reports/auto_recommendation_gpu.html")
+            code = main(["optimize", "--target", "gpu", "--max-candidates", "2", "--", "python", "train.py"])
+        self.assertEqual(code, 0)
+        self.assertEqual(optimize.call_args.kwargs["optimization_target"], "gpu")
+        self.assertEqual(optimize.call_args.kwargs["output"], str(Path("results/reports/auto_recommendation_gpu.json")))
+        self.assertEqual(optimize.call_args.kwargs["cache_path"], str(Path(".autotuneai") / "recommendations" / "latest_guarded_gpu.json"))
+        self.assertEqual(report.call_args.args[0], Path("results/reports/auto_recommendation_gpu.json"))
 
     @patch("autotune.cli.launch_performance")
     @patch("autotune.cli.generate_run_report")

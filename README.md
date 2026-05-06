@@ -422,6 +422,7 @@ autotuneai optimize-performance \
 
 autotuneai launch-performance \
   --apply-recommendation \
+  --recommendation .autotuneai/recommendations/latest_performance_gpu.json \
   --executor systemd \
   --sudo \
   --system-tuning-sudo \
@@ -429,7 +430,7 @@ autotuneai launch-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without AutoTuneAI's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want the early candidate set to focus on one bottleneck. It writes `results/reports/performance_recommendation.json`, generates `results/reports/performance_recommendation.html`, and caches the recommendation at `.autotuneai/recommendations/latest.json`.
+`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without AutoTuneAI's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want the early candidate set to focus on one bottleneck. Targeted sweeps use target-specific defaults, for example `results/reports/performance_recommendation_gpu.json` and `.autotuneai/recommendations/latest_performance_gpu.json`; `--target auto` keeps the legacy `performance_recommendation.json` and `latest.json` paths.
 
 The sweep command above is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If a short sweep finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
@@ -455,7 +456,7 @@ autotuneai optimize \
 autotuneai run --apply-recommendation -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. In guarded mode, NVIDIA candidates include `nvidia-balanced` and `nvidia-guard`, so GPU power/clocks can be capped and restored with the same lifecycle as CPU/memory guard. Use it when the goal includes resource guard behavior. It writes `results/reports/auto_recommendation.json`, automatically generates `results/reports/auto_recommendation.html`, and caches the latest recommendation at `.autotuneai/recommendations/latest.json`.
+`optimize` evaluates curated candidates across guard mode, system profile, runtime environment profile, and NVIDIA GPU profile. In guarded mode, NVIDIA candidates include `nvidia-balanced` and `nvidia-guard`, so GPU power/clocks can be capped and restored with the same lifecycle as CPU/memory guard. Use it when the goal includes resource guard behavior. Targeted guarded sweeps use paths such as `results/reports/auto_recommendation_gpu.json` and `.autotuneai/recommendations/latest_guarded_gpu.json`; `--target auto` keeps the legacy `auto_recommendation.json` and `latest.json` paths.
 
 Open `results/reports/auto_recommendation.html` to see the current baseline, the recommended configuration, per-candidate throughput, GPU throughput, CPU peaks, and deltas.
 
