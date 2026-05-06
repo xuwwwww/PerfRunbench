@@ -25,6 +25,7 @@ class ComparisonRunnerTest(unittest.TestCase):
         self.assertEqual(result["deltas"]["workload_duration_seconds"], -2.0)
         self.assertEqual(result["baseline"]["system_tuning_overhead_seconds"], 0.0)
         self.assertEqual(result["deltas"]["peak_memory_mb"], -20)
+        self.assertEqual(result["deltas"]["workload"]["step_time_p95_seconds"]["percent"], -20.0)
         self.assertNotIn("final_accuracy", result["baseline"]["workload"])
         self.assertNotIn("final_accuracy", result["deltas"]["workload"])
         self.assertEqual(result["tuned_profile"], "linux-throughput")
@@ -284,6 +285,8 @@ class ComparisonRunnerTest(unittest.TestCase):
                     "duration_seconds": 10 if run_id == "baseline" else 8,
                     "epoch_time_mean_seconds": 2.0 if run_id == "baseline" else 1.5,
                     "step_time_mean_seconds": 0.5 if run_id == "baseline" else 0.4,
+                    "step_time_p95_seconds": 0.5 if run_id == "baseline" else 0.4,
+                    "step_time_p99_seconds": 0.6 if run_id == "baseline" else 0.45,
                     "samples_per_second": 100.0 if run_id == "baseline" else 125.0,
                     "final_accuracy": 0.9,
                     "final_loss": 0.2 if run_id == "baseline" else 0.18,

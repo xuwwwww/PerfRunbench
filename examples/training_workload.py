@@ -154,6 +154,7 @@ def train_softmax_classifier(
         "epoch_time_mean_seconds": round(sum(epoch_times) / max(1, len(epoch_times)), 6),
         "epoch_time_max_seconds": round(max(epoch_times), 6),
         "step_time_mean_seconds": round(sum(step_times) / max(1, len(step_times)), 6),
+        **summarize_step_latencies(step_times),
         "samples_per_second": round(total_samples / max(duration_seconds, 1e-9), 3),
         "final_accuracy": round(accuracy, 4),
         "final_loss": round(loss_history[-1] if loss_history else 0.0, 6),
@@ -195,6 +196,39 @@ def print_metrics_summary(metrics: dict[str, object]) -> None:
         f"loss={metrics.get('final_loss')} "
         f"samples_per_second={metrics.get('samples_per_second')}"
     )
+
+
+def summarize_step_latencies(step_times: list[float]) -> dict[str, object]:
+    if not step_times:
+        return {
+            "step_time_sample_count": 0,
+            "step_time_sample_mean_seconds": None,
+            "step_time_p50_seconds": None,
+            "step_time_p95_seconds": None,
+            "step_time_p99_seconds": None,
+            "step_time_max_seconds": None,
+        }
+    return {
+        "step_time_sample_count": len(step_times),
+        "step_time_sample_mean_seconds": round(sum(step_times) / len(step_times), 6),
+        "step_time_p50_seconds": round(percentile(step_times, 50), 6),
+        "step_time_p95_seconds": round(percentile(step_times, 95), 6),
+        "step_time_p99_seconds": round(percentile(step_times, 99), 6),
+        "step_time_max_seconds": round(max(step_times), 6),
+    }
+
+
+def percentile(values: list[float], percentile_value: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    rank = (len(ordered) - 1) * (percentile_value / 100.0)
+    lower = int(math.floor(rank))
+    upper = int(math.ceil(rank))
+    if lower == upper:
+        return ordered[lower]
+    fraction = rank - lower
+    return ordered[lower] * (1.0 - fraction) + ordered[upper] * fraction
 
 
 def dot(weights: Iterable[float], features: Iterable[float]) -> float:

@@ -53,6 +53,7 @@ def format_comparison_report(data: dict[str, Any], source: Path | None = None) -
                 ("benchmark duration %", _nested(deltas, "benchmark_duration_percent")),
                 ("workload duration %", _nested(deltas, "workload_duration_percent")),
                 ("samples/sec %", _nested(deltas, "workload", "samples_per_second", "percent")),
+                ("step p95 %", _nested(deltas, "workload", "step_time_p95_seconds", "percent")),
                 ("peak memory %", _nested(deltas, "peak_memory_percent")),
                 ("system tuning overhead sec", _nested(deltas, "system_tuning_overhead_seconds")),
             ],
@@ -166,6 +167,7 @@ def format_comparison_report_html(data: dict[str, Any], source: Path | None = No
                     ("benchmark duration %", _nested(deltas, "benchmark_duration_percent")),
                     ("workload duration %", _nested(deltas, "workload_duration_percent")),
                     ("samples/sec %", _nested(deltas, "workload", "samples_per_second", "percent")),
+                    ("step p95 %", _nested(deltas, "workload", "step_time_p95_seconds", "percent")),
                     ("peak memory %", _nested(deltas, "peak_memory_percent")),
                     ("system tuning overhead sec", _nested(deltas, "system_tuning_overhead_seconds")),
                 ],
@@ -353,6 +355,7 @@ def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None
         f"- Recommended: `{best.get('label')}`",
         f"- Samples/sec delta: {_delta_percent(best_metrics.get('samples_per_second'), baseline_metrics.get('samples_per_second'))}%",
         f"- Duration delta: {_delta_percent(best_metrics.get('duration_seconds'), baseline_metrics.get('duration_seconds'))}%",
+        f"- Step p95 delta: {_delta_percent(best_metrics.get('step_time_p95_seconds'), baseline_metrics.get('step_time_p95_seconds'))}%",
         f"- GPU TFLOPS delta: {_delta_percent(best_metrics.get('gpu_tflops_estimate'), baseline_metrics.get('gpu_tflops_estimate'))}%",
         "",
         "## Ranking",
@@ -375,6 +378,7 @@ def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None
             f"{item.get('label')}: status={item.get('status')}, "
             f"samples/sec={metrics.get('samples_per_second')}, "
             f"duration={metrics.get('duration_seconds')}, "
+            f"step_p95={metrics.get('step_time_p95_seconds')}, "
             f"system={item.get('system_profile')}, runtime={item.get('runtime_profile')}, gpu={item.get('gpu_profile')}"
         )
     return "\n".join(lines) + "\n"
@@ -411,6 +415,9 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         ("GPU profile", best.get("gpu_profile")),
         ("Samples/sec delta", _format_delta(_delta_percent(best_metrics.get("samples_per_second"), baseline_metrics.get("samples_per_second")))),
         ("Duration delta", _format_delta(_delta_percent(best_metrics.get("duration_seconds"), baseline_metrics.get("duration_seconds")))),
+        ("Step p95 delta", _format_delta(_delta_percent(best_metrics.get("step_time_p95_seconds"), baseline_metrics.get("step_time_p95_seconds")))),
+        ("Recommended step p95 sec", best_metrics.get("step_time_p95_seconds")),
+        ("Recommended step p99 sec", best_metrics.get("step_time_p99_seconds")),
         ("GPU TFLOPS delta", _format_delta(_delta_percent(best_metrics.get("gpu_tflops_estimate"), baseline_metrics.get("gpu_tflops_estimate")))),
     ]
     table_rows = "".join(
@@ -420,6 +427,8 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         f"<td>{_html_escape(_nested(item, 'metrics', 'samples_per_second'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'normalized_samples_per_second_percent'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'duration_seconds'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'step_time_p95_seconds'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'step_time_p99_seconds'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'gpu_tflops_estimate'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'peak_system_cpu_percent'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'per_cpu_peak_max_percent'))}</td>"
@@ -429,7 +438,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         f"<td>{_html_escape(item.get('gpu_profile'))}</td>"
         "</tr>"
         for item in candidates
-    ) or "<tr><td colspan=\"12\">No candidates recorded.</td></tr>"
+    ) or "<tr><td colspan=\"14\">No candidates recorded.</td></tr>"
     diagnostics = data.get("diagnostics", [])
     diagnostics_html = "".join(f"<li>{_html_escape(item)}</li>" for item in diagnostics) or "<li>No diagnostics recorded.</li>"
     execution_rows = "".join(
@@ -480,7 +489,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             "</section>",
             "<section class=\"card wide\">",
             "<h2>Candidate Details</h2>",
-            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Thermal-normalized %</th><th>Duration sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>Trials</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
+            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Thermal-normalized %</th><th>Duration sec</th><th>Step p95 sec</th><th>Step p99 sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>Trials</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
             f"<tbody>{table_rows}</tbody></table>",
             "</section>",
             "<section class=\"card wide\">",

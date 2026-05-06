@@ -1,5 +1,6 @@
 duration_seconds: 8
 warmup_seconds: 1
+latency_sample_limit: 128
 require_cuda: true
 matrix_size: 3072
 batch_matrices: 3

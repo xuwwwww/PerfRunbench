@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from training_workload import load_flat_config, write_training_metrics
+from training_workload import load_flat_config, summarize_step_latencies, write_training_metrics
 
 
 def main() -> int:
@@ -24,12 +24,13 @@ def main() -> int:
     feature_count = int(config.get("feature_count", 4096))
     samples_per_step = int(config.get("samples_per_step", batch_size))
     steps_per_epoch = int(config.get("steps_per_epoch", 100))
+    latency_sample_limit = int(config.get("latency_sample_limit", 128))
 
     memory = _allocate_memory(memory_target_mb)
     deadline = time.perf_counter() + duration_seconds
     result_queue: mp.Queue = mp.Queue()
     workers = [
-        mp.Process(target=_worker, args=(deadline, worker_id, feature_count, batch_size, result_queue))
+        mp.Process(target=_worker, args=(deadline, worker_id, feature_count, batch_size, latency_sample_limit, result_queue))
         for worker_id in range(max(1, cpu_workers))
     ]
     start = time.perf_counter()
@@ -43,10 +44,16 @@ def main() -> int:
     elapsed = time.perf_counter() - start
     total_steps = sum(item["steps"] for item in worker_results)
     total_samples = total_steps * samples_per_step
+    step_latency_samples = [
+        value
+        for item in worker_results
+        for value in item.get("step_times", [])
+    ]
     metrics = {
         "duration_seconds": round(elapsed, 6),
         "samples_per_second": round(total_samples / max(elapsed, 1e-9), 3),
         "step_time_mean_seconds": round((elapsed * max(1, cpu_workers)) / max(1, total_steps), 6),
+        **summarize_step_latencies(step_latency_samples),
         "epoch_time_mean_seconds": round((elapsed * steps_per_epoch * max(1, cpu_workers)) / max(1, total_steps), 6),
         "epoch_time_max_seconds": round(elapsed, 6),
         "peak_batch_payload_mb": round((batch_size * feature_count * 8) / (1024 * 1024), 6),
@@ -79,18 +86,29 @@ def _allocate_memory(memory_target_mb: int) -> bytearray:
     return memory
 
 
-def _worker(deadline: float, worker_id: int, feature_count: int, batch_size: int, result_queue: mp.Queue) -> None:
+def _worker(
+    deadline: float,
+    worker_id: int,
+    feature_count: int,
+    batch_size: int,
+    latency_sample_limit: int,
+    result_queue: mp.Queue,
+) -> None:
     steps = 0
     value = float(worker_id + 1)
     width = max(16, min(feature_count, 8192))
+    step_times = []
     while time.perf_counter() < deadline:
+        step_start = time.perf_counter()
         for sample_index in range(batch_size):
             base = (sample_index + 1) / batch_size
             for feature_index in range(width):
                 angle = (feature_index + 1) * base
                 value += math.sin(angle) * math.cos(angle / (worker_id + 1))
         steps += 1
-    result_queue.put({"worker_id": worker_id, "steps": steps, "checksum": value})
+        if len(step_times) < max(0, latency_sample_limit):
+            step_times.append(time.perf_counter() - step_start)
+    result_queue.put({"worker_id": worker_id, "steps": steps, "checksum": value, "step_times": step_times})
 
 
 if __name__ == "__main__":

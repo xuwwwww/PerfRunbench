@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import time
 
-from training_workload import load_flat_config, write_training_metrics
+from training_workload import load_flat_config, summarize_step_latencies, write_training_metrics
 
 
 def main() -> int:
@@ -35,6 +35,7 @@ def main() -> int:
     batch_matrices = int(config.get("batch_matrices", 3))
     gpu_memory_target_mb = int(config.get("gpu_memory_target_mb", 3072))
     warmup_seconds = float(config.get("warmup_seconds", 3.0))
+    latency_sample_limit = int(config.get("latency_sample_limit", 128))
     use_tf32 = bool(config.get("allow_tf32", True))
     torch.backends.cuda.matmul.allow_tf32 = use_tf32
     torch.backends.cudnn.allow_tf32 = use_tf32
@@ -51,10 +52,19 @@ def main() -> int:
     _run_matmul_loop(torch, matrices, accumulator, warmup_seconds)
     torch.cuda.synchronize(device_index)
     start = time.perf_counter()
-    deadline = start + duration_seconds
-    steps = _run_matmul_loop(torch, matrices, accumulator, duration_seconds)
+    steps, latency_events = _run_matmul_loop(
+        torch,
+        matrices,
+        accumulator,
+        duration_seconds,
+        latency_sample_limit=latency_sample_limit,
+    )
     torch.cuda.synchronize(device_index)
     elapsed = time.perf_counter() - start
+    step_latencies = [
+        start_event.elapsed_time(end_event) / 1000.0
+        for start_event, end_event in latency_events
+    ]
 
     # Touch memory blocks so allocation cannot be optimized away by lazy kernels.
     checksum = float(accumulator.float().mean().item())
@@ -67,6 +77,7 @@ def main() -> int:
         "gpu_matmuls_per_second": round(matmuls / max(elapsed, 1e-9), 3),
         "gpu_tflops_estimate": round((matmuls * flops_per_matmul) / max(elapsed, 1e-9) / 1e12, 3),
         "step_time_mean_seconds": round(elapsed / max(1, steps), 6),
+        **summarize_step_latencies(step_latencies),
         "epoch_time_mean_seconds": round(elapsed, 6),
         "epoch_time_max_seconds": round(elapsed, 6),
         "optimizer_steps": steps,
@@ -96,16 +107,26 @@ def main() -> int:
     return 0
 
 
-def _run_matmul_loop(torch, matrices, accumulator, duration_seconds: float) -> int:
+def _run_matmul_loop(torch, matrices, accumulator, duration_seconds: float, *, latency_sample_limit: int = 0):
     deadline = time.perf_counter() + max(0.0, duration_seconds)
     steps = 0
+    latency_events = []
     while time.perf_counter() < deadline:
+        start_event = None
+        end_event = None
+        if len(latency_events) < max(0, latency_sample_limit):
+            start_event = torch.cuda.Event(enable_timing=True)
+            end_event = torch.cuda.Event(enable_timing=True)
+            start_event.record()
         value = matrices[0]
         for other in matrices[1:]:
             value = torch.matmul(value, other)
         accumulator.mul_(0.95).add_(value, alpha=0.05)
+        if start_event is not None and end_event is not None:
+            end_event.record()
+            latency_events.append((start_event, end_event))
         steps += 1
-    return steps
+    return steps, latency_events
 
 
 def _allocate_gpu_memory(torch, device, dtype, target_mb: int):

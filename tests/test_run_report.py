@@ -181,13 +181,25 @@ class RunReportTest(unittest.TestCase):
                         "system_profile": "linux-performance",
                         "runtime_profile": "runtime-pytorch-max-performance",
                         "gpu_profile": "nvidia-performance",
-                        "metrics": {"samples_per_second": 120, "duration_seconds": 9, "gpu_tflops_estimate": 10},
+                        "metrics": {
+                            "samples_per_second": 120,
+                            "duration_seconds": 9,
+                            "step_time_p95_seconds": 0.08,
+                            "step_time_p99_seconds": 0.09,
+                            "gpu_tflops_estimate": 10,
+                        },
                     },
                     "candidates": [
                         {
                             "label": "unbounded:baseline",
                             "status": "completed",
-                            "metrics": {"samples_per_second": 100, "duration_seconds": 10, "gpu_tflops_estimate": 8},
+                            "metrics": {
+                                "samples_per_second": 100,
+                                "duration_seconds": 10,
+                                "step_time_p95_seconds": 0.1,
+                                "step_time_p99_seconds": 0.12,
+                                "gpu_tflops_estimate": 8,
+                            },
                         },
                         {
                             "label": "unbounded:linux-performance",
@@ -195,7 +207,13 @@ class RunReportTest(unittest.TestCase):
                             "system_profile": "linux-performance",
                             "runtime_profile": "runtime-pytorch-max-performance",
                             "gpu_profile": "nvidia-performance",
-                            "metrics": {"samples_per_second": 120, "duration_seconds": 9, "gpu_tflops_estimate": 10},
+                            "metrics": {
+                                "samples_per_second": 120,
+                                "duration_seconds": 9,
+                                "step_time_p95_seconds": 0.08,
+                                "step_time_p99_seconds": 0.09,
+                                "gpu_tflops_estimate": 10,
+                            },
                         },
                     ],
                 },
@@ -206,6 +224,7 @@ class RunReportTest(unittest.TestCase):
             report = report_path.read_text(encoding="utf-8")
             self.assertIn("Auto Recommendation", report)
             self.assertIn("Current vs Recommended", report)
+            self.assertIn("Step p95", report)
             self.assertIn("unbounded:linux-performance", report)
 
 

@@ -1,4 +1,5 @@
 duration_seconds: 60
+latency_sample_limit: 128
 cpu_workers: 6
 memory_target_mb: 6144
 batch_size: 192

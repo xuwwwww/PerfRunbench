@@ -909,6 +909,11 @@ def _run_metrics(run_id: str) -> dict[str, Any]:
         "status": analysis.get("status"),
         "duration_seconds": _number(workload.get("duration_seconds")),
         "samples_per_second": _number(workload.get("samples_per_second")),
+        "step_time_p50_seconds": _number(workload.get("step_time_p50_seconds")),
+        "step_time_p95_seconds": _number(workload.get("step_time_p95_seconds")),
+        "step_time_p99_seconds": _number(workload.get("step_time_p99_seconds")),
+        "step_time_max_seconds": _number(workload.get("step_time_max_seconds")),
+        "step_time_sample_count": _number(workload.get("step_time_sample_count")),
         "gpu_tflops_estimate": _number(workload.get("gpu_tflops_estimate")),
         "gpu_matmuls_per_second": _number(workload.get("gpu_matmuls_per_second")),
         "gpu_peak_memory_allocated_mb": _number(workload.get("gpu_peak_memory_allocated_mb")),
@@ -935,6 +940,11 @@ def _candidate_result(candidate: RecommendationCandidate, trials: list[dict[str,
     metrics = {
         "samples_per_second": _median(trials, "samples_per_second"),
         "duration_seconds": _median(trials, "duration_seconds"),
+        "step_time_p50_seconds": _median(trials, "step_time_p50_seconds"),
+        "step_time_p95_seconds": _median(trials, "step_time_p95_seconds"),
+        "step_time_p99_seconds": _median(trials, "step_time_p99_seconds"),
+        "step_time_max_seconds": _median(trials, "step_time_max_seconds"),
+        "step_time_sample_count": _median(trials, "step_time_sample_count"),
         "gpu_tflops_estimate": _median(trials, "gpu_tflops_estimate"),
         "gpu_matmuls_per_second": _median(trials, "gpu_matmuls_per_second"),
         "gpu_peak_memory_allocated_mb": _median(trials, "gpu_peak_memory_allocated_mb"),
@@ -973,6 +983,8 @@ def _candidate_result(candidate: RecommendationCandidate, trials: list[dict[str,
                 "paired_baseline_run_id": trial.get("paired_baseline_run_id"),
                 "samples_per_second": trial.get("samples_per_second"),
                 "duration_seconds": trial.get("duration_seconds"),
+                "step_time_p95_seconds": trial.get("step_time_p95_seconds"),
+                "step_time_p99_seconds": trial.get("step_time_p99_seconds"),
                 "gpu_tflops_estimate": trial.get("gpu_tflops_estimate"),
                 "paired_baseline_samples_per_second": trial.get("paired_baseline_samples_per_second"),
                 "normalized_samples_per_second_ratio": trial.get("normalized_samples_per_second_ratio"),
@@ -1001,20 +1013,22 @@ def _recommendation_from_result(result: dict[str, Any] | None) -> dict[str, Any]
     }
 
 
-def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float]:
+def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float, float]:
     if item.get("status") != "completed" or item.get("metrics", {}).get("memory_budget_exceeded"):
-        return (float("-inf"), float("-inf"), float("-inf"), float("-inf"))
+        return (float("-inf"), float("-inf"), float("-inf"), float("-inf"), float("-inf"))
     metrics = item.get("metrics", {})
     normalized = metrics.get("normalized_samples_per_second_ratio")
     throughput = metrics.get("samples_per_second")
     gpu_tflops = metrics.get("gpu_tflops_estimate")
     duration = metrics.get("duration_seconds")
+    step_p95 = metrics.get("step_time_p95_seconds")
     if normalized is not None:
         return (
             2.0,
             float(normalized),
             float(throughput if throughput is not None else 0.0),
             float(gpu_tflops if gpu_tflops is not None else 0.0),
+            -float(step_p95 if step_p95 is not None else float("inf")),
         )
     memory = metrics.get("peak_memory_mb")
     has_throughput = 1.0 if throughput is not None else 0.0
@@ -1023,6 +1037,7 @@ def _rank_key(item: dict[str, Any]) -> tuple[float, float, float, float]:
         float(throughput if throughput is not None else 0.0),
         float(gpu_tflops if gpu_tflops is not None else 0.0),
         -float(duration if duration is not None else float("inf")),
+        -float(step_p95 if step_p95 is not None else float("inf")),
     )
 
 
@@ -1070,6 +1085,7 @@ def _reason(candidate: RecommendationCandidate, trials: list[dict[str, Any]]) ->
     metrics = {
         "samples_per_second": _median(trials, "samples_per_second"),
         "duration_seconds": _median(trials, "duration_seconds"),
+        "step_time_p95_seconds": _median(trials, "step_time_p95_seconds"),
         "gpu_tflops_estimate": _median(trials, "gpu_tflops_estimate"),
         "normalized_samples_per_second_ratio": normalized,
         "peak_memory_mb": _median(trials, "peak_memory_mb"),
@@ -1081,6 +1097,8 @@ def _reason(candidate: RecommendationCandidate, trials: list[dict[str, Any]]) ->
     ]
     if metrics["gpu_tflops_estimate"] is not None:
         reasons.append(f"gpu_tflops_estimate={metrics['gpu_tflops_estimate']}")
+    if metrics["step_time_p95_seconds"] is not None:
+        reasons.append(f"step_time_p95_seconds={metrics['step_time_p95_seconds']}")
     if metrics["normalized_samples_per_second_ratio"] is not None:
         reasons.append(f"thermal_normalized_speed={metrics['normalized_samples_per_second_ratio']}")
         reasons.append(f"thermal_normalized_delta_percent={_ratio_to_percent(metrics['normalized_samples_per_second_ratio'])}")

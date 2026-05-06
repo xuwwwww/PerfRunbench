@@ -61,6 +61,7 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
                 ("system CPU p95 %", analysis["cpu"].get("observed_system_cpu_percent_p95")),
                 ("per-core peak max %", analysis["cpu"].get("per_cpu_peak_max_percent")),
                 ("workload samples/sec", analysis.get("workload", {}).get("samples_per_second")),
+                ("workload step p95 ms", _seconds_to_ms(analysis.get("workload", {}).get("step_time_p95_seconds"))),
             ],
         ),
         "",
@@ -227,6 +228,7 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
                     ("system CPU p95 %", analysis["cpu"].get("observed_system_cpu_percent_p95")),
                     ("per-core peak max %", analysis["cpu"].get("per_cpu_peak_max_percent")),
                     ("workload samples/sec", workload.get("samples_per_second")),
+                    ("workload step p95 ms", _seconds_to_ms(workload.get("step_time_p95_seconds"))),
                 ],
             ),
             sparkline_svg(
@@ -353,6 +355,12 @@ def _count_pair(value: object, total: object) -> str:
     if value is None and total is None:
         return "n/a"
     return f"{value}/{total}"
+
+
+def _seconds_to_ms(value: object) -> float | None:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    return round(float(value) * 1000.0, 3)
 
 
 def _shell_join(command: list[str]) -> str:

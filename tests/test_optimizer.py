@@ -25,7 +25,11 @@ class OptimizerTest(unittest.TestCase):
             return {
                 "status": "completed",
                 "return_code": 0,
-                "workload": {"samples_per_second": throughput, "duration_seconds": 10.0},
+                "workload": {
+                    "samples_per_second": throughput,
+                    "duration_seconds": 10.0,
+                    "step_time_p95_seconds": [0.1, 0.08, 0.09, 0.12][index],
+                },
                 "memory": {"peak_memory_mb": 1000.0, "memory_budget_exceeded": False},
                 "cpu": {"observed_peak_process_cpu_percent": 50.0},
             }
@@ -45,6 +49,7 @@ class OptimizerTest(unittest.TestCase):
             self.assertTrue(cache.exists())
 
         self.assertEqual(result["recommendation"]["metrics"]["samples_per_second"], 120.0)
+        self.assertEqual(result["recommendation"]["metrics"]["step_time_p95_seconds"], 0.08)
 
     @patch("autotune.recommendation.optimizer.recommend_nvidia_tuning")
     @patch("autotune.recommendation.optimizer.analyze_run")
