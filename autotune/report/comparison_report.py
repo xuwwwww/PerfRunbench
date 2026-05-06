@@ -335,6 +335,7 @@ def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None
     candidates = data.get("candidates", [])
     baseline = _auto_baseline_candidate(candidates)
     best = data.get("recommendation") or {}
+    decision = data.get("decision", {}) if isinstance(data.get("decision"), dict) else {}
     best_metrics = best.get("metrics", {}) if isinstance(best.get("metrics"), dict) else {}
     baseline_metrics = baseline.get("metrics", {}) if isinstance(baseline, dict) else {}
     lines = [
@@ -357,6 +358,18 @@ def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None
         f"- Duration delta: {_delta_percent(best_metrics.get('duration_seconds'), baseline_metrics.get('duration_seconds'))}%",
         f"- Step p95 delta: {_delta_percent(best_metrics.get('step_time_p95_seconds'), baseline_metrics.get('step_time_p95_seconds'))}%",
         f"- GPU TFLOPS delta: {_delta_percent(best_metrics.get('gpu_tflops_estimate'), baseline_metrics.get('gpu_tflops_estimate'))}%",
+        "",
+        "## Decision",
+        "",
+        f"- Status: `{decision.get('status')}`",
+        f"- Noise band: +/-{decision.get('noise_band_percent')}%",
+        f"- Primary speed delta: {_format_delta(decision.get('primary_speed_delta_percent'))}",
+        f"- Within noise band: `{decision.get('within_noise_band')}`",
+        f"- Interpretation: {decision.get('interpretation')}",
+        "",
+        "## Why This Recommendation",
+        "",
+        *_recommendation_reason_lines(decision, best),
         "",
         "## Ranking",
         "",
@@ -388,6 +401,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
     candidates = data.get("candidates", [])
     baseline = _auto_baseline_candidate(candidates)
     best = data.get("recommendation") or {}
+    decision = data.get("decision", {}) if isinstance(data.get("decision"), dict) else {}
     best_metrics = best.get("metrics", {}) if isinstance(best.get("metrics"), dict) else {}
     baseline_metrics = baseline.get("metrics", {}) if isinstance(baseline, dict) else {}
     summary_rows = [
@@ -477,6 +491,14 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             _simple_table(current_rows),
             "</section>",
             "<section class=\"card\">",
+            "<h2>Decision</h2>",
+            _simple_table(_decision_rows(decision)),
+            "</section>",
+            "<section class=\"card\">",
+            "<h2>Why This Recommendation</h2>",
+            _reason_list_html(decision, best),
+            "</section>",
+            "<section class=\"card\">",
             "<h2>Diagnostics</h2>",
             f"<ul>{diagnostics_html}</ul>",
             "</section>",
@@ -525,7 +547,7 @@ def _delta_percent(value: Any, baseline: Any) -> float | None:
 
 
 def _format_delta(value: float | None) -> str:
-    if value is None:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
         return "n/a"
     return f"{value:+.3f}%"
 
@@ -536,6 +558,37 @@ def _simple_table(rows: list[tuple[str, object]]) -> str:
         for label, value in rows
     )
     return f"<table><tbody>{body}</tbody></table>"
+
+
+def _decision_rows(decision: dict[str, Any]) -> list[tuple[str, object]]:
+    if not decision:
+        return [("Status", "not available")]
+    return [
+        ("Status", decision.get("status")),
+        ("Baseline", decision.get("baseline_label")),
+        ("Recommended", decision.get("recommended_label")),
+        ("Noise band", f"+/-{decision.get('noise_band_percent')}%"),
+        ("Primary speed delta", _format_delta(decision.get("primary_speed_delta_percent"))),
+        ("Samples/sec delta", _format_delta(decision.get("samples_per_second_delta_percent"))),
+        ("Step p95 delta", _format_delta(decision.get("step_time_p95_delta_percent"))),
+        ("GPU TFLOPS delta", _format_delta(decision.get("gpu_tflops_delta_percent"))),
+        ("Within noise band", decision.get("within_noise_band")),
+        ("Interpretation", decision.get("interpretation")),
+    ]
+
+
+def _recommendation_reason_lines(decision: dict[str, Any], best: dict[str, Any]) -> list[str]:
+    reasons = decision.get("recommendation_reason")
+    if not isinstance(reasons, list) or not reasons:
+        reasons = best.get("reason", []) if isinstance(best.get("reason"), list) else []
+    if not reasons:
+        return ["- No recommendation reason recorded."]
+    return [f"- {item}" for item in reasons]
+
+
+def _reason_list_html(decision: dict[str, Any], best: dict[str, Any]) -> str:
+    reasons = _recommendation_reason_lines(decision, best)
+    return "<ul>" + "".join(f"<li>{_html_escape(item.removeprefix('- '))}</li>" for item in reasons) + "</ul>"
 
 
 def _gpu_tuning_summary(group: dict[str, Any]) -> str:

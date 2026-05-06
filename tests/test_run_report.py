@@ -175,6 +175,19 @@ class RunReportTest(unittest.TestCase):
                     "fingerprint": "abc",
                     "repeat": 1,
                     "warmup_runs": 1,
+                    "decision": {
+                        "status": "meaningful-speedup",
+                        "baseline_label": "unbounded:baseline",
+                        "recommended_label": "unbounded:linux-performance",
+                        "noise_band_percent": 2.0,
+                        "primary_speed_delta_percent": 20.0,
+                        "samples_per_second_delta_percent": 20.0,
+                        "step_time_p95_delta_percent": -20.0,
+                        "gpu_tflops_delta_percent": 25.0,
+                        "within_noise_band": False,
+                        "recommendation_reason": ["system_profile=linux-performance", "samples_per_second=120"],
+                        "interpretation": "Recommended profile beat baseline outside the noise band.",
+                    },
                     "recommendation": {
                         "label": "unbounded:linux-performance",
                         "guard_mode": "unbounded",
@@ -224,6 +237,9 @@ class RunReportTest(unittest.TestCase):
             report = report_path.read_text(encoding="utf-8")
             self.assertIn("Auto Recommendation", report)
             self.assertIn("Current vs Recommended", report)
+            self.assertIn("Decision", report)
+            self.assertIn("Why This Recommendation", report)
+            self.assertIn("meaningful-speedup", report)
             self.assertIn("Step p95", report)
             self.assertIn("unbounded:linux-performance", report)
 

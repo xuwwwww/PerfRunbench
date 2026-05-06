@@ -20,6 +20,7 @@ from autotune.system_tuner.runtime import available_profiles
 RECOMMENDATIONS_DIR = Path(".autotuneai") / "recommendations"
 LATEST_RECOMMENDATION = RECOMMENDATIONS_DIR / "latest.json"
 OPTIMIZATION_TARGETS = {"auto", "cpu", "memory", "gpu", "mixed"}
+DEFAULT_NOISE_BAND_PERCENT = 2.0
 
 
 @dataclass(frozen=True)
@@ -567,6 +568,11 @@ def _write_summary(
 ) -> dict[str, Any]:
     ranked = sorted(results, key=_rank_key, reverse=True)
     best = ranked[0] if ranked else None
+    decision = _decision_summary(
+        ranked,
+        optimization_mode=optimization_mode,
+        noise_band_percent=DEFAULT_NOISE_BAND_PERCENT,
+    )
     summary = {
         "kind": "auto_recommendation",
         "fingerprint": fingerprint,
@@ -584,6 +590,7 @@ def _write_summary(
         "time_budget_hours": time_budget_hours,
         "complete": complete,
         "goal": _goal_text(optimization_mode, optimization_target),
+        "decision": decision,
         "diagnostics": _summary_diagnostics(
             optimization_mode=optimization_mode,
             optimization_target=optimization_target,
@@ -591,6 +598,7 @@ def _write_summary(
             complete=complete,
             results=ranked,
             execution_order=execution_order,
+            decision=decision,
         ),
         "best_label": best["label"] if best else None,
         "recommendation": _recommendation_from_result(best) if best else None,
@@ -1049,6 +1057,7 @@ def _summary_diagnostics(
     complete: bool,
     results: list[dict[str, Any]],
     execution_order: list[dict[str, Any]],
+    decision: dict[str, Any] | None = None,
 ) -> list[str]:
     diagnostics = []
     if optimization_mode == "performance":
@@ -1063,6 +1072,10 @@ def _summary_diagnostics(
         diagnostics.append("Time budget or interrupt stopped the sweep before all requested trials completed; recommendation is based on partial results.")
     if results and str(results[0].get("label", "")).endswith(":baseline") and len(results) > 1:
         diagnostics.append("Baseline is currently ranked best; this can be valid, but inspect per-trial execution order before treating it as a tuning failure.")
+    if decision:
+        interpretation = decision.get("interpretation")
+        if interpretation:
+            diagnostics.append(str(interpretation))
     if execution_order:
         diagnostics.append(f"Recorded {len(execution_order)} measured trial(s) in execution_order for auditability.")
     return diagnostics
@@ -1111,6 +1124,94 @@ def _reason(candidate: RecommendationCandidate, trials: list[dict[str, Any]]) ->
     if candidate.gpu_profile:
         reasons.append(f"gpu_profile={candidate.gpu_profile}")
     return reasons
+
+
+def _decision_summary(
+    ranked_results: list[dict[str, Any]],
+    *,
+    optimization_mode: str,
+    noise_band_percent: float,
+) -> dict[str, Any]:
+    best = ranked_results[0] if ranked_results else None
+    baseline = _baseline_result(ranked_results, optimization_mode=optimization_mode)
+    if best is None or baseline is None:
+        return {
+            "status": "insufficient-data",
+            "noise_band_percent": noise_band_percent,
+            "interpretation": "No baseline/recommendation pair was available for decision analysis.",
+        }
+    best_metrics = best.get("metrics", {}) if isinstance(best.get("metrics"), dict) else {}
+    baseline_metrics = baseline.get("metrics", {}) if isinstance(baseline.get("metrics"), dict) else {}
+    samples_delta = _delta_percent(
+        best_metrics.get("samples_per_second"),
+        baseline_metrics.get("samples_per_second"),
+    )
+    normalized_delta = best_metrics.get("normalized_samples_per_second_percent")
+    primary_delta = normalized_delta if isinstance(normalized_delta, (int, float)) else samples_delta
+    duration_delta = _delta_percent(best_metrics.get("duration_seconds"), baseline_metrics.get("duration_seconds"))
+    step_p95_delta = _delta_percent(
+        best_metrics.get("step_time_p95_seconds"),
+        baseline_metrics.get("step_time_p95_seconds"),
+    )
+    gpu_tflops_delta = _delta_percent(
+        best_metrics.get("gpu_tflops_estimate"),
+        baseline_metrics.get("gpu_tflops_estimate"),
+    )
+    best_is_baseline = best.get("label") == baseline.get("label")
+    within_noise = primary_delta is None or abs(float(primary_delta)) <= noise_band_percent
+    if best_is_baseline:
+        status = "baseline-best"
+        interpretation = "Baseline ranked best; no tested profile beat baseline for this workload."
+    elif within_noise:
+        status = "within-noise"
+        interpretation = (
+            f"Recommended profile is within the +/-{noise_band_percent:.1f}% noise band; "
+            "confirm with higher repeat or a longer workload before treating it as a real speedup."
+        )
+    else:
+        status = "meaningful-speedup" if float(primary_delta) > 0 else "regression"
+        interpretation = (
+            f"Recommended profile beat baseline by {primary_delta:+.3f}% on the primary speed metric, "
+            f"outside the +/-{noise_band_percent:.1f}% noise band."
+        )
+    return {
+        "status": status,
+        "baseline_label": baseline.get("label"),
+        "recommended_label": best.get("label"),
+        "noise_band_percent": noise_band_percent,
+        "primary_speed_delta_percent": round(float(primary_delta), 6) if isinstance(primary_delta, (int, float)) else None,
+        "samples_per_second_delta_percent": samples_delta,
+        "normalized_samples_per_second_delta_percent": normalized_delta,
+        "duration_delta_percent": duration_delta,
+        "step_time_p95_delta_percent": step_p95_delta,
+        "gpu_tflops_delta_percent": gpu_tflops_delta,
+        "within_noise_band": within_noise,
+        "baseline_metrics": {
+            "samples_per_second": baseline_metrics.get("samples_per_second"),
+            "duration_seconds": baseline_metrics.get("duration_seconds"),
+            "step_time_p95_seconds": baseline_metrics.get("step_time_p95_seconds"),
+            "gpu_tflops_estimate": baseline_metrics.get("gpu_tflops_estimate"),
+        },
+        "recommended_metrics": {
+            "samples_per_second": best_metrics.get("samples_per_second"),
+            "duration_seconds": best_metrics.get("duration_seconds"),
+            "step_time_p95_seconds": best_metrics.get("step_time_p95_seconds"),
+            "gpu_tflops_estimate": best_metrics.get("gpu_tflops_estimate"),
+        },
+        "recommendation_reason": best.get("reason", []),
+        "interpretation": interpretation,
+    }
+
+
+def _baseline_result(results: list[dict[str, Any]], *, optimization_mode: str) -> dict[str, Any] | None:
+    preferred = "performance:baseline" if optimization_mode == "performance" else "unbounded:baseline"
+    for item in results:
+        if item.get("label") == preferred:
+            return item
+    for item in results:
+        if str(item.get("label", "")).endswith(":baseline"):
+            return item
+    return None
 
 
 def _fingerprint(
@@ -1166,6 +1267,14 @@ def _ratio_to_percent(ratio: Any) -> float | None:
     if ratio_number is None:
         return None
     return round((ratio_number - 1.0) * 100.0, 3)
+
+
+def _delta_percent(value: Any, baseline: Any) -> float | None:
+    value_number = _number(value)
+    baseline_number = _number(baseline)
+    if value_number is None or baseline_number is None or baseline_number == 0:
+        return None
+    return round(((value_number - baseline_number) / abs(baseline_number)) * 100.0, 3)
 
 
 def _goal_text(optimization_mode: str, optimization_target: str) -> str:
