@@ -66,6 +66,14 @@ bash scripts/bootstrap_server_env.sh --update --pytorch-index-url https://downlo
 
 The bootstrap script does not require `conda activate`; it uses `conda run`, installs the editable package, checks `torch`, `google.protobuf`, CUDA visibility, `nvidia-smi`, executor capabilities, and the fast test suite.
 
+If the server environment already exists but a command fails, run read-only diagnostics first:
+
+```bash
+bash scripts/diagnose_server_env.sh --env-name autotuneai-benchmark
+```
+
+This isolates common server failures: missing conda env, missing editable install, `ModuleNotFoundError: torch`, `ModuleNotFoundError: google`, CUDA not visible to PyTorch, missing `nvidia-smi`, or systemd/sudo executor issues.
+
 Built-in repo demo workflows:
 
 ```bash
