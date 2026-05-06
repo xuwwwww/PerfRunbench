@@ -65,7 +65,7 @@ def build_docker_run_command(
     if budget.enforce and budget.enabled:
         notes.append("Docker executor enforces limits inside the container; host process sampling observes the docker client.")
     else:
-        notes.append("Docker executor launches without AutoTuneAI resource guard limits.")
+        notes.append("Docker executor launches without PerfRunbench resource guard limits.")
     return DockerCommand(command=wrapped, notes=notes)
 
 

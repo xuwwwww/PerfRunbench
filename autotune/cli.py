@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="autotuneai", description="AutoTuneAI resource and tuning toolkit.")
+    parser = argparse.ArgumentParser(prog="autotuneai", description="PerfRunbench resource and tuning toolkit.")
     subparsers = parser.add_subparsers(dest="command")
 
     inspect_parser = subparsers.add_parser("inspect", help="Inspect hardware, runtime, limits, and recommendations.")
@@ -286,7 +286,7 @@ def build_parser() -> argparse.ArgumentParser:
     tune_training.add_argument("workload", nargs=argparse.REMAINDER)
     tune_training.set_defaults(handler=_cmd_tune_training)
 
-    list_parser = subparsers.add_parser("list-runs", help="List AutoTuneAI runs.")
+    list_parser = subparsers.add_parser("list-runs", help="List PerfRunbench runs.")
     list_parser.set_defaults(handler=_cmd_list_runs)
 
     restore = subparsers.add_parser("restore", help="Restore files and runtime system settings changed by a run.")
@@ -851,7 +851,7 @@ def _cmd_tune_training(args: argparse.Namespace) -> int:
 def _cmd_list_runs(args: argparse.Namespace) -> int:
     runs = list_runs()
     if not runs:
-        print("No AutoTuneAI runs found.")
+        print("No PerfRunbench runs found.")
         return 0
     for run in runs:
         print(
@@ -907,7 +907,7 @@ def _resolve_restore_run_id(args: argparse.Namespace) -> str:
     if args.latest:
         runs = list_runs()
         if not runs:
-            raise SystemExit("No AutoTuneAI runs found.")
+            raise SystemExit("No PerfRunbench runs found.")
         return str(runs[0]["run_id"])
     if not args.run_id:
         raise SystemExit("Usage: autotuneai restore --run-id <run_id> [--sudo], autotuneai restore --latest [--sudo], or autotuneai restore --active [--sudo]")

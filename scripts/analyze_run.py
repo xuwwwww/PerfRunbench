@@ -11,7 +11,7 @@ from autotune.resource.run_analysis import analyze_run, format_analysis
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Analyze an AutoTuneAI run's resource guard behavior.")
+    parser = argparse.ArgumentParser(description="Analyze a PerfRunbench run's resource guard behavior.")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
     args = parser.parse_args()

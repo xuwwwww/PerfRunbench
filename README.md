@@ -1,4 +1,4 @@
-# AutoTuneAI-Serve
+# PerfRunbench
 
 Cost-model-guided inference optimization and scheduling framework for resource-constrained AI systems.
 
@@ -196,7 +196,7 @@ windows-training-safe
   General Windows training profile using a temporary high performance power scheme.
 
 windows-memory-conservative
-  Windows memory-budget profile; memory guard stays in AutoTuneAI, while CPU frequency scaling noise is reduced.
+  Windows memory-budget profile; memory guard stays in PerfRunbench, while CPU frequency scaling noise is reduced.
 
 windows-throughput
   Throughput-oriented Windows profile using a temporary high performance power scheme.
@@ -251,7 +251,7 @@ python -m pip install -r requirements-benchmark.txt
 python scripts/run_benchmark.py --config configs/resnet18.yaml --mode real --backends pytorch --max-configs 1
 ```
 
-AutoTuneAI can wrap a training command from another environment:
+PerfRunbench can wrap a training command from another environment:
 
 ```bash
 autotuneai run \
@@ -293,9 +293,9 @@ autotuneai run \
   -- /path/to/user/env/bin/python train.py
 ```
 
-Use `sudo -v` plus `--sudo`; do not run AutoTuneAI from a `sudo su` root shell. The root shell may not have the user's conda initialization and can point at the wrong conda path. AutoTuneAI should stay in the user environment while systemd/cgroup limits are requested through sudo.
+Use `sudo -v` plus `--sudo`; do not run PerfRunbench from a `sudo su` root shell. The root shell may not have the user's conda initialization and can point at the wrong conda path. PerfRunbench should stay in the user environment while systemd/cgroup limits are requested through sudo.
 
-Systemd runs use a named scope such as `autotuneai-<run_id>.scope`. When available, AutoTuneAI samples the scope cgroup files (`memory.current`, `memory.peak`, `cpu.stat`) and writes cgroup-level memory/CPU fields to `resource_timeline.json` and `resource_summary.json`.
+Systemd runs use a named scope such as `autotuneai-<run_id>.scope`. When available, PerfRunbench samples the scope cgroup files (`memory.current`, `memory.peak`, `cpu.stat`) and writes cgroup-level memory/CPU fields to `resource_timeline.json` and `resource_summary.json`.
 
 User guide:
 
@@ -363,7 +363,7 @@ autotuneai run \
 `examples/heavy_training_pressure.py` is a synthetic 60-second CPU and memory pressure workload. It is useful for validating the wrapper, cgroup guard, monitoring, restore behavior, and rough Linux runtime effects. It is not a substitute for a real PyTorch/CUDA benchmark because it does not exercise DataLoader, CUDA kernels, cuDNN/cuBLAS, or GPU memory allocation.
 For GPU pressure, use `examples/gpu_training_pressure.py`. It refuses to run when CUDA is unavailable, allocates GPU memory, runs CUDA matrix multiplications, and emits GPU metrics such as estimated TFLOPS, peak allocated GPU memory, and sampled step latency percentiles (`step_time_p50_seconds`, `step_time_p95_seconds`, `step_time_p99_seconds`). Use `examples/gpu_training_pressure_sweep_config.yaml` for fast recommendation sweeps and `examples/gpu_training_pressure_config.yaml` for longer confirmation runs.
 
-If a run is interrupted after runtime tuning was applied, AutoTuneAI records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
+If a run is interrupted after runtime tuning was applied, PerfRunbench records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
 
 Visual reports are available for both single runs and tuning comparisons:
 
@@ -391,7 +391,7 @@ GPU profiles are reversible runtime controls:
 - `nvidia-balanced` caps power around 80% of the min/max range and chooses mid-high supported application clocks for lower heat with less throughput loss.
 - `nvidia-guard` is the resource-guard profile: it attempts the minimum reported power limit and lowest supported application clocks. This is the GPU-side counterpart to CPU/memory guard limits.
 
-Linux `linux-performance` also attempts reversible cpufreq tuning when the kernel exposes it: `scaling_governor=performance`, energy performance preference, and an aggressive minimum frequency during the run. AutoTuneAI does not perform voltage increases or BIOS/firmware overclocking as a generic runtime action; it only uses OS/driver controls that can be snapshotted and restored.
+Linux `linux-performance` also attempts reversible cpufreq tuning when the kernel exposes it: `scaling_governor=performance`, energy performance preference, and an aggressive minimum frequency during the run. PerfRunbench does not perform voltage increases or BIOS/firmware overclocking as a generic runtime action; it only uses OS/driver controls that can be snapshotted and restored.
 
 For a single training run, GPU tuning can be applied and restored as part of the run lifecycle:
 
@@ -456,7 +456,7 @@ autotuneai launch-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without AutoTuneAI's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`; sampled `step_time_p95_seconds` is used as a stability tie-breaker when throughput is close. Recommendation JSON and HTML include a `decision` section that compares the recommended profile against baseline, applies a default +/-2% noise band, and explains whether the result is a meaningful speedup, baseline-best result, or too close to trust without a longer repeat. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want the early candidate set to focus on one bottleneck. Targeted sweeps use target-specific defaults, for example `results/reports/performance_recommendation_gpu.json` and `.autotuneai/recommendations/latest_performance_gpu.json`; `--target auto` keeps the legacy `performance_recommendation.json` and `latest.json` paths.
+`optimize-performance` is for raw speed. It does not apply memory budgets, CPU quotas, or reserved-core guard limits. The default `--monitor-mode minimal` launches candidates without PerfRunbench's per-sample resource monitor, so ranking is driven by workload metrics such as `samples_per_second` or `gpu_tflops_estimate`; sampled `step_time_p95_seconds` is used as a stability tie-breaker when throughput is close. Recommendation JSON and HTML include a `decision` section that compares the recommended profile against baseline, applies a default +/-2% noise band, and explains whether the result is a meaningful speedup, baseline-best result, or too close to trust without a longer repeat. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want the early candidate set to focus on one bottleneck. Targeted sweeps use target-specific defaults, for example `results/reports/performance_recommendation_gpu.json` and `.autotuneai/recommendations/latest_performance_gpu.json`; `--target auto` keeps the legacy `performance_recommendation.json` and `latest.json` paths.
 
 The sweep command above is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If a short sweep finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 

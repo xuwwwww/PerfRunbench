@@ -35,7 +35,7 @@ def format_comparison_report(data: dict[str, Any], source: Path | None = None) -
     if aggregate:
         deltas = aggregate.get("deltas", deltas)
     lines = [
-        f"# AutoTuneAI {title}",
+        f"# PerfRunbench {title}",
         "",
         f"- Source: `{source}`" if source else "- Source: in-memory comparison",
         f"- Profile: `{data.get('tuned_profile')}`",
@@ -146,7 +146,7 @@ def format_comparison_report_html(data: dict[str, Any], source: Path | None = No
             "<head>",
             "<meta charset=\"utf-8\">",
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-            f"<title>AutoTuneAI {title}</title>",
+            f"<title>PerfRunbench {title}</title>",
             "<style>",
             _comparison_report_css(),
             "</style>",
@@ -154,7 +154,7 @@ def format_comparison_report_html(data: dict[str, Any], source: Path | None = No
             "<body>",
             "<main class=\"page\">",
             "<section class=\"hero\">",
-            "<p class=\"eyebrow\">AutoTuneAI</p>",
+            "<p class=\"eyebrow\">PerfRunbench</p>",
             f"<h1>{_html_escape(title)}</h1>",
             "<p class=\"lede\">Performance-first comparison with inline charts and repeat-aware aggregates.</p>",
             "</section>",
@@ -223,7 +223,7 @@ def format_comparison_report_html(data: dict[str, Any], source: Path | None = No
 def _format_profile_summary_report(data: dict[str, Any], source: Path | None = None) -> str:
     comparisons = data.get("comparisons", [])
     lines = [
-        "# AutoTuneAI Profile Comparison Summary",
+        "# PerfRunbench Profile Comparison Summary",
         "",
         f"- Source: `{source}`" if source else "- Source: in-memory comparison",
         f"- Repeat: {data.get('repeat', 1)}",
@@ -290,7 +290,7 @@ def _format_profile_summary_report_html(data: dict[str, Any], source: Path | Non
             "<head>",
             "<meta charset=\"utf-8\">",
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-            "<title>AutoTuneAI Profile Comparison Summary</title>",
+            "<title>PerfRunbench Profile Comparison Summary</title>",
             "<style>",
             _comparison_report_css(),
             "table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left}th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}",
@@ -299,7 +299,7 @@ def _format_profile_summary_report_html(data: dict[str, Any], source: Path | Non
             "<body>",
             "<main class=\"page\">",
             "<section class=\"hero\">",
-            "<p class=\"eyebrow\">AutoTuneAI</p>",
+            "<p class=\"eyebrow\">PerfRunbench</p>",
             "<h1>Profile Comparison Summary</h1>",
             "<p class=\"lede\">Ranked profile sweep with throughput-first comparison outputs.</p>",
             "</section>",
@@ -339,7 +339,7 @@ def _format_auto_recommendation_report(data: dict[str, Any], source: Path | None
     best_metrics = best.get("metrics", {}) if isinstance(best.get("metrics"), dict) else {}
     baseline_metrics = baseline.get("metrics", {}) if isinstance(baseline, dict) else {}
     lines = [
-        "# AutoTuneAI Auto Recommendation",
+        "# PerfRunbench Auto Recommendation",
         "",
         f"- Source: `{source}`" if source else "- Source: in-memory recommendation",
         f"- Best label: `{data.get('best_label')}`",
@@ -472,7 +472,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             "<head>",
             "<meta charset=\"utf-8\">",
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-            "<title>AutoTuneAI Auto Recommendation</title>",
+            "<title>PerfRunbench Auto Recommendation</title>",
             "<style>",
             _comparison_report_css(),
             "table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.wide{overflow-x:auto}",
@@ -481,7 +481,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             "<body>",
             "<main class=\"page\">",
             "<section class=\"hero\">",
-            "<p class=\"eyebrow\">AutoTuneAI</p>",
+            "<p class=\"eyebrow\">PerfRunbench</p>",
             "<h1>Auto Recommendation</h1>",
             "<p class=\"lede\">Current baseline, recommended configuration, and candidate ranking from the empirical sweep.</p>",
             "</section>",

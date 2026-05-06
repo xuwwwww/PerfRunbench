@@ -42,7 +42,7 @@ class RunReportTest(unittest.TestCase):
 
             self.assertEqual(report_path, run_dir / "report.md")
             report = report_path.read_text(encoding="utf-8")
-            self.assertIn("AutoTuneAI Run Report: run1", report)
+            self.assertIn("PerfRunbench Run Report: run1", report)
             self.assertIn("## Before / After", report)
             self.assertIn("## Visual Summary", report)
             self.assertIn("<svg", report)
@@ -105,7 +105,7 @@ class RunReportTest(unittest.TestCase):
             report_path = generate_comparison_report(path)
 
             report = report_path.read_text(encoding="utf-8")
-            self.assertIn("AutoTuneAI Tuning Comparison", report)
+            self.assertIn("PerfRunbench Tuning Comparison", report)
             self.assertIn("Performance Deltas", report)
             self.assertIn("GPU Tuning Effectiveness", report)
             self.assertIn("<svg", report)

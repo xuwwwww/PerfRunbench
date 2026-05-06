@@ -287,7 +287,7 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
         RuntimeSetting(
             key="power.active_scheme",
             value="SCHEME_MIN",
-            reason="Windows does not expose Linux-style memory sysctls; keep CPU frequency stable while memory budget enforcement stays in AutoTuneAI.",
+            reason="Windows does not expose Linux-style memory sysctls; keep CPU frequency stable while memory budget enforcement stays in PerfRunbench.",
             source="powercfg",
             path="powercfg://active-scheme",
         ),
@@ -305,7 +305,7 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
         RuntimeSetting(
             key="power.active_scheme",
             value="SCHEME_MIN",
-            reason="Use the Windows high performance power scheme for the most aggressive throughput-first mode AutoTuneAI can restore safely.",
+            reason="Use the Windows high performance power scheme for the most aggressive throughput-first mode PerfRunbench can restore safely.",
             source="powercfg",
             path="powercfg://active-scheme",
         ),

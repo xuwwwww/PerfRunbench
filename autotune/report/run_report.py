@@ -25,7 +25,7 @@ def generate_run_report(run_id: str, output: str | Path | None = None, runs_dir:
 def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
     gpu_tuning = analysis.get("gpu_tuning", {})
     lines = [
-        f"# AutoTuneAI Run Report: {analysis['run_id']}",
+        f"# PerfRunbench Run Report: {analysis['run_id']}",
         "",
         "## Summary",
         "",
@@ -203,7 +203,7 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
             "<head>",
             "<meta charset=\"utf-8\">",
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-            f"<title>AutoTuneAI Run Report {analysis['run_id']}</title>",
+            f"<title>PerfRunbench Run Report {analysis['run_id']}</title>",
             "<style>",
             _run_report_css(),
             "</style>",
@@ -211,7 +211,7 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
             "<body>",
             "<main class=\"page\">",
             "<section class=\"hero\">",
-            "<p class=\"eyebrow\">AutoTuneAI</p>",
+            "<p class=\"eyebrow\">PerfRunbench</p>",
             f"<h1>Run Report: {_html_escape(analysis['run_id'])}</h1>",
             "</section>",
             _html_table_card("Summary", summary_rows),

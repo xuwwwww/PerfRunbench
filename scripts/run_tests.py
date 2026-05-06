@@ -24,7 +24,7 @@ SLOW_MODULES = {
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run AutoTuneAI tests.")
+    parser = argparse.ArgumentParser(description="Run PerfRunbench tests.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--fast", action="store_true", help="Skip subprocess-heavy integration tests.")
     mode.add_argument("--all", action="store_true", help="Run the full unittest suite.")

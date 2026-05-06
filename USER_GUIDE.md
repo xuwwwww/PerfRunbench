@@ -1,10 +1,10 @@
-# AutoTuneAI 使用說明
+# PerfRunbench 使用說明
 
-AutoTuneAI 目前是一個「包住訓練或 benchmark 入口」的資源監控、限制、分析與 runtime tuning 工具。它的設計目標不是取代你的訓練環境，而是讓 AutoTuneAI 跑在自己的環境中，再去啟動另一個 Python、conda、venv、shell script 或 Docker container 內的 training command。
+PerfRunbench 目前是一個「包住訓練或 benchmark 入口」的資源監控、限制、分析與 runtime tuning 工具。它的設計目標不是取代你的訓練環境，而是讓 PerfRunbench 跑在自己的環境中，再去啟動另一個 Python、conda、venv、shell script 或 Docker container 內的 training command。
 
 ## 1. 安裝與基本檢查
 
-建議先在 WSL/Linux 裡建立 AutoTuneAI 自己的環境：
+建議先在 WSL/Linux 裡建立 PerfRunbench 自己的環境：
 
 ```bash
 conda env create -f environment.yml
@@ -102,9 +102,9 @@ python -m unittest discover -s tests
 
 完整測試指令會從 `tests/` 目錄自動尋找 `test_*.py`，然後執行全部 unittest。成功時最後會看到 `OK`。
 
-## 2. 不要用 sudo su 進 root shell 跑 AutoTuneAI
+## 2. 不要用 sudo su 進 root shell 跑 PerfRunbench
 
-正確做法是讓 AutoTuneAI 留在使用者的 conda 環境，需要 root 權限時只透過 `--sudo` 或 `sudo -v` 讓特定 systemd/sysctl 動作用 root 執行。
+正確做法是讓 PerfRunbench 留在使用者的 conda 環境，需要 root 權限時只透過 `--sudo` 或 `sudo -v` 讓特定 systemd/sysctl 動作用 root 執行。
 
 ```bash
 sudo -v
@@ -118,7 +118,7 @@ sudo su
 conda activate autotuneai
 ```
 
-原因是 root shell 通常沒有使用者的 conda 初始化，會發生 `conda: command not found` 或指到錯的 Python。AutoTuneAI 只需要 systemd/cgroup/sysctl 這些動作有權限，訓練程式本身不應該因此變成 root 身份執行。
+原因是 root shell 通常沒有使用者的 conda 初始化，會發生 `conda: command not found` 或指到錯的 Python。PerfRunbench 只需要 systemd/cgroup/sysctl 這些動作有權限，訓練程式本身不應該因此變成 root 身份執行。
 
 ## 3. 單一 CLI 入口
 
@@ -183,11 +183,11 @@ macos
 autotuneai run --executor auto --allow-sudo-auto --memory-budget-gb 22 -- python train.py
 ```
 
-如果 systemd 需要 sudo 而你沒有加 `--allow-sudo-auto`，AutoTuneAI 會停止並提示你明確 opt in。
+如果 systemd 需要 sudo 而你沒有加 `--allow-sudo-auto`，PerfRunbench 會停止並提示你明確 opt in。
 
 ## 5. 包住另一個訓練環境
 
-AutoTuneAI 不要求使用者把訓練相依套件裝到 AutoTuneAI 的環境。你可以從 AutoTuneAI 環境啟動另一個環境的 Python。
+PerfRunbench 不要求使用者把訓練相依套件裝到 PerfRunbench 的環境。你可以從 PerfRunbench 環境啟動另一個環境的 Python。
 
 直接指定另一個 venv/conda 的 Python：
 
@@ -218,11 +218,11 @@ autotuneai run \
   -- /path/to/conda run -n user-train-env python train.py
 ```
 
-這就是「雙環境」模型：AutoTuneAI 的環境只負責監控、限制、記錄和調度；使用者原本的 training environment 負責真正訓練。
+這就是「雙環境」模型：PerfRunbench 的環境只負責監控、限制、記錄和調度；使用者原本的 training environment 負責真正訓練。
 
 ## 6. Docker 雙環境用法
 
-如果你要讓別人 clone 後更容易跑，Docker 是最乾淨的方式之一。AutoTuneAI 只需要本機有 Docker CLI/daemon，訓練相依套件放在 image 裡。
+如果你要讓別人 clone 後更容易跑，Docker 是最乾淨的方式之一。PerfRunbench 只需要本機有 Docker CLI/daemon，訓練相依套件放在 image 裡。
 
 ```bash
 autotuneai run \
@@ -312,7 +312,7 @@ autotuneai run --reserve-cores 1 -- python train.py
 autotuneai run --cpu-quota-percent 90 -- python train.py
 ```
 
-兩者一起用時，AutoTuneAI 會取更嚴格的 allowed thread 數。8 logical cores 下：
+兩者一起用時，PerfRunbench 會取更嚴格的 allowed thread 數。8 logical cores 下：
 
 ```text
 --reserve-cores 1     => allowed_threads = 7
@@ -450,7 +450,7 @@ autotuneai restore --run-id <run_id>
 autotuneai restore --active
 ```
 
-也可以改用自動模式，讓 AutoTuneAI 依目前平台選建議的 runtime system tuning profile：
+也可以改用自動模式，讓 PerfRunbench 依目前平台選建議的 runtime system tuning profile：
 
 ```bash
 sudo -v
@@ -502,7 +502,7 @@ windows-training-safe
   Windows 一般訓練 profile，暫時切到 High performance power scheme，結束後還原。
 
 windows-memory-conservative
-  Windows 沒有 Linux sysctl 類型的安全記憶體 runtime knob；目前搭配 AutoTuneAI memory budget 監控與 High performance power scheme。
+  Windows 沒有 Linux sysctl 類型的安全記憶體 runtime knob；目前搭配 PerfRunbench memory budget 監控與 High performance power scheme。
 
 windows-throughput
   Windows throughput profile，降低 CPU downclocking 對訓練吞吐的干擾。
@@ -636,7 +636,7 @@ deltas.min_available_memory_mb
 
 判讀時要分清楚：
 
-- `lifecycle_duration_*` 是整段 AutoTuneAI run 時間，包含 system tuning apply/restore。
+- `lifecycle_duration_*` 是整段 PerfRunbench run 時間，包含 system tuning apply/restore。
 - `system_tuning_overhead_seconds` 是 system tuning apply + restore 的成本。
 - `adjusted_lifecycle_duration_*` 是 `lifecycle_duration_*` 扣掉 system tuning apply/restore 後的時間，適合沒有 workload metrics 的通用 command。
 - `workload_duration_*` 是 workload 自己寫出的訓練時間，若有提供會優先作為 benchmark duration。
@@ -713,9 +713,9 @@ autotuneai run \
 
 限制：
 
-- `nvidia-smi` 某些欄位在 laptop GPU 或 WSL 可能是 `[N/A]`，AutoTuneAI 會略過無法套用的 setting。
+- `nvidia-smi` 某些欄位在 laptop GPU 或 WSL 可能是 `[N/A]`，PerfRunbench 會略過無法套用的 setting。
 - power limit / persistence mode 可能需要 root/admin 權限，也可能被 OEM/driver 鎖住。
-- AutoTuneAI 不把加電壓、BIOS/firmware overclock 當成通用自動動作；目前只套用可 snapshot/restore 的 OS 或 driver runtime controls。
+- PerfRunbench 不把加電壓、BIOS/firmware overclock 當成通用自動動作；目前只套用可 snapshot/restore 的 OS 或 driver runtime controls。
 - Linux `linux-performance` 在 kernel 暴露 cpufreq 時，會嘗試 reversible governor/EPP/min-frequency tuning；如果 VM、WSL、雲端或 OEM 鎖住這些檔案，會記錄為 unsupported/unchanged。
 
 `autotuneai report --run-id <run_id>` 的 `Before / After` 區塊會集中顯示 memory start/end/min、peak memory、system tuning snapshots，以及 source/config change 數量。
@@ -727,7 +727,7 @@ autotuneai list-runs
 autotuneai restore --run-id <run_id> --sudo
 ```
 
-BIOS/UEFI、SMT、Turbo Boost、fan curve、XMP/EXPO 這些不是 runtime tool 能安全跨機器修改的範圍。目前 AutoTuneAI 聚焦 runtime-level tuning，原因是可記錄、可回復、可跨機器。
+BIOS/UEFI、SMT、Turbo Boost、fan curve、XMP/EXPO 這些不是 runtime tool 能安全跨機器修改的範圍。目前 PerfRunbench 聚焦 runtime-level tuning，原因是可記錄、可回復、可跨機器。
 
 ## 11. Reversible source/config tuning
 
@@ -776,7 +776,7 @@ python scripts/run_tuned_with_budget.py \
 
 ## 12. Training config tuner
 
-AutoTuneAI 可以調任意「單一 numeric key」，不是只能調 batch size。
+PerfRunbench 可以調任意「單一 numeric key」，不是只能調 batch size。
 
 範例 YAML：
 
@@ -929,7 +929,7 @@ System Tuning Diff
 
 ```text
 使用者 clone repo
-建立 AutoTuneAI 環境
+建立 PerfRunbench 環境
 autotuneai inspect / executors 看本機能力
 autotuneai run 包住自己的 training command
 autotuneai tune-batch / tune-system / calibrate-memory 做調教
@@ -972,7 +972,7 @@ PyTorch Profiler
   擅長 profiling，不負責 system tuning、cgroup hard limit 或 source restore。
 ```
 
-AutoTuneAI 的定位是把「單機訓練入口包住」，同時做資源限制、runtime tuning、config tuning、分析報告與恢復。
+PerfRunbench 的定位是把「單機訓練入口包住」，同時做資源限制、runtime tuning、config tuning、分析報告與恢復。
 
 ## 16. 目前限制
 
@@ -1003,7 +1003,7 @@ autotuneai compare-tuning --workload-profile performance -- python train.py
 
 ## Aggressive formal benchmark tuning
 
-`examples/heavy_training_pressure.py` is a synthetic workload. It runs CPU math in multiple processes, allocates/touches a large memory block, and emits throughput-like metrics. It is good for validating AutoTuneAI's wrapper, cgroup limits, monitoring, restore flow, and HTML reports. It is not a real model benchmark and will not prove GPU, DataLoader, CUDA allocator, cuDNN, or cuBLAS gains.
+`examples/heavy_training_pressure.py` is a synthetic workload. It runs CPU math in multiple processes, allocates/touches a large memory block, and emits throughput-like metrics. It is good for validating PerfRunbench's wrapper, cgroup limits, monitoring, restore flow, and HTML reports. It is not a real model benchmark and will not prove GPU, DataLoader, CUDA allocator, cuDNN, or cuBLAS gains.
 
 For a local GPU-burning benchmark, use:
 
@@ -1066,11 +1066,11 @@ autotuneai optimize-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_sweep_config.yaml
 ```
 
-It only runs unbounded candidates, does not apply memory/CPU/GPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode AutoTuneAI does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`, with sampled `step_time_p95_seconds` used as a stability tie-breaker when throughput is close. Recommendation JSON and HTML include a `decision` section that compares the recommendation against baseline, applies a default +/-2% noise band, and explains whether the result is a meaningful speedup, baseline-best result, or too close to trust without a longer repeat. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want early candidates to focus on one bottleneck. Targeted sweeps use target-specific defaults, for example `results/reports/performance_recommendation_gpu.json` and `.autotuneai/recommendations/latest_performance_gpu.json`; `--target auto` keeps the legacy `performance_recommendation.json` and `latest.json` paths.
+It only runs unbounded candidates, does not apply memory/CPU/GPU guard limits, and defaults to `--monitor-mode minimal`. In minimal mode PerfRunbench does not collect the per-sample CPU/memory timeline for performance candidates; ranking should come from workload metrics such as `samples_per_second` and `gpu_tflops_estimate`, with sampled `step_time_p95_seconds` used as a stability tie-breaker when throughput is close. Recommendation JSON and HTML include a `decision` section that compares the recommendation against baseline, applies a default +/-2% noise band, and explains whether the result is a meaningful speedup, baseline-best result, or too close to trust without a longer repeat. Performance sweeps use paired baseline controls by default, so candidates are ranked by speed relative to a nearby baseline run instead of raw cold-start throughput. Use `--target gpu`, `--target cpu`, or `--target memory` when `--max-candidates` is small and you want early candidates to focus on one bottleneck. Targeted sweeps use target-specific defaults, for example `results/reports/performance_recommendation_gpu.json` and `.autotuneai/recommendations/latest_performance_gpu.json`; `--target auto` keeps the legacy `performance_recommendation.json` and `latest.json` paths.
 
 The sweep command is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If it finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
-Use `optimize` when you want AutoTuneAI to empirically find a guarded configuration instead of guessing:
+Use `optimize` when you want PerfRunbench to empirically find a guarded configuration instead of guessing:
 
 ```bash
 sudo -v
@@ -1106,4 +1106,4 @@ autotuneai launch-performance \
   -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_config.yaml
 ```
 
-`launch-performance` applies the cached system/GPU/runtime profiles, starts the real workload, waits for completion, and restores the previous machine settings in `finally`. It is the path to use after a performance sweep because the formal training run is not slowed down by AutoTuneAI resource monitoring. Use `autotuneai run --apply-recommendation` only when the cached recommendation is from guarded `optimize` and you intentionally want the resource guard runner.
+`launch-performance` applies the cached system/GPU/runtime profiles, starts the real workload, waits for completion, and restores the previous machine settings in `finally`. It is the path to use after a performance sweep because the formal training run is not slowed down by PerfRunbench resource monitoring. Use `autotuneai run --apply-recommendation` only when the cached recommendation is from guarded `optimize` and you intentionally want the resource guard runner.

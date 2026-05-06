@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "autotuneai-serve"
+name = "perfrunbench"
 version = "0.1.0"
-description = "Cost-model-guided inference optimization and scheduling for resource-constrained AI systems."
+description = "PerfRunbench: resource-aware workload benchmarking, tuning, and performance comparison toolkit."
 requires-python = ">=3.10"
 dependencies = [
   "psutil",

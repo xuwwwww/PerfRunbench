@@ -9,7 +9,7 @@ usage() {
   cat <<'EOF'
 Usage: bash scripts/diagnose_server_env.sh [options]
 
-Run read-only diagnostics for a Linux/WSL/server AutoTuneAI benchmark environment.
+Run read-only diagnostics for a Linux/WSL/server PerfRunbench benchmark environment.
 This script does not create, update, or delete conda environments.
 
 Options:
@@ -82,7 +82,7 @@ run_step() {
 
 failures=0
 
-echo "AutoTuneAI server environment diagnostics"
+echo "PerfRunbench server environment diagnostics"
 echo "cwd: $(pwd)"
 echo "uname: $(uname -a 2>/dev/null || true)"
 

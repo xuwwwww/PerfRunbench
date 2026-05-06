@@ -14,7 +14,7 @@ usage() {
   cat <<'EOF'
 Usage: bash scripts/bootstrap_server_env.sh [options]
 
-Create or repair the AutoTuneAI benchmark environment on a Linux/WSL/server host.
+Create or repair the PerfRunbench benchmark environment on a Linux/WSL/server host.
 The script does not require `conda activate`; it uses `conda run`.
 
 Options:

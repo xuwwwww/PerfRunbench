@@ -7,7 +7,7 @@ import time
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate CPU and memory load for AutoTuneAI resource guard tests.")
+    parser = argparse.ArgumentParser(description="Generate CPU and memory load for PerfRunbench resource guard tests.")
     parser.add_argument("--workers", type=int, default=max(1, os.cpu_count() or 1))
     parser.add_argument("--duration-seconds", type=float, default=10.0)
     parser.add_argument("--memory-mb", type=int, default=0, help="Total memory to allocate and touch in the parent process.")

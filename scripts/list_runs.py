@@ -11,7 +11,7 @@ from autotune.resource.run_state import list_runs
 def main() -> None:
     runs = list_runs()
     if not runs:
-        print("No AutoTuneAI runs found.")
+        print("No PerfRunbench runs found.")
         return
     for run in runs:
         print(
@@ -22,4 +22,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

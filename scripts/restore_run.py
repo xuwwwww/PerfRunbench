@@ -12,7 +12,7 @@ from autotune.system_tuner.runtime import restore_system_tuning
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Restore files and runtime system settings changed by an AutoTuneAI run.")
+    parser = argparse.ArgumentParser(description="Restore files and runtime system settings changed by a PerfRunbench run.")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--sudo", action="store_true", help="Use sudo when restoring runtime system settings.")
     args = parser.parse_args()
