@@ -6,3 +6,4 @@ protobuf
 onnx
 onnxscript
 onnxruntime
+timm

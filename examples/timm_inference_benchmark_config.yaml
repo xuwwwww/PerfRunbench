@@ -1,0 +1,12 @@
+duration_seconds: 300
+warmup_seconds: 10
+latency_sample_limit: 512
+require_cuda: true
+model_name: resnet50
+batch_size: 256
+image_size: 224
+channels: 3
+amp_dtype: float16
+allow_tf32: true
+channels_last: true
+extra_gpu_memory_target_mb: 2048

@@ -14,3 +14,4 @@ dependencies:
       - onnx
       - onnxscript
       - onnxruntime
+      - timm

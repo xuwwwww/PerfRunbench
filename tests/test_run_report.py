@@ -89,6 +89,34 @@ class RunReportTest(unittest.TestCase):
             self.assertIn("1/2", report)
             self.assertIn("power.limit", report)
 
+    def test_generate_run_report_explains_minimal_mode_metrics(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            runs_dir = Path(temp_dir)
+            run_dir = runs_dir / "run1"
+            run_dir.mkdir()
+            write_json(
+                run_dir / "manifest.json",
+                {
+                    "run_id": "run1",
+                    "status": "completed",
+                    "return_code": 0,
+                    "command": ["python", "train.py"],
+                    "budget": {},
+                    "notes": ["selected_executor=systemd"],
+                },
+            )
+            write_json(
+                run_dir / "resource_summary.json",
+                {"samples": 0, "monitoring_mode": "none", "memory_budget_exceeded": False},
+            )
+            write_json(run_dir / "training_metrics.json", {"samples_per_second": 100.0})
+
+            report_path = generate_run_report("run1", run_dir / "report.html", runs_dir=runs_dir)
+
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("Monitoring mode", report)
+            self.assertIn("not collected in minimal mode", report)
+
     def test_generate_comparison_report_writes_visual_markdown(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
             path = Path(temp_dir) / "comparison.json"

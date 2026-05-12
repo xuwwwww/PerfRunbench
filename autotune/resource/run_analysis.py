@@ -39,6 +39,7 @@ def analyze_run(run_id: str, runs_dir: Path = RUNS_DIR) -> dict[str, Any]:
         "status": manifest.get("status"),
         "return_code": manifest.get("return_code"),
         "command": manifest.get("command", []),
+        "monitoring_mode": summary.get("monitoring_mode", "full" if timeline else "none"),
         "executor": executor,
         "cpu": cpu,
         "memory": memory,

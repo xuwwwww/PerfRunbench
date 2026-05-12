@@ -24,6 +24,8 @@ def generate_run_report(run_id: str, output: str | Path | None = None, runs_dir:
 
 def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
     gpu_tuning = analysis.get("gpu_tuning", {})
+    monitoring_mode = analysis.get("monitoring_mode")
+    monitoring_note = _monitoring_note(monitoring_mode)
     lines = [
         f"# PerfRunbench Run Report: {analysis['run_id']}",
         "",
@@ -33,13 +35,14 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Return code: {analysis.get('return_code')}",
         f"- Command: `{_shell_join(analysis.get('command', []))}`",
         f"- Run directory: `{run_dir}`",
+        f"- Monitoring mode: {monitoring_mode}",
         "",
         "## Before / After",
         "",
-        f"- Available memory at start MB: {analysis['memory'].get('available_memory_start_mb')}",
-        f"- Available memory at end MB: {analysis['memory'].get('available_memory_end_mb')}",
-        f"- Minimum available memory MB: {analysis['memory'].get('observed_min_available_memory_mb')}",
-        f"- Workload peak memory MB: {analysis['memory'].get('peak_memory_mb')}",
+        f"- Available memory at start MB: {_display_metric(analysis['memory'].get('available_memory_start_mb'), monitoring_note)}",
+        f"- Available memory at end MB: {_display_metric(analysis['memory'].get('available_memory_end_mb'), monitoring_note)}",
+        f"- Minimum available memory MB: {_display_metric(analysis['memory'].get('observed_min_available_memory_mb'), monitoring_note)}",
+        f"- Workload peak memory MB: {_display_metric(analysis['memory'].get('peak_memory_mb'), monitoring_note)}",
         f"- Memory budget exceeded: {analysis['memory'].get('memory_budget_exceeded')}",
         f"- Training metrics captured: {bool(analysis.get('workload'))}",
         f"- System tuning snapshots: {_system_tuning_snapshot_status(run_dir)}",
@@ -75,6 +78,7 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Requested: {analysis['executor'].get('requested')}",
         f"- Selected: {analysis['executor'].get('selected')}",
         f"- sudo used: {analysis['executor'].get('sudo_used')}",
+        f"- Monitoring mode: {monitoring_mode}",
         "",
         "## CPU",
         "",
@@ -83,33 +87,33 @@ def format_run_report(analysis: dict[str, Any], run_dir: Path) -> str:
         f"- Allowed threads: {analysis['cpu'].get('allowed_threads')}",
         f"- Affinity applied: {analysis['cpu'].get('affinity_applied')}",
         f"- Affinity cores: {analysis['cpu'].get('affinity_cores')}",
-        f"- Expected max total CPU percent: {analysis['cpu'].get('expected_max_total_cpu_percent')}",
-        f"- Observed average process CPU percent: {analysis['cpu'].get('observed_average_process_cpu_percent')}",
-        f"- Observed peak process CPU percent: {analysis['cpu'].get('observed_peak_process_cpu_percent')}",
-        f"- Observed process CPU p95 percent: {analysis['cpu'].get('observed_process_cpu_percent_p95')}",
-        f"- Observed average system CPU percent: {analysis['cpu'].get('observed_average_system_cpu_percent')}",
-        f"- Observed peak system CPU percent: {analysis['cpu'].get('observed_peak_system_cpu_percent')}",
-        f"- Observed system CPU p95 percent: {analysis['cpu'].get('observed_system_cpu_percent_p95')}",
-        f"- Per-core average max percent: {analysis['cpu'].get('per_cpu_average_max_percent')}",
-        f"- Per-core peak max percent: {analysis['cpu'].get('per_cpu_peak_max_percent')}",
-        f"- Per-core average percent: {analysis['cpu'].get('per_cpu_average_percent')}",
-        f"- Per-core peak percent: {analysis['cpu'].get('per_cpu_peak_percent')}",
+        f"- Expected max total CPU percent: {_display_metric(analysis['cpu'].get('expected_max_total_cpu_percent'))}",
+        f"- Observed average process CPU percent: {_display_metric(analysis['cpu'].get('observed_average_process_cpu_percent'), monitoring_note)}",
+        f"- Observed peak process CPU percent: {_display_metric(analysis['cpu'].get('observed_peak_process_cpu_percent'), monitoring_note)}",
+        f"- Observed process CPU p95 percent: {_display_metric(analysis['cpu'].get('observed_process_cpu_percent_p95'), monitoring_note)}",
+        f"- Observed average system CPU percent: {_display_metric(analysis['cpu'].get('observed_average_system_cpu_percent'), monitoring_note)}",
+        f"- Observed peak system CPU percent: {_display_metric(analysis['cpu'].get('observed_peak_system_cpu_percent'), monitoring_note)}",
+        f"- Observed system CPU p95 percent: {_display_metric(analysis['cpu'].get('observed_system_cpu_percent_p95'), monitoring_note)}",
+        f"- Per-core average max percent: {_display_metric(analysis['cpu'].get('per_cpu_average_max_percent'), monitoring_note)}",
+        f"- Per-core peak max percent: {_display_metric(analysis['cpu'].get('per_cpu_peak_max_percent'), monitoring_note)}",
+        f"- Per-core average percent: {_display_metric(analysis['cpu'].get('per_cpu_average_percent'), monitoring_note)}",
+        f"- Per-core peak percent: {_display_metric(analysis['cpu'].get('per_cpu_peak_percent'), monitoring_note)}",
         "",
         "## Memory",
         "",
         f"- Mode: {analysis['memory'].get('mode')}",
-        f"- Requested memory GB: {analysis['memory'].get('requested_memory_gb')}",
-        f"- Effective budget MB: {analysis['memory'].get('effective_budget_mb')}",
-        f"- Peak memory MB: {analysis['memory'].get('peak_memory_mb')}",
-        f"- Min available memory MB: {analysis['memory'].get('observed_min_available_memory_mb')}",
+        f"- Requested memory GB: {_display_metric(analysis['memory'].get('requested_memory_gb'))}",
+        f"- Effective budget MB: {_display_metric(analysis['memory'].get('effective_budget_mb'))}",
+        f"- Peak memory MB: {_display_metric(analysis['memory'].get('peak_memory_mb'), monitoring_note)}",
+        f"- Min available memory MB: {_display_metric(analysis['memory'].get('observed_min_available_memory_mb'), monitoring_note)}",
         f"- Memory budget exceeded: {analysis['memory'].get('memory_budget_exceeded')}",
         "",
         "## Cgroup",
         "",
         f"- Available: {analysis['cgroup'].get('available')}",
-        f"- Path: {analysis['cgroup'].get('path')}",
-        f"- Peak cgroup memory MB: {analysis['cgroup'].get('peak_memory_mb')}",
-        f"- Peak cgroup CPU percent: {analysis['cgroup'].get('peak_cpu_percent')}",
+        f"- Path: {_display_metric(analysis['cgroup'].get('path'))}",
+        f"- Peak cgroup memory MB: {_display_metric(analysis['cgroup'].get('peak_memory_mb'), monitoring_note)}",
+        f"- Peak cgroup CPU percent: {_display_metric(analysis['cgroup'].get('peak_cpu_percent'), monitoring_note)}",
         "",
         "## GPU Tuning",
         "",
@@ -171,6 +175,8 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
     workload = analysis.get("workload", {})
     gpu_tuning = analysis.get("gpu_tuning", {})
     diagnostics = analysis.get("diagnostics", [])
+    monitoring_mode = analysis.get("monitoring_mode")
+    monitoring_note = _monitoring_note(monitoring_mode)
     workload_items = "".join(
         f"<tr><th>{_html_escape(key)}</th><td>{_html_escape(workload.get(key))}</td></tr>"
         for key in sorted(workload)
@@ -181,12 +187,13 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
         ("Return code", analysis.get("return_code")),
         ("Command", _shell_join(analysis.get("command", []))),
         ("Run directory", str(run_dir)),
+        ("Monitoring mode", monitoring_mode),
     ]
     memory_rows = [
-        ("Available memory at start MB", analysis["memory"].get("available_memory_start_mb")),
-        ("Available memory at end MB", analysis["memory"].get("available_memory_end_mb")),
-        ("Minimum available memory MB", analysis["memory"].get("observed_min_available_memory_mb")),
-        ("Workload peak memory MB", analysis["memory"].get("peak_memory_mb")),
+        ("Available memory at start MB", _display_metric(analysis["memory"].get("available_memory_start_mb"), monitoring_note)),
+        ("Available memory at end MB", _display_metric(analysis["memory"].get("available_memory_end_mb"), monitoring_note)),
+        ("Minimum available memory MB", _display_metric(analysis["memory"].get("observed_min_available_memory_mb"), monitoring_note)),
+        ("Workload peak memory MB", _display_metric(analysis["memory"].get("peak_memory_mb"), monitoring_note)),
         ("Memory budget exceeded", analysis["memory"].get("memory_budget_exceeded")),
         ("Training metrics captured", bool(workload)),
         ("System tuning snapshots", _system_tuning_snapshot_status(run_dir)),
@@ -242,6 +249,7 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
                     ("Requested", analysis["executor"].get("requested")),
                     ("Selected", analysis["executor"].get("selected")),
                     ("sudo used", analysis["executor"].get("sudo_used")),
+                    ("Monitoring mode", monitoring_mode),
                 ],
             ),
             _html_table_card(
@@ -252,27 +260,27 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
                     ("Allowed threads", analysis["cpu"].get("allowed_threads")),
                     ("Affinity applied", analysis["cpu"].get("affinity_applied")),
                     ("Affinity cores", analysis["cpu"].get("affinity_cores")),
-                    ("Expected max total CPU percent", analysis["cpu"].get("expected_max_total_cpu_percent")),
-                    ("Observed average process CPU percent", analysis["cpu"].get("observed_average_process_cpu_percent")),
-                    ("Observed peak process CPU percent", analysis["cpu"].get("observed_peak_process_cpu_percent")),
-                    ("Observed process CPU p95 percent", analysis["cpu"].get("observed_process_cpu_percent_p95")),
-                    ("Observed average system CPU percent", analysis["cpu"].get("observed_average_system_cpu_percent")),
-                    ("Observed peak system CPU percent", analysis["cpu"].get("observed_peak_system_cpu_percent")),
-                    ("Observed system CPU p95 percent", analysis["cpu"].get("observed_system_cpu_percent_p95")),
-                    ("Per-core average max percent", analysis["cpu"].get("per_cpu_average_max_percent")),
-                    ("Per-core peak max percent", analysis["cpu"].get("per_cpu_peak_max_percent")),
-                    ("Per-core average percent", analysis["cpu"].get("per_cpu_average_percent")),
-                    ("Per-core peak percent", analysis["cpu"].get("per_cpu_peak_percent")),
+                    ("Expected max total CPU percent", _display_metric(analysis["cpu"].get("expected_max_total_cpu_percent"))),
+                    ("Observed average process CPU percent", _display_metric(analysis["cpu"].get("observed_average_process_cpu_percent"), monitoring_note)),
+                    ("Observed peak process CPU percent", _display_metric(analysis["cpu"].get("observed_peak_process_cpu_percent"), monitoring_note)),
+                    ("Observed process CPU p95 percent", _display_metric(analysis["cpu"].get("observed_process_cpu_percent_p95"), monitoring_note)),
+                    ("Observed average system CPU percent", _display_metric(analysis["cpu"].get("observed_average_system_cpu_percent"), monitoring_note)),
+                    ("Observed peak system CPU percent", _display_metric(analysis["cpu"].get("observed_peak_system_cpu_percent"), monitoring_note)),
+                    ("Observed system CPU p95 percent", _display_metric(analysis["cpu"].get("observed_system_cpu_percent_p95"), monitoring_note)),
+                    ("Per-core average max percent", _display_metric(analysis["cpu"].get("per_cpu_average_max_percent"), monitoring_note)),
+                    ("Per-core peak max percent", _display_metric(analysis["cpu"].get("per_cpu_peak_max_percent"), monitoring_note)),
+                    ("Per-core average percent", _display_metric(analysis["cpu"].get("per_cpu_average_percent"), monitoring_note)),
+                    ("Per-core peak percent", _display_metric(analysis["cpu"].get("per_cpu_peak_percent"), monitoring_note)),
                 ],
             ),
             _html_table_card(
                 "Memory",
                 [
                     ("Mode", analysis["memory"].get("mode")),
-                    ("Requested memory GB", analysis["memory"].get("requested_memory_gb")),
-                    ("Effective budget MB", analysis["memory"].get("effective_budget_mb")),
-                    ("Peak memory MB", analysis["memory"].get("peak_memory_mb")),
-                    ("Min available memory MB", analysis["memory"].get("observed_min_available_memory_mb")),
+                    ("Requested memory GB", _display_metric(analysis["memory"].get("requested_memory_gb"))),
+                    ("Effective budget MB", _display_metric(analysis["memory"].get("effective_budget_mb"))),
+                    ("Peak memory MB", _display_metric(analysis["memory"].get("peak_memory_mb"), monitoring_note)),
+                    ("Min available memory MB", _display_metric(analysis["memory"].get("observed_min_available_memory_mb"), monitoring_note)),
                     ("Memory budget exceeded", analysis["memory"].get("memory_budget_exceeded")),
                 ],
             ),
@@ -280,9 +288,9 @@ def format_run_report_html(analysis: dict[str, Any], run_dir: Path) -> str:
                 "Cgroup",
                 [
                     ("Available", analysis["cgroup"].get("available")),
-                    ("Path", analysis["cgroup"].get("path")),
-                    ("Peak cgroup memory MB", analysis["cgroup"].get("peak_memory_mb")),
-                    ("Peak cgroup CPU percent", analysis["cgroup"].get("peak_cpu_percent")),
+                    ("Path", _display_metric(analysis["cgroup"].get("path"))),
+                    ("Peak cgroup memory MB", _display_metric(analysis["cgroup"].get("peak_memory_mb"), monitoring_note)),
+                    ("Peak cgroup CPU percent", _display_metric(analysis["cgroup"].get("peak_cpu_percent"), monitoring_note)),
                 ],
             ),
             _html_table_card(
@@ -355,6 +363,18 @@ def _count_pair(value: object, total: object) -> str:
     if value is None and total is None:
         return "n/a"
     return f"{value}/{total}"
+
+
+def _monitoring_note(mode: object) -> str | None:
+    if mode == "none":
+        return "not collected in minimal mode"
+    return None
+
+
+def _display_metric(value: object, fallback: str | None = None) -> object:
+    if value is None and fallback is not None:
+        return fallback
+    return value
 
 
 def _seconds_to_ms(value: object) -> float | None:

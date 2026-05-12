@@ -363,6 +363,23 @@ autotuneai run \
 `examples/heavy_training_pressure.py` is a synthetic 60-second CPU and memory pressure workload. It is useful for validating the wrapper, cgroup guard, monitoring, restore behavior, and rough Linux runtime effects. It is not a substitute for a real PyTorch/CUDA benchmark because it does not exercise DataLoader, CUDA kernels, cuDNN/cuBLAS, or GPU memory allocation.
 For GPU pressure, use `examples/gpu_training_pressure.py`. It refuses to run when CUDA is unavailable, allocates GPU memory, runs CUDA matrix multiplications, and emits GPU metrics such as estimated TFLOPS, peak allocated GPU memory, and sampled step latency percentiles (`step_time_p50_seconds`, `step_time_p95_seconds`, `step_time_p99_seconds`). Use `examples/gpu_training_pressure_sweep_config.yaml` for fast recommendation sweeps and `examples/gpu_training_pressure_config.yaml` for longer confirmation runs.
 
+For server-class validation, the repo also includes heavier GPU pressure configs:
+
+```bash
+python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_server_5m_config.yaml
+python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_server_10m_config.yaml
+```
+
+These keep the same synthetic GPU pressure workload but raise the matrix size, batch payload, GPU memory target, warmup, and run duration into the 5 to 10 minute range for larger servers.
+
+For a more realistic CUDA model benchmark that PerfRunbench can wrap directly, use the timm-based inference benchmark:
+
+```bash
+python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
+```
+
+This uses a real `timm` model on CUDA, emits throughput and step-latency metrics into `training_metrics.json`, and is a better next step than the synthetic pressure test when you want to compare raw model throughput.
+
 If a run is interrupted after runtime tuning was applied, PerfRunbench records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
 
 Visual reports are available for both single runs and tuning comparisons:
@@ -461,6 +478,91 @@ autotuneai launch-performance \
 The sweep command above is intentionally short: roughly 8 seconds of measured GPU work per candidate plus 1 second warmup. If a short sweep finds a non-baseline winner, confirm the cached profile on the longer config or on the real training command with `launch-performance`.
 
 `launch-performance --apply-recommendation` applies the cached `system_profile`, `runtime_profile`, and `gpu_profile`, starts the real workload without resource monitoring, waits for it to finish, and restores the original system/GPU settings even on nonzero exit or Ctrl+C. If baseline is still the fastest candidate, the cached recommendation can still be launched this way to avoid measurement overhead during the real run.
+
+Recommended server-scale validation sequence:
+
+```bash
+sudo -v
+
+# 1. Heavier synthetic GPU pressure, monitored, to verify cgroup/memory/CPU capture.
+autotuneai run \
+  --executor systemd \
+  --sudo \
+  --runtime-profile runtime-pytorch-gpu-performance \
+  --tune-gpu nvidia-performance \
+  --gpu-tuning-sudo \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_server_5m_config.yaml
+
+# 2. Heavy synthetic recommendation search, then launch the selected profile.
+autotuneai optimize-performance \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --target gpu \
+  --monitor-mode minimal \
+  --time-budget-hours 0.6 \
+  --max-candidates 6 \
+  --repeat 3 \
+  --warmup-runs 1 \
+  --cooldown-seconds 8 \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_sweep_config.yaml
+
+autotuneai launch-performance \
+  --apply-recommendation \
+  --recommendation .autotuneai/recommendations/latest_performance_gpu.json \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  -- python examples/gpu_training_pressure.py --config examples/gpu_training_pressure_server_10m_config.yaml
+
+# 3. Real-model benchmark: raw timm command, wrapped run, tuned launch, and guarded comparison.
+python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
+
+autotuneai run \
+  --executor systemd \
+  --sudo \
+  --runtime-profile runtime-pytorch-gpu-performance \
+  --tune-gpu nvidia-performance \
+  --gpu-tuning-sudo \
+  -- python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
+
+autotuneai optimize-performance \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  --target gpu \
+  --monitor-mode minimal \
+  --time-budget-hours 0.5 \
+  --max-candidates 6 \
+  --repeat 3 \
+  --warmup-runs 1 \
+  --cooldown-seconds 8 \
+  -- python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
+
+autotuneai launch-performance \
+  --apply-recommendation \
+  --recommendation .autotuneai/recommendations/latest_performance_gpu.json \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-tuning-sudo \
+  -- python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
+
+autotuneai compare-tuning \
+  --executor systemd \
+  --sudo \
+  --system-tuning-sudo \
+  --gpu-profile nvidia-performance \
+  --gpu-tuning-sudo \
+  --memory-budget-gb 22 \
+  --reserve-cores 1 \
+  --cpu-quota-percent 90 \
+  --repeat 3 \
+  -- python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
+```
 
 Guarded recommendation search for local machines:
 

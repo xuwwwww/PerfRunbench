@@ -1,0 +1,9 @@
+duration_seconds: 300
+warmup_seconds: 10
+latency_sample_limit: 512
+require_cuda: true
+matrix_size: 6144
+batch_matrices: 4
+gpu_memory_target_mb: 6144
+dtype: float16
+allow_tf32: true
