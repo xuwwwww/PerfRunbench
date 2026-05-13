@@ -269,6 +269,8 @@ class RunReportTest(unittest.TestCase):
             self.assertIn("Why This Recommendation", report)
             self.assertIn("meaningful-speedup", report)
             self.assertIn("Step p95", report)
+            self.assertIn("Logical CPU count", report)
+            self.assertIn("Busiest core peak %", report)
             self.assertIn("unbounded:linux-performance", report)
 
 

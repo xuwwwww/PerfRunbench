@@ -433,6 +433,8 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         ("Recommended step p95 sec", best_metrics.get("step_time_p95_seconds")),
         ("Recommended step p99 sec", best_metrics.get("step_time_p99_seconds")),
         ("GPU TFLOPS delta", _format_delta(_delta_percent(best_metrics.get("gpu_tflops_estimate"), baseline_metrics.get("gpu_tflops_estimate")))),
+        ("Logical CPU count", best_metrics.get("logical_cpu_count")),
+        ("Busiest core peak %", best_metrics.get("per_cpu_peak_max_percent")),
     ]
     table_rows = "".join(
         "<tr>"
@@ -445,6 +447,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         f"<td>{_html_escape(_nested(item, 'metrics', 'step_time_p99_seconds'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'gpu_tflops_estimate'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'peak_system_cpu_percent'))}</td>"
+        f"<td>{_html_escape(_nested(item, 'metrics', 'logical_cpu_count'))}</td>"
         f"<td>{_html_escape(_nested(item, 'metrics', 'per_cpu_peak_max_percent'))}</td>"
         f"<td>{_html_escape(len(item.get('trials', [])))}</td>"
         f"<td>{_html_escape(item.get('system_profile'))}</td>"
@@ -452,7 +455,7 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
         f"<td>{_html_escape(item.get('gpu_profile'))}</td>"
         "</tr>"
         for item in candidates
-    ) or "<tr><td colspan=\"14\">No candidates recorded.</td></tr>"
+    ) or "<tr><td colspan=\"15\">No candidates recorded.</td></tr>"
     diagnostics = data.get("diagnostics", [])
     diagnostics_html = "".join(f"<li>{_html_escape(item)}</li>" for item in diagnostics) or "<li>No diagnostics recorded.</li>"
     execution_rows = "".join(
@@ -511,7 +514,8 @@ def _format_auto_recommendation_report_html(data: dict[str, Any], source: Path |
             "</section>",
             "<section class=\"card wide\">",
             "<h2>Candidate Details</h2>",
-            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Thermal-normalized %</th><th>Duration sec</th><th>Step p95 sec</th><th>Step p99 sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Per-core peak max %</th><th>Trials</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
+            "<p class=\"muted\">CPU columns summarize host-side launch pressure. Busiest core peak % is the highest observed utilization among all logical CPU cores, not the number of cores assigned to the workload.</p>",
+            "<table><thead><tr><th>Label</th><th>Status</th><th>Samples/sec</th><th>Thermal-normalized %</th><th>Duration sec</th><th>Step p95 sec</th><th>Step p99 sec</th><th>GPU TFLOPS</th><th>Peak system CPU %</th><th>Logical CPU count</th><th>Busiest core peak %</th><th>Trials</th><th>System</th><th>Runtime</th><th>GPU</th></tr></thead>",
             f"<tbody>{table_rows}</tbody></table>",
             "</section>",
             "<section class=\"card wide\">",
