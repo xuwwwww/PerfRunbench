@@ -12,6 +12,12 @@ from autotune.gpu.nvidia_tuner import (
     recommend_nvidia_tuning,
     restore_nvidia_tuning,
 )
+from autotune.resource.advanced_tuning import (
+    AdvancedRunOptions,
+    AdvancedTuningError,
+    parse_extra_env,
+    validate_advanced_confirmation,
+)
 from autotune.report.run_report import generate_run_report
 from autotune.report.comparison_report import generate_comparison_report
 from autotune.recommendation.optimizer import (
@@ -254,6 +260,7 @@ def build_parser() -> argparse.ArgumentParser:
     tune_system.add_argument("--recommend-all", action="store_true", help="Print recommendations for every profile supported on this platform.")
     tune_system.add_argument("--apply", action="store_true")
     tune_system.add_argument("--sudo", action="store_true")
+    tune_system.add_argument("--confirm-advanced-tuning", action="store_true")
     tune_system.set_defaults(handler=_cmd_tune_system)
 
     tune_gpu = subparsers.add_parser("tune-gpu", help="Recommend or apply reversible NVIDIA runtime tuning.")
@@ -322,6 +329,11 @@ def _add_budget_executor_args(parser: argparse.ArgumentParser) -> None:
         default="python:3.12-slim",
         help="Docker image to use when --executor docker is selected.",
     )
+    parser.add_argument("--confirm-advanced-tuning", action="store_true", help="Required when using advanced NUMA bindings, aggressive runtime profiles, or extra child env overrides.")
+    parser.add_argument("--numa-node", type=int, help="Bind both CPU and memory allocation to a NUMA node with numactl.")
+    parser.add_argument("--numa-cpu-nodes", help="numactl CPU node selection string, for example 0 or 0-1.")
+    parser.add_argument("--numa-memory-nodes", help="numactl memory node selection string, for example 0 or 0-1.")
+    parser.add_argument("--extra-env", action="append", default=[], help="Extra child environment override in KEY=VALUE form. Repeat for multiple values.")
 
 
 def _cmd_inspect(args: argparse.Namespace) -> int:
@@ -364,6 +376,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
         tune_system_profile = _resolve_system_tuning_profile(args)
         tune_gpu_profile = _resolve_gpu_tuning_profile(args)
         runtime_env_profile = args.runtime_profile
+    advanced_options = _advanced_options_from_args(args)
+    _require_advanced_confirmation(
+        args,
+        tune_system_profile=tune_system_profile,
+        runtime_env_profile=runtime_env_profile,
+        advanced_options=advanced_options,
+    )
     try:
         return_code, run_dir = run_with_budget(
             command,
@@ -381,8 +400,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
             restore_gpu_after=not args.no_restore_gpu_after,
             gpu_tuning_sudo=args.gpu_tuning_sudo,
             runtime_env_profile=runtime_env_profile,
+            advanced_options=advanced_options,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, AdvancedTuningError) as exc:
         raise SystemExit(str(exc)) from exc
     print(f"Run directory: {run_dir}")
     html_path = _auto_run_report_html(run_dir)
@@ -440,6 +460,13 @@ def _cmd_compare_tuning(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai compare-tuning [budget args] -- <command>")
     budget = _budget_from_args(args)
     profile = args.profile or select_system_profile(budget, workload_profile=args.workload_profile).profile
+    advanced_options = _advanced_options_from_args(args)
+    _require_advanced_confirmation(
+        args,
+        tune_system_profile=profile,
+        runtime_env_profile=args.runtime_profile,
+        advanced_options=advanced_options,
+    )
     try:
         result = compare_tuning(
             command,
@@ -459,8 +486,9 @@ def _cmd_compare_tuning(args: argparse.Namespace) -> int:
             repeat=args.repeat,
             alternate_order=not args.no_alternate_order,
             cooldown_seconds=args.cooldown_seconds,
+            advanced_options=advanced_options,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, AdvancedTuningError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote tuning comparison to {args.output}")
@@ -472,6 +500,12 @@ def _cmd_compare_tuning(args: argparse.Namespace) -> int:
 def _cmd_compare_profiles(args: argparse.Namespace) -> int:
     command = _command_after_separator(args.workload, "Usage: autotuneai compare-profiles [budget args] -- <command>")
     budget = _budget_from_args(args)
+    advanced_options = _advanced_options_from_args(args)
+    _require_advanced_confirmation(
+        args,
+        runtime_env_profile=args.runtime_profile,
+        advanced_options=advanced_options,
+    )
     try:
         result = compare_profiles(
             command,
@@ -491,8 +525,9 @@ def _cmd_compare_profiles(args: argparse.Namespace) -> int:
             repeat=args.repeat,
             alternate_order=not args.no_alternate_order,
             cooldown_seconds=args.cooldown_seconds,
+            advanced_options=advanced_options,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, AdvancedTuningError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote profile comparison summary to {args.output}")
@@ -507,6 +542,13 @@ def _cmd_compare_budgets(args: argparse.Namespace) -> int:
     profile = args.profile
     if profile is None and args.workload_profile != "auto":
         profile = select_system_profile(budget, workload_profile=args.workload_profile).profile
+    advanced_options = _advanced_options_from_args(args)
+    _require_advanced_confirmation(
+        args,
+        tune_system_profile=profile,
+        runtime_env_profile=args.runtime_profile,
+        advanced_options=advanced_options,
+    )
     try:
         result = compare_budget_modes(
             command,
@@ -526,8 +568,9 @@ def _cmd_compare_budgets(args: argparse.Namespace) -> int:
             repeat=args.repeat,
             alternate_order=not args.no_alternate_order,
             cooldown_seconds=args.cooldown_seconds,
+            advanced_options=advanced_options,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, AdvancedTuningError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote budget comparison to {args.output}")
@@ -558,6 +601,8 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
         default_output="results/reports/auto_recommendation.json",
         cache_kind="guarded",
     )
+    advanced_options = _advanced_options_from_args(args)
+    _require_advanced_confirmation(args, advanced_options=advanced_options)
     try:
         result = optimize_recommendation(
             command,
@@ -581,8 +626,9 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
             optimization_target=args.target,
             monitor_mode="full",
             time_budget_hours=None,
+            advanced_options=advanced_options,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, AdvancedTuningError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote auto recommendation to {output_path}")
@@ -601,6 +647,8 @@ def _cmd_optimize_performance(args: argparse.Namespace) -> int:
         default_output="results/reports/performance_recommendation.json",
         cache_kind="performance",
     )
+    advanced_options = _advanced_options_from_args(args)
+    _require_advanced_confirmation(args, advanced_options=advanced_options)
     try:
         result = optimize_recommendation(
             command,
@@ -625,8 +673,9 @@ def _cmd_optimize_performance(args: argparse.Namespace) -> int:
             monitor_mode=args.monitor_mode,
             time_budget_hours=args.time_budget_hours,
             thermal_control=not args.no_thermal_control,
+            advanced_options=advanced_options,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, AdvancedTuningError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Wrote performance recommendation to {output_path}")
@@ -646,6 +695,13 @@ def _cmd_launch_performance(args: argparse.Namespace) -> int:
     tune_system_profile = recommendation.get("system_profile")
     tune_gpu_profile = recommendation.get("gpu_profile")
     runtime_env_profile = args.runtime_profile or recommendation.get("runtime_profile")
+    advanced_options = _advanced_options_from_args(args)
+    _require_advanced_confirmation(
+        args,
+        tune_system_profile=str(tune_system_profile) if tune_system_profile is not None else None,
+        runtime_env_profile=str(runtime_env_profile) if runtime_env_profile is not None else None,
+        advanced_options=advanced_options,
+    )
     print(
         "Launching performance workload without resource monitoring: "
         f"label={recommendation.get('label')} "
@@ -668,8 +724,9 @@ def _cmd_launch_performance(args: argparse.Namespace) -> int:
             restore_gpu_after=True,
             gpu_tuning_sudo=args.gpu_tuning_sudo,
             runtime_env_profile=runtime_env_profile,
+            advanced_options=advanced_options,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, AdvancedTuningError) as exc:
         raise SystemExit(str(exc)) from exc
     print(f"Run directory: {run_dir}")
     html_path = _auto_run_report_html(run_dir)
@@ -755,6 +812,7 @@ def _cmd_demo(args: argparse.Namespace) -> int:
 def _cmd_tune_system(args: argparse.Namespace) -> int:
     profile = args.profile or select_system_profile(ResourceBudget()).profile
     try:
+        _require_advanced_confirmation(args, tune_system_profile=profile)
         if args.recommend_all:
             recommendations = [
                 item
@@ -977,6 +1035,37 @@ def _resolve_cached_recommendation(args: argparse.Namespace) -> dict[str, object
     if not isinstance(recommendation, dict):
         raise SystemExit(f"recommendation cache has no recommendation: {args.recommendation}")
     return recommendation
+
+
+def _advanced_options_from_args(args: argparse.Namespace) -> AdvancedRunOptions:
+    try:
+        extra_env = parse_extra_env(getattr(args, "extra_env", []))
+    except AdvancedTuningError as exc:
+        raise SystemExit(str(exc)) from exc
+    return AdvancedRunOptions(
+        numa_node=getattr(args, "numa_node", None),
+        numa_cpu_nodes=getattr(args, "numa_cpu_nodes", None),
+        numa_memory_nodes=getattr(args, "numa_memory_nodes", None),
+        extra_env=extra_env,
+    )
+
+
+def _require_advanced_confirmation(
+    args: argparse.Namespace,
+    *,
+    tune_system_profile: str | None = None,
+    runtime_env_profile: str | None = None,
+    advanced_options: AdvancedRunOptions | None = None,
+) -> None:
+    try:
+        validate_advanced_confirmation(
+            confirm_advanced_tuning=getattr(args, "confirm_advanced_tuning", False),
+            tune_system_profile=tune_system_profile,
+            runtime_env_profile=runtime_env_profile,
+            advanced_options=advanced_options,
+        )
+    except AdvancedTuningError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 def _command_after_separator(command: list[str], usage: str) -> list[str]:

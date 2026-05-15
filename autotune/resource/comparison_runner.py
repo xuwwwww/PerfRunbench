@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from autotune.resource.advanced_tuning import AdvancedRunOptions
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_analysis import analyze_run
 from autotune.resource.run_state import RUNS_DIR, load_manifest, write_json
@@ -33,6 +34,7 @@ def compare_tuning(
     repeat: int = 1,
     alternate_order: bool = True,
     cooldown_seconds: float = 0.0,
+    advanced_options: AdvancedRunOptions | None = None,
 ) -> dict[str, Any]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -54,6 +56,7 @@ def compare_tuning(
                     use_sudo=use_sudo,
                     allow_sudo_auto=allow_sudo_auto,
                     docker_image=docker_image,
+                    advanced_options=advanced_options,
                 )
             else:
                 return_code, run_dir = run_with_budget(
@@ -72,6 +75,7 @@ def compare_tuning(
                     gpu_tuning_sudo=gpu_tuning_sudo,
                     runtime_env_profile=tuned_runtime_env_profile,
                     docker_image=docker_image,
+                    advanced_options=advanced_options,
                 )
             trial[f"{label}_code"] = return_code
             trial[f"{label}_dir"] = run_dir
@@ -140,6 +144,7 @@ def compare_profiles(
     repeat: int = 3,
     alternate_order: bool = True,
     cooldown_seconds: float = 0.0,
+    advanced_options: AdvancedRunOptions | None = None,
 ) -> dict[str, Any]:
     selected_profiles = profiles or _default_profile_sweep(executor)
     comparisons = []
@@ -165,6 +170,7 @@ def compare_profiles(
             repeat=repeat,
             alternate_order=alternate_order,
             cooldown_seconds=cooldown_seconds,
+            advanced_options=advanced_options,
         )
         aggregate = result.get("aggregate", {})
         deltas = aggregate.get("deltas", result.get("deltas", {}))
@@ -213,6 +219,7 @@ def compare_budget_modes(
     repeat: int = 3,
     alternate_order: bool = True,
     cooldown_seconds: float = 0.0,
+    advanced_options: AdvancedRunOptions | None = None,
 ) -> dict[str, Any]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -242,6 +249,7 @@ def compare_budget_modes(
                 gpu_tuning_sudo=gpu_tuning_sudo,
                 runtime_env_profile=tuned_runtime_env_profile,
                 docker_image=docker_image,
+                advanced_options=advanced_options,
             )
             trial[f"{label}_code"] = return_code
             trial[f"{label}_dir"] = run_dir

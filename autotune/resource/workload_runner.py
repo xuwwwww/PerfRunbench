@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from autotune.gpu.nvidia_tuner import apply_nvidia_tuning_to_run, restore_nvidia_tuning
+from autotune.resource.advanced_tuning import AdvancedRunOptions, wrap_command_with_numa
 from autotune.resource.affinity import apply_cpu_affinity
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.cgroup_monitor import CgroupStats, cgroup_path, read_cgroup_stats, wait_for_systemd_control_group
@@ -64,6 +65,7 @@ def run_with_budget(
     restore_gpu_after: bool = True,
     gpu_tuning_sudo: bool = False,
     runtime_env_profile: str | None = None,
+    advanced_options: AdvancedRunOptions | None = None,
 ) -> tuple[int, Path]:
     run_dir, manifest, child_env, runtime_env_result, selected_executor, selected_use_sudo, selection_notes = _prepare_run(
         command,
@@ -74,6 +76,7 @@ def run_with_budget(
         use_sudo=use_sudo,
         allow_sudo_auto=allow_sudo_auto,
         runtime_env_profile=runtime_env_profile,
+        advanced_options=advanced_options,
     )
     timeline: list[ChildSample] = []
     process = None
@@ -99,6 +102,7 @@ def run_with_budget(
                 selected_use_sudo=selected_use_sudo,
                 child_env=child_env,
                 runtime_env_result=runtime_env_result,
+                advanced_options=advanced_options or AdvancedRunOptions(),
                 manifest=manifest,
                 docker_image=docker_image,
                 monitored=True,
@@ -156,6 +160,7 @@ def launch_performance(
     restore_gpu_after: bool = True,
     gpu_tuning_sudo: bool = False,
     runtime_env_profile: str | None = None,
+    advanced_options: AdvancedRunOptions | None = None,
 ) -> tuple[int, Path]:
     budget = budget or ResourceBudget(enforce=False)
     run_dir, manifest, child_env, runtime_env_result, selected_executor, selected_use_sudo, selection_notes = _prepare_run(
@@ -167,6 +172,7 @@ def launch_performance(
         use_sudo=use_sudo,
         allow_sudo_auto=allow_sudo_auto,
         runtime_env_profile=runtime_env_profile,
+        advanced_options=advanced_options,
     )
     manifest.notes.append("monitor_mode=minimal")
     manifest.notes.append("performance launch applies tuning and waits for workload without resource sampling.")
@@ -193,6 +199,7 @@ def launch_performance(
                 selected_use_sudo=selected_use_sudo,
                 child_env=child_env,
                 runtime_env_result=runtime_env_result,
+                advanced_options=advanced_options or AdvancedRunOptions(),
                 manifest=manifest,
                 docker_image=docker_image,
                 monitored=False,
@@ -230,9 +237,11 @@ def _prepare_run(
     use_sudo: bool,
     allow_sudo_auto: bool,
     runtime_env_profile: str | None,
+    advanced_options: AdvancedRunOptions | None,
 ) -> tuple[Path, RunManifest, dict[str, str], dict[str, Any] | None, str, bool, list[str]]:
     if not command:
         raise ValueError("command cannot be empty")
+    advanced_options = advanced_options or AdvancedRunOptions()
     selected_executor, selected_use_sudo, selection_notes = _resolve_executor(
         executor,
         use_sudo=use_sudo,
@@ -251,6 +260,29 @@ def _prepare_run(
         budget,
         total_cores=_visible_cpu_count(),
     )
+    if advanced_options.extra_env:
+        before = {key: child_env.get(key) for key in advanced_options.extra_env}
+        child_env.update(advanced_options.extra_env)
+        advanced_env_result = {
+            "extra_env": advanced_options.extra_env,
+            "before": before,
+            "notes": [
+                f"advanced_extra_env_keys={sorted(advanced_options.extra_env)}",
+            ],
+        }
+        write_json(run_dir / "advanced_runtime_env.json", advanced_env_result)
+        manifest.notes.extend(advanced_env_result["notes"])
+    if advanced_options.enabled():
+        write_json(
+            run_dir / "advanced_options.json",
+            {
+                "numa_node": advanced_options.numa_node,
+                "numa_cpu_nodes": advanced_options.numa_cpu_nodes,
+                "numa_memory_nodes": advanced_options.numa_memory_nodes,
+                "extra_env": advanced_options.extra_env,
+            },
+        )
+        manifest.notes.extend(f"advanced_{item}" for item in advanced_options.summary())
     if runtime_env_result is not None:
         write_json(run_dir / "runtime_env_tuning.json", runtime_env_result)
         manifest.notes.extend(runtime_env_result["notes"])
@@ -265,6 +297,7 @@ def _build_executor_command(
     selected_use_sudo: bool,
     child_env: dict[str, str],
     runtime_env_result: dict[str, Any] | None,
+    advanced_options: AdvancedRunOptions,
     manifest: RunManifest,
     docker_image: str,
     monitored: bool,
@@ -272,10 +305,10 @@ def _build_executor_command(
     if selected_executor == "local":
         affinity_context = apply_cpu_affinity(budget)
         manifest.notes.append(f"affinity_context={affinity_context}")
-        return command, None
+        return wrap_command_with_numa(command, advanced_options), None
     if selected_executor == "systemd":
         unit_name = make_systemd_scope_name(manifest.run_id)
-        resolved_command = _resolve_command_executable(command)
+        resolved_command = _resolve_command_executable(wrap_command_with_numa(command, advanced_options))
         if resolved_command != command:
             manifest.notes.append(f"resolved_systemd_command_executable={resolved_command[0]}")
         systemd_command = build_systemd_run_command(
@@ -299,6 +332,8 @@ def _build_executor_command(
             manifest.notes.append("systemd executor launches the workload scope without resource sampling.")
         return systemd_command.command, unit_name
     if selected_executor == "docker":
+        if advanced_options.numa_node is not None or advanced_options.numa_cpu_nodes or advanced_options.numa_memory_nodes:
+            raise RuntimeError("advanced NUMA binding is only supported with the local or systemd executors.")
         docker_command = build_docker_run_command(
             command,
             budget,
@@ -868,10 +903,36 @@ def _missing_path_hint(path_text: str) -> str:
 
 
 def _unwrap_command_for_validation(command: list[str]) -> list[str]:
+    if command and Path(command[0]).name.lower() == "numactl":
+        return _strip_numactl_prefix(command)
     if len(command) >= 2 and command[0] == "conda" and command[1] == "run":
         nested = _strip_conda_run_prefix(command)
         return nested if nested else command
     return command
+
+
+def _strip_numactl_prefix(command: list[str]) -> list[str]:
+    index = 1
+    options_with_values = {
+        "--cpunodebind",
+        "--membind",
+        "--physcpubind",
+        "--localalloc",
+        "--interleave",
+    }
+    while index < len(command):
+        token = command[index]
+        if token in options_with_values:
+            index += 2
+            continue
+        if token.startswith("--cpunodebind=") or token.startswith("--membind=") or token.startswith("--physcpubind="):
+            index += 1
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        return command[index:]
+    return []
 
 
 def _strip_conda_run_prefix(command: list[str]) -> list[str]:

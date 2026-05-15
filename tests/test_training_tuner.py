@@ -8,10 +8,14 @@ from autotune.resource.budget import ResourceBudget
 from autotune.training_tuner.batch_size import (
     find_batch_size_assignment,
     find_numeric_assignment,
+    find_scalar_assignment,
+    format_scalar_value,
+    parse_scalar_value,
     replace_assignment_value,
     tune_batch_size,
     tune_numeric_config_key,
 )
+from autotune.training_tuner.multi_knob import parse_knob_specs
 
 
 class TrainingTunerTest(unittest.TestCase):
@@ -30,6 +34,28 @@ class TrainingTunerTest(unittest.TestCase):
             value, line = find_numeric_assignment(config, "num_workers")
             self.assertEqual(value, 4)
             self.assertEqual(replace_assignment_value(line, 2), "num_workers: 2")
+
+    def test_find_scalar_assignment_supports_bool_and_string_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "train.yaml"
+            config.write_text("pin_memory: true\namp_dtype: bfloat16\n", encoding="utf-8")
+            pin_memory, pin_line = find_scalar_assignment(config, "pin_memory")
+            amp_dtype, amp_line = find_scalar_assignment(config, "amp_dtype")
+            self.assertTrue(pin_memory)
+            self.assertEqual(amp_dtype, "bfloat16")
+            self.assertEqual(replace_assignment_value(pin_line, False), "pin_memory: false")
+            self.assertEqual(replace_assignment_value(amp_line, "float16"), "amp_dtype: float16")
+
+    def test_parse_scalar_value_and_knob_specs_support_mixed_values(self) -> None:
+        self.assertEqual(parse_scalar_value("12"), 12)
+        self.assertEqual(parse_scalar_value("0.5"), 0.5)
+        self.assertTrue(parse_scalar_value("true"))
+        self.assertEqual(parse_scalar_value("bf16"), "bf16")
+        self.assertEqual(format_scalar_value(False), "false")
+        knobs = parse_knob_specs(["pin_memory=true,false", "amp_dtype=float16,bfloat16", "prefetch_factor=2,4"])
+        self.assertEqual(knobs["pin_memory"], [True, False])
+        self.assertEqual(knobs["amp_dtype"], ["float16", "bfloat16"])
+        self.assertEqual(knobs["prefetch_factor"], [2, 4])
 
     def test_tune_batch_size_recommends_largest_safe_value_and_restores_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

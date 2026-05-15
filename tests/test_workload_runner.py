@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from autotune.resource.advanced_tuning import AdvancedRunOptions
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_state import ACTIVE_TUNING_STATE, clear_active_tuning_state, load_active_tuning_state, load_manifest
 from autotune.resource.workload_runner import (
@@ -54,6 +55,18 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertTrue((Path(run_dir) / "runtime_env_tuning.json").exists())
         manifest = load_manifest(Path(run_dir))
         self.assertTrue(any("runtime_env_profile=runtime-cpu-performance" in note for note in manifest["notes"]))
+
+    def test_run_with_budget_applies_advanced_extra_env(self) -> None:
+        return_code, run_dir = run_with_budget(
+            ["python", "tests/fixtures/write_metrics_workload.py"],
+            ResourceBudget(cpu_quota_percent=50),
+            sample_interval_seconds=0.05,
+            advanced_options=AdvancedRunOptions(extra_env={"CUDNN_BENCHMARK": "1"}),
+        )
+        self.assertEqual(return_code, 0)
+        self.assertTrue((Path(run_dir) / "advanced_runtime_env.json").exists())
+        manifest = load_manifest(Path(run_dir))
+        self.assertTrue(any("advanced_extra_env_keys=['CUDNN_BENCHMARK']" in note for note in manifest["notes"]))
 
     def test_launch_performance_runs_without_resource_timeline(self) -> None:
         return_code, run_dir = launch_performance(
@@ -122,6 +135,11 @@ class WorkloadRunnerTest(unittest.TestCase):
             control_group="/system.slice/demo.scope",
         )
         self.assertEqual(sample.cgroup_path, "/sys/fs/cgroup/system.slice/demo.scope")
+
+    def test_validate_workload_command_accepts_numactl_wrapped_python(self) -> None:
+        validate_workload_command(
+            ["numactl", "--cpunodebind", "0", "--membind", "0", "python", "tests/fixtures/write_metrics_workload.py"]
+        )
 
     @patch("autotune.resource.workload_runner.subprocess.run")
     def test_systemd_termination_kills_scope_before_wrapper(self, run_command) -> None:

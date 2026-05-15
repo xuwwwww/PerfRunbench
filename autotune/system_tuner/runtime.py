@@ -214,6 +214,64 @@ PROFILES: dict[str, list[RuntimeSetting]] = {
             path="/sys/kernel/mm/transparent_hugepage/defrag",
         ),
     ],
+    "linux-extreme-throughput": [
+        RuntimeSetting(
+            key="vm.swappiness",
+            value="1",
+            reason="Keep anonymous memory resident aggressively during the benchmark window.",
+        ),
+        RuntimeSetting(
+            key="vm.vfs_cache_pressure",
+            value="10",
+            reason="Retain filesystem metadata cache aggressively for repeated dataset access.",
+        ),
+        RuntimeSetting(
+            key="vm.page-cluster",
+            value="0",
+            reason="Reduce swap burst behavior if the kernel still reaches swap under pressure.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_background_ratio",
+            value="20",
+            reason="Delay background writeback further so compute-heavy runs can batch IO aggressively.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_ratio",
+            value="60",
+            reason="Allow very large dirty bursts when chasing raw throughput over tail latency.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_expire_centisecs",
+            value="6000",
+            reason="Keep dirty data resident longer to maximize write coalescing.",
+        ),
+        RuntimeSetting(
+            key="vm.dirty_writeback_centisecs",
+            value="3000",
+            reason="Reduce periodic writeback frequency further than linux-performance.",
+        ),
+        RuntimeSetting(
+            key="kernel.numa_balancing",
+            value="0",
+            reason="Remove NUMA page migration noise while using host-level NUMA placement explicitly.",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.enabled",
+            value="always",
+            reason="Force transparent huge pages for large linear allocations during throughput-first runs.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/enabled",
+        ),
+        RuntimeSetting(
+            key="transparent_hugepage.defrag",
+            value="always",
+            reason="Allow aggressive huge-page defragmentation when absolute throughput is preferred over latency stability.",
+            require_existing=False,
+            source="file",
+            path="/sys/kernel/mm/transparent_hugepage/defrag",
+        ),
+    ],
     "linux-low-latency": [
         RuntimeSetting(
             key="vm.swappiness",
@@ -566,7 +624,7 @@ def _dynamic_profile_settings(
     *,
     cpufreq_base: Path = Path("/sys/devices/system/cpu/cpufreq"),
 ) -> list[RuntimeSetting]:
-    if not profile.startswith("linux-") or profile not in {"linux-throughput", "linux-performance"}:
+    if not profile.startswith("linux-") or profile not in {"linux-throughput", "linux-performance", "linux-extreme-throughput"}:
         return []
     settings: list[RuntimeSetting] = []
     for policy in sorted(cpufreq_base.glob("policy*")):
@@ -586,7 +644,7 @@ def _dynamic_profile_settings(
             )
         epp_path = policy / "energy_performance_preference"
         available_epp = _read_words(policy / "energy_performance_available_preferences")
-        if profile == "linux-performance" and epp_path.exists() and (not available_epp or "performance" in available_epp):
+        if profile in {"linux-performance", "linux-extreme-throughput"} and epp_path.exists() and (not available_epp or "performance" in available_epp):
             settings.append(
                 RuntimeSetting(
                     key=f"cpu.cpufreq.{policy.name}.energy_performance_preference",
@@ -599,7 +657,7 @@ def _dynamic_profile_settings(
         min_freq_path = policy / "scaling_min_freq"
         max_freq_path = policy / "cpuinfo_max_freq"
         max_freq = _read_text(max_freq_path)
-        if profile == "linux-performance" and min_freq_path.exists() and max_freq:
+        if profile in {"linux-performance", "linux-extreme-throughput"} and min_freq_path.exists() and max_freq:
             settings.append(
                 RuntimeSetting(
                     key=f"cpu.cpufreq.{policy.name}.scaling_min_freq",
@@ -752,8 +810,11 @@ def _plan_notes(profile: str, current_platform: str, supported: bool) -> list[st
             "The active power scheme is snapshotted before tuning and restored after the run.",
             "Persistent registry settings are not modified.",
         ]
-    return [
+    notes = [
         "Only runtime sysctl/sysfs values from an allowlist are considered.",
         "Persistent files such as /etc/sysctl.conf are not modified.",
         "Use restore_run.py with the run id to restore the before snapshot.",
     ]
+    if profile == "linux-extreme-throughput":
+        notes.append("linux-extreme-throughput increases dirty-page burst limits and should be reserved for explicit throughput-focused experiments.")
+    return notes

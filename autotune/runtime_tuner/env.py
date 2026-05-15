@@ -22,6 +22,7 @@ PROFILES = {
     "runtime-cpu-performance",
     "runtime-pytorch-gpu-performance",
     "runtime-pytorch-max-performance",
+    "runtime-pytorch-aggressive",
 }
 
 
@@ -72,17 +73,33 @@ def build_runtime_env_plan(
             "runtime env favors GPU training by limiting CPU thread oversubscription and enabling CUDA/PyTorch throughput knobs.",
         ]
         return RuntimeEnvPlan(profile, env, notes)
-    env = {
-        **_cpu_env(allowed_threads),
-        **_pytorch_cuda_env(),
-        "TORCH_CUDNN_V8_API_LRU_CACHE_LIMIT": "0",
-    }
-    notes = [
-        f"runtime_env_profile={profile}",
-        f"runtime_env_allowed_threads={allowed_threads}",
-        "runtime env combines CPU throughput and PyTorch CUDA throughput settings; benchmark before keeping it.",
-    ]
-    return RuntimeEnvPlan(profile, env, notes)
+    if profile == "runtime-pytorch-max-performance":
+        env = {
+            **_cpu_env(allowed_threads),
+            **_pytorch_cuda_env(),
+            "TORCH_CUDNN_V8_API_LRU_CACHE_LIMIT": "0",
+        }
+        notes = [
+            f"runtime_env_profile={profile}",
+            f"runtime_env_allowed_threads={allowed_threads}",
+            "runtime env combines CPU throughput and PyTorch CUDA throughput settings; benchmark before keeping it.",
+        ]
+        return RuntimeEnvPlan(profile, env, notes)
+    if profile == "runtime-pytorch-aggressive":
+        helper_threads = max(1, min(4, allowed_threads))
+        env = {
+            **_gpu_loader_env(helper_threads),
+            **_pytorch_cuda_env(),
+            **_pytorch_throughput_unstable_env(),
+            "TORCH_CUDNN_V8_API_LRU_CACHE_LIMIT": "0",
+        }
+        notes = [
+            f"runtime_env_profile={profile}",
+            f"runtime_env_cpu_helper_threads={env['OMP_NUM_THREADS']}",
+            "runtime env trades reproducibility and allocator headroom for throughput: cuDNN autotune, looser GC threshold, more concurrent CUDA connections, no strict OMP affinity.",
+        ]
+        return RuntimeEnvPlan(profile, env, notes)
+    raise RuntimeEnvTuningError(f"unhandled runtime env profile: {profile}")
 
 
 def apply_runtime_env_profile(
@@ -136,4 +153,14 @@ def _pytorch_cuda_env() -> dict[str, str]:
         "TORCH_ALLOW_TF32_CUBLAS_OVERRIDE": "1",
         "PYTORCH_NVML_BASED_CUDA_CHECK": "1",
         "TORCH_NCCL_USE_COMM_NONBLOCKING": "1",
+    }
+
+
+def _pytorch_throughput_unstable_env() -> dict[str, str]:
+    """Extra knobs that often improve throughput at the cost of determinism or VRAM headroom."""
+    return {
+        # Overrides PYTORCH_CUDA_ALLOC_CONF from _pytorch_cuda_env when merged later in the dict.
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True,garbage_collection_threshold:0.96",
+        "CUDNN_BENCHMARK": "1",
+        "CUDA_DEVICE_MAX_CONNECTIONS": "32",
     }

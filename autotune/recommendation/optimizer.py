@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from autotune.gpu.nvidia_tuner import recommend_nvidia_tuning
+from autotune.resource.advanced_tuning import AdvancedRunOptions
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_analysis import analyze_run
 from autotune.resource.run_state import RUNS_DIR, write_json
@@ -57,6 +58,7 @@ def optimize_recommendation(
     monitor_mode: str = "full",
     time_budget_hours: float | None = None,
     thermal_control: bool | None = None,
+    advanced_options: AdvancedRunOptions | None = None,
 ) -> dict[str, Any]:
     if not command:
         raise ValueError("command cannot be empty")
@@ -107,6 +109,7 @@ def optimize_recommendation(
                 docker_image=docker_image,
                 monitor_mode=monitor_mode,
                 optimization_mode=optimization_mode,
+                advanced_options=advanced_options,
             )
             warmups.append({"run_id": run_dir.name, "return_code": return_code, "index": warmup_index})
             if cooldown_seconds > 0:
@@ -141,6 +144,7 @@ def optimize_recommendation(
             gpu_tuning_sudo=gpu_tuning_sudo,
             docker_image=docker_image,
             cooldown_seconds=cooldown_seconds,
+            advanced_options=advanced_options,
         )
         return _write_summary(
             output=output,
@@ -178,6 +182,7 @@ def optimize_recommendation(
                 docker_image=docker_image,
                 monitor_mode=monitor_mode,
                 optimization_mode=optimization_mode,
+                advanced_options=advanced_options,
             )
             metrics = _run_metrics(run_dir.name)
             trial = {
@@ -255,6 +260,7 @@ def _run_candidate(
     docker_image: str,
     monitor_mode: str,
     optimization_mode: str,
+    advanced_options: AdvancedRunOptions | None,
 ) -> tuple[int, Path]:
     if optimization_mode == "performance" and monitor_mode == "minimal":
         return launch_performance(
@@ -271,6 +277,7 @@ def _run_candidate(
             gpu_tuning_sudo=gpu_tuning_sudo,
             runtime_env_profile=candidate.runtime_profile,
             docker_image=docker_image,
+            advanced_options=advanced_options,
         )
     return run_with_budget(
         command,
@@ -288,6 +295,7 @@ def _run_candidate(
         gpu_tuning_sudo=gpu_tuning_sudo,
         runtime_env_profile=candidate.runtime_profile,
         docker_image=docker_image,
+        advanced_options=advanced_options,
     )
 
 
@@ -317,6 +325,7 @@ def _run_thermal_controlled_trials(
     gpu_tuning_sudo: bool,
     docker_image: str,
     cooldown_seconds: float,
+    advanced_options: AdvancedRunOptions | None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     baseline = candidates[0]
     candidates_to_test = candidates[1:]
@@ -343,6 +352,7 @@ def _run_thermal_controlled_trials(
                     docker_image=docker_image,
                     monitor_mode=monitor_mode,
                     optimization_mode=optimization_mode,
+                    advanced_options=advanced_options,
                     trial_index=trial_index,
                     order_index=order_index * 2,
                     pair_id=pair_id,
@@ -364,6 +374,7 @@ def _run_thermal_controlled_trials(
                     docker_image=docker_image,
                     monitor_mode=monitor_mode,
                     optimization_mode=optimization_mode,
+                    advanced_options=advanced_options,
                     trial_index=trial_index,
                     order_index=order_index * 2 + 1,
                     pair_id=pair_id,
@@ -385,6 +396,7 @@ def _run_thermal_controlled_trials(
                     docker_image=docker_image,
                     monitor_mode=monitor_mode,
                     optimization_mode=optimization_mode,
+                    advanced_options=advanced_options,
                     trial_index=trial_index,
                     order_index=order_index * 2,
                     pair_id=pair_id,
@@ -404,6 +416,7 @@ def _run_thermal_controlled_trials(
                     docker_image=docker_image,
                     monitor_mode=monitor_mode,
                     optimization_mode=optimization_mode,
+                    advanced_options=advanced_options,
                     trial_index=trial_index,
                     order_index=order_index * 2 + 1,
                     pair_id=pair_id,
@@ -483,6 +496,7 @@ def _run_measured_trial(
     docker_image: str,
     monitor_mode: str,
     optimization_mode: str,
+    advanced_options: AdvancedRunOptions | None,
     trial_index: int,
     order_index: int,
     pair_id: str,
@@ -503,6 +517,7 @@ def _run_measured_trial(
         docker_image=docker_image,
         monitor_mode=monitor_mode,
         optimization_mode=optimization_mode,
+        advanced_options=advanced_options,
     )
     trial = {
         "run_id": run_dir.name,

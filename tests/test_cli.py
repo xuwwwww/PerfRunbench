@@ -446,6 +446,31 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(run_with_budget.call_args.kwargs["runtime_env_profile"], "runtime-pytorch-max-performance")
 
+    def test_run_command_requires_confirmation_for_advanced_tuning(self) -> None:
+        with self.assertRaises(SystemExit):
+            main(["run", "--runtime-profile", "runtime-pytorch-aggressive", "--", "python", "train.py"])
+
+    @patch("autotune.cli.run_with_budget")
+    def test_run_command_passes_advanced_options(self, run_with_budget) -> None:
+        run_with_budget.return_value = (0, ".autotuneai/runs/run1")
+        with patch("autotune.cli.generate_run_report") as generate_report, redirect_stdout(io.StringIO()):
+            generate_report.return_value = Path(".autotuneai/runs/run1/report.html")
+            code = main([
+                "run",
+                "--confirm-advanced-tuning",
+                "--numa-node",
+                "0",
+                "--extra-env",
+                "CUDNN_BENCHMARK=1",
+                "--",
+                "python",
+                "train.py",
+            ])
+        self.assertEqual(code, 0)
+        advanced = run_with_budget.call_args.kwargs["advanced_options"]
+        self.assertEqual(advanced.numa_node, 0)
+        self.assertEqual(advanced.extra_env, {"CUDNN_BENCHMARK": "1"})
+
     def test_tune_runtime_command_prints_env(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

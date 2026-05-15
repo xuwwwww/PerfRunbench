@@ -131,30 +131,61 @@ def tune_numeric_config_key(
 
 
 def find_numeric_assignment(config_file: str | Path, key: str) -> tuple[int, str]:
+    value, assignment = find_scalar_assignment(config_file, key)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise BatchSizeTuningError(f"assignment for key {key!r} is not an integer in {config_file}")
+    return value, assignment
+
+
+def find_scalar_assignment(config_file: str | Path, key: str) -> tuple[int | float | bool | str, str]:
     path = Path(config_file)
     if not path.exists():
         raise BatchSizeTuningError(f"config file does not exist: {path}")
     text = path.read_text(encoding="utf-8")
-    pattern = re.compile(rf"^([ \t]*{re.escape(key)}[ \t]*[:=][ \t]*)(\d+)([ \t]*(?:#.*)?)$", re.MULTILINE)
+    pattern = re.compile(rf"^([ \t]*{re.escape(key)}[ \t]*[:=][ \t]*)([^#\r\n]+?)([ \t]*(?:#.*)?)$", re.MULTILINE)
     matches = list(pattern.finditer(text))
     if not matches:
-        raise BatchSizeTuningError(f"could not find a numeric assignment for key {key!r} in {path}")
+        raise BatchSizeTuningError(f"could not find an assignment for key {key!r} in {path}")
     if len(matches) > 1:
         raise BatchSizeTuningError(f"found {len(matches)} assignments for key {key!r}; refusing ambiguous edit")
     match = matches[0]
-    return int(match.group(2)), match.group(0)
+    return parse_scalar_value(match.group(2).strip()), match.group(0)
 
 
 def find_batch_size_assignment(config_file: str | Path, key: str) -> tuple[int, str]:
     return find_numeric_assignment(config_file, key)
 
 
-def replace_assignment_value(assignment_line: str, value: int) -> str:
-    pattern = re.compile(r"^([ \t]*[^:=]+?[ \t]*[:=][ \t]*)(\d+)([ \t]*(?:#.*)?)$")
+def replace_assignment_value(assignment_line: str, value: Any) -> str:
+    pattern = re.compile(r"^([ \t]*[^:=]+?[ \t]*[:=][ \t]*)([^#\r\n]+?)([ \t]*(?:#.*)?)$")
     match = pattern.match(assignment_line)
     if not match:
         raise BatchSizeTuningError(f"unsupported assignment line: {assignment_line}")
-    return f"{match.group(1)}{value}{match.group(3)}"
+    return f"{match.group(1)}{format_scalar_value(value)}{match.group(3)}"
+
+
+def parse_scalar_value(text: str) -> int | float | bool | str:
+    normalized = text.strip()
+    lowered = normalized.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if re.fullmatch(r"-?\d+", normalized):
+        return int(normalized)
+    if re.fullmatch(r"-?(?:\d+\.\d+|\d+\.|\.\d+)", normalized):
+        return float(normalized)
+    if (normalized.startswith('"') and normalized.endswith('"')) or (
+        normalized.startswith("'") and normalized.endswith("'")
+    ):
+        return normalized[1:-1]
+    return normalized
+
+
+def format_scalar_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 def _load_resource_summary(run_dir: Path) -> dict[str, Any]:

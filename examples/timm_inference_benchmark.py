@@ -45,6 +45,13 @@ def main() -> int:
     amp_dtype_name = str(config.get("amp_dtype", "float16"))
     amp_dtype = _amp_dtype(torch, amp_dtype_name)
     extra_gpu_memory_target_mb = int(config.get("extra_gpu_memory_target_mb", 0))
+    loader_workers = int(config.get("loader_workers", 4))
+    pin_memory = bool(config.get("pin_memory", True))
+    prefetch_factor = int(config.get("prefetch_factor", 4))
+    persistent_workers = bool(config.get("persistent_workers", True))
+    synthetic_dataset_size = int(config.get("synthetic_dataset_size", max(batch_size * 64, 4096)))
+    use_torch_compile = bool(config.get("torch_compile", False))
+    compile_mode = str(config.get("compile_mode", "reduce-overhead"))
 
     torch.backends.cuda.matmul.allow_tf32 = use_tf32
     torch.backends.cudnn.allow_tf32 = use_tf32
@@ -55,29 +62,47 @@ def main() -> int:
     model.eval()
     if use_channels_last:
         model = model.to(memory_format=torch.channels_last)
+    if use_torch_compile:
+        if not hasattr(torch, "compile"):
+            raise SystemExit("torch.compile was requested, but this PyTorch build does not expose torch.compile.")
+        model = torch.compile(model, mode=compile_mode)
 
-    inputs = torch.randn((batch_size, channels, image_size, image_size), device=device, dtype=torch.float32)
-    if use_channels_last:
-        inputs = inputs.contiguous(memory_format=torch.channels_last)
+    loader = _build_loader(
+        torch,
+        batch_size=batch_size,
+        channels=channels,
+        image_size=image_size,
+        synthetic_dataset_size=synthetic_dataset_size,
+        loader_workers=loader_workers,
+        pin_memory=pin_memory,
+        prefetch_factor=prefetch_factor,
+        persistent_workers=persistent_workers,
+    )
     extra_blocks = _allocate_gpu_memory(torch, device, extra_gpu_memory_target_mb)
 
     _run_loop(
         torch,
         model,
-        inputs,
+        loader,
+        device,
         warmup_seconds,
         amp_dtype=amp_dtype,
+        use_channels_last=use_channels_last,
+        pin_memory=pin_memory,
     )
     torch.cuda.synchronize(device_index)
     start = time.perf_counter()
-    steps, latency_events, output_checksum = _run_loop(
+    steps, sample_count, latency_events, output_checksum = _run_loop(
         torch,
         model,
-        inputs,
+        loader,
+        device,
         duration_seconds,
         amp_dtype=amp_dtype,
         latency_sample_limit=latency_sample_limit,
         return_checksum=True,
+        use_channels_last=use_channels_last,
+        pin_memory=pin_memory,
     )
     torch.cuda.synchronize(device_index)
     elapsed = time.perf_counter() - start
@@ -88,7 +113,7 @@ def main() -> int:
 
     metrics = {
         "duration_seconds": round(elapsed, 6),
-        "samples_per_second": round((steps * batch_size) / max(elapsed, 1e-9), 3),
+        "samples_per_second": round(sample_count / max(elapsed, 1e-9), 3),
         "step_time_mean_seconds": round(elapsed / max(1, steps), 6),
         **summarize_step_latencies(step_latencies),
         "epoch_time_mean_seconds": round(elapsed, 6),
@@ -96,8 +121,8 @@ def main() -> int:
         "optimizer_steps": steps,
         "completed_epochs": 1,
         "feature_count": image_size * image_size * channels,
-        "train_samples": steps * batch_size,
-        "peak_batch_payload_mb": round(inputs.numel() * inputs.element_size() / (1024 * 1024), 3),
+        "train_samples": sample_count,
+        "peak_batch_payload_mb": round((batch_size * channels * image_size * image_size * 4) / (1024 * 1024), 3),
         "gpu_peak_memory_allocated_mb": round(torch.cuda.max_memory_allocated(device_index) / (1024 * 1024), 3),
         "gpu_peak_memory_reserved_mb": round(torch.cuda.max_memory_reserved(device_index) / (1024 * 1024), 3),
         "device": torch.cuda.get_device_name(device_index),
@@ -108,6 +133,13 @@ def main() -> int:
         "amp_dtype": amp_dtype_name,
         "allow_tf32": use_tf32,
         "channels_last": use_channels_last,
+        "loader_workers": loader_workers,
+        "pin_memory": pin_memory,
+        "prefetch_factor": prefetch_factor if loader_workers > 0 else None,
+        "persistent_workers": persistent_workers if loader_workers > 0 else False,
+        "synthetic_dataset_size": synthetic_dataset_size,
+        "torch_compile": use_torch_compile,
+        "compile_mode": compile_mode if use_torch_compile else None,
         "extra_gpu_memory_target_mb": extra_gpu_memory_target_mb,
         "checksum": round(output_checksum + _extra_checksum(extra_blocks), 6),
         "dataset": "timm-synthetic-inference",
@@ -128,19 +160,32 @@ def main() -> int:
 def _run_loop(
     torch,
     model,
-    inputs,
+    loader,
+    device,
     duration_seconds: float,
     *,
     amp_dtype,
     latency_sample_limit: int = 0,
     return_checksum: bool = False,
+    use_channels_last: bool = False,
+    pin_memory: bool = False,
 ):
     deadline = time.perf_counter() + max(0.0, duration_seconds)
     steps = 0
+    sample_count = 0
     latency_events = []
     checksum = 0.0
+    iterator = iter(loader)
     with torch.inference_mode():
         while time.perf_counter() < deadline:
+            try:
+                inputs, _labels = next(iterator)
+            except StopIteration:
+                iterator = iter(loader)
+                inputs, _labels = next(iterator)
+            inputs = inputs.to(device, non_blocking=pin_memory)
+            if use_channels_last:
+                inputs = inputs.contiguous(memory_format=torch.channels_last)
             start_event = None
             end_event = None
             if len(latency_events) < max(0, latency_sample_limit):
@@ -155,7 +200,56 @@ def _run_loop(
             if return_checksum:
                 checksum += float(outputs.float().mean().item())
             steps += 1
-    return steps, latency_events, checksum
+            sample_count += int(inputs.shape[0])
+    return steps, sample_count, latency_events, checksum
+
+
+def _build_loader(
+    torch,
+    *,
+    batch_size: int,
+    channels: int,
+    image_size: int,
+    synthetic_dataset_size: int,
+    loader_workers: int,
+    pin_memory: bool,
+    prefetch_factor: int,
+    persistent_workers: bool,
+):
+    dataset = _SyntheticImageDataset(
+        torch,
+        sample_count=synthetic_dataset_size,
+        channels=channels,
+        image_size=image_size,
+    )
+    kwargs = {
+        "batch_size": batch_size,
+        "shuffle": False,
+        "drop_last": True,
+        "num_workers": max(0, loader_workers),
+        "pin_memory": pin_memory,
+    }
+    if loader_workers > 0:
+        kwargs["prefetch_factor"] = max(2, prefetch_factor)
+        kwargs["persistent_workers"] = persistent_workers
+    return torch.utils.data.DataLoader(dataset, **kwargs)
+
+
+class _SyntheticImageDataset:
+    def __init__(self, torch, *, sample_count: int, channels: int, image_size: int) -> None:
+        self._torch = torch
+        self._sample_count = max(1, sample_count)
+        self._shape = (channels, image_size, image_size)
+
+    def __len__(self) -> int:
+        return self._sample_count
+
+    def __getitem__(self, index: int):
+        generator = self._torch.Generator()
+        generator.manual_seed(index)
+        sample = self._torch.randn(self._shape, generator=generator, dtype=self._torch.float32)
+        label = int(index % 1000)
+        return sample, label
 
 
 def _allocate_gpu_memory(torch, device, target_mb: int):

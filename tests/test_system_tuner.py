@@ -164,6 +164,7 @@ class SystemTunerTest(unittest.TestCase):
         self.assertIn("linux-memory-conservative", profiles)
         self.assertIn("linux-throughput", profiles)
         self.assertIn("linux-performance", profiles)
+        self.assertIn("linux-extreme-throughput", profiles)
         self.assertIn("linux-low-latency", profiles)
         self.assertIn("linux-cpu-conservative", profiles)
         self.assertIn("windows-training-safe", profiles)
@@ -202,7 +203,7 @@ class SystemTunerTest(unittest.TestCase):
             (policy / "scaling_min_freq").write_text("400000\n", encoding="utf-8")
             (policy / "cpuinfo_max_freq").write_text("3800000\n", encoding="utf-8")
 
-            settings = _dynamic_profile_settings("linux-performance", cpufreq_base=Path(temp_dir))
+            settings = _dynamic_profile_settings("linux-extreme-throughput", cpufreq_base=Path(temp_dir))
 
         keys = {setting.key: setting.value for setting in settings}
         self.assertEqual(keys["cpu.cpufreq.policy0.scaling_governor"], "performance")

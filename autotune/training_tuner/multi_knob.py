@@ -9,7 +9,8 @@ from autotune.resource.budget import ResourceBudget
 from autotune.resource.run_state import load_manifest, write_json
 from autotune.training_tuner.batch_size import (
     BatchSizeTuningError,
-    find_numeric_assignment,
+    find_scalar_assignment,
+    parse_scalar_value,
     replace_assignment_value,
 )
 
@@ -17,7 +18,7 @@ from autotune.training_tuner.batch_size import (
 @dataclass(frozen=True)
 class KnobTrial:
     key: str
-    value: int
+    value: int | float | bool | str
     run_id: str
     run_dir: str
     return_code: int
@@ -30,7 +31,7 @@ class KnobTrial:
 
 def tune_training_knobs(
     config_file: str | Path,
-    knob_values: dict[str, list[int]],
+    knob_values: dict[str, list[int | float | bool | str]],
     command: list[str],
     budget: ResourceBudget,
     output: str | Path,
@@ -64,7 +65,7 @@ def tune_training_knobs(
             if not values:
                 raise BatchSizeTuningError(f"knob {key!r} has no candidate values")
             config_path.write_text(current_text, encoding="utf-8")
-            original_value, current_assignment = find_numeric_assignment(config_path, key)
+            original_value, current_assignment = find_scalar_assignment(config_path, key)
             stage_trials: list[KnobTrial] = []
             best_trial: KnobTrial | None = None
             best_text = current_text
@@ -153,13 +154,13 @@ def _run_candidate(
     )
 
 
-def parse_knob_specs(specs: list[str]) -> dict[str, list[int]]:
-    result: dict[str, list[int]] = {}
+def parse_knob_specs(specs: list[str]) -> dict[str, list[int | float | bool | str]]:
+    result: dict[str, list[int | float | bool | str]] = {}
     for spec in specs:
         if "=" not in spec:
             raise BatchSizeTuningError(f"invalid knob spec {spec!r}; expected key=v1,v2")
         key, values_text = spec.split("=", 1)
-        values = [int(item.strip()) for item in values_text.split(",") if item.strip()]
+        values = [parse_scalar_value(item.strip()) for item in values_text.split(",") if item.strip()]
         if not values:
             raise BatchSizeTuningError(f"invalid knob spec {spec!r}; no values found")
         result[key.strip()] = values

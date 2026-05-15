@@ -95,6 +95,14 @@ autotuneai tune-training \
   --knob gradient_accumulation_steps=1,2,4 \
   --knob preload_copies=4,8,12 \
   -- python examples/iris_train.py --config examples/iris_train_config.yaml
+autotuneai tune-training \
+  --file examples/timm_inference_benchmark_config.yaml \
+  --knob batch_size=128,256 \
+  --knob loader_workers=2,4,8 \
+  --knob pin_memory=true,false \
+  --knob amp_dtype=float16,bfloat16 \
+  --knob torch_compile=true,false \
+  -- python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
 sudo -v
 autotuneai compare-tuning \
   --workload-profile memory \
@@ -129,11 +137,13 @@ autotuneai tune-system
 autotuneai tune-system --profile linux-memory-conservative
 autotuneai tune-system --profile linux-throughput
 autotuneai tune-system --profile linux-performance
+autotuneai tune-system --profile linux-extreme-throughput
 autotuneai tune-system --profile linux-low-latency
 autotuneai tune-system --profile windows-throughput
 autotuneai tune-system --profile windows-performance
 autotuneai tune-system --recommend-all
 autotuneai tune-runtime --profile runtime-pytorch-max-performance
+autotuneai tune-runtime --profile runtime-pytorch-aggressive
 autotuneai tune-gpu --profile nvidia-performance
 ```
 
@@ -186,6 +196,9 @@ linux-throughput
 linux-performance
   Aggressive throughput-first Linux/WSL profile with larger dirty-page windows and forced THP.
 
+linux-extreme-throughput
+  Higher-risk Linux throughput profile with larger dirty-page bursts and the same reversible cpufreq/EPP path as linux-performance.
+
 linux-low-latency
   Lower dirty-page and THP settings for smoother latency.
 
@@ -218,7 +231,25 @@ runtime-pytorch-gpu-performance
 
 runtime-pytorch-max-performance
   Combine CPU thread tuning and PyTorch CUDA throughput variables for aggressive benchmark runs.
+
+runtime-pytorch-aggressive
+  Add cuDNN autotune and more aggressive CUDA allocator/runtime settings. Requires explicit confirmation before execution.
 ```
+
+Advanced execution controls are available for explicit experiments:
+
+```bash
+autotuneai run \
+  --confirm-advanced-tuning \
+  --tune-system linux-extreme-throughput \
+  --runtime-profile runtime-pytorch-aggressive \
+  --extra-env CUDNN_BENCHMARK=1 \
+  --extra-env PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,garbage_collection_threshold:0.96 \
+  --numa-node 0 \
+  -- python examples/timm_inference_benchmark.py --config examples/timm_inference_benchmark_config.yaml
+```
+
+`--confirm-advanced-tuning` is required whenever you request `linux-extreme-throughput`, `runtime-pytorch-aggressive`, explicit NUMA binding, or arbitrary `--extra-env KEY=VALUE` overrides. PerfRunbench records these overrides in `advanced_options.json` and `advanced_runtime_env.json` under the run directory.
 
 Resource guard smoke test with CPU and memory load:
 
@@ -379,6 +410,7 @@ python examples/timm_inference_benchmark.py --config examples/timm_inference_ben
 ```
 
 This uses a real `timm` model on CUDA, emits throughput and step-latency metrics into `training_metrics.json`, and is a better next step than the synthetic pressure test when you want to compare raw model throughput.
+It now exercises a synthetic CPU-side DataLoader as well, so `loader_workers`, `pin_memory`, `prefetch_factor`, `persistent_workers`, `channels_last`, `amp_dtype`, and `torch_compile` can be tuned in the benchmark config.
 
 If a run is interrupted after runtime tuning was applied, PerfRunbench records `.autotuneai/active_tuning_state.json`. Use `autotuneai restore --active` to revert to the pre-run system state without manually finding the run id.
 
