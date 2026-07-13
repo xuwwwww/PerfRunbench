@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from autotune.arm_tune.config import load_target_spec, parse_target_spec
+from autotune.arm_tune.errors import ArmTuneConfigError
+
+
+class ArmTuneConfigTest(unittest.TestCase):
+    def test_parse_local_target_defaults(self) -> None:
+        spec = parse_target_spec({"schema_version": "1.0", "target": {"type": "local"}})
+
+        self.assertEqual(spec.type, "local")
+        self.assertTrue(spec.strict_host_key_checking)
+        self.assertEqual(spec.schema_version, "1.0")
+
+    def test_parse_ssh_target_defaults_to_strict_host_key_checking(self) -> None:
+        spec = parse_target_spec({"schema_version": "1.0", "target": {"type": "ssh", "host": "arm-host"}})
+
+        self.assertEqual(spec.type, "ssh")
+        self.assertEqual(spec.host, "arm-host")
+        self.assertEqual(spec.port, 22)
+        self.assertEqual(spec.remote_python, "python3")
+        self.assertEqual(spec.remote_module, "autotune.cli")
+        self.assertTrue(spec.strict_host_key_checking)
+
+    def test_parse_ssh_target_accepts_structured_remote_worker_fields(self) -> None:
+        spec = parse_target_spec(
+            {
+                "schema_version": "1.0",
+                "target": {
+                    "type": "ssh",
+                    "host": "arm-host",
+                    "remote_python": "/usr/bin/python3",
+                    "remote_module": "autotune.cli",
+                },
+            }
+        )
+
+        self.assertEqual(spec.remote_python, "/usr/bin/python3")
+        self.assertEqual(spec.remote_module, "autotune.cli")
+
+    def test_rejects_unknown_target_fields(self) -> None:
+        with self.assertRaises(ArmTuneConfigError):
+            parse_target_spec({"schema_version": "1.0", "target": {"type": "local", "secret": "nope"}})
+
+    def test_rejects_arbitrary_remote_command_field(self) -> None:
+        with self.assertRaises(ArmTuneConfigError):
+            parse_target_spec(
+                {
+                    "schema_version": "1.0",
+                    "target": {
+                        "type": "ssh",
+                        "host": "arm-host",
+                        "remote_worker_command": "python3 -m autotune.cli arm worker",
+                    },
+                }
+            )
+
+    def test_rejects_invalid_remote_module(self) -> None:
+        with self.assertRaises(ArmTuneConfigError):
+            parse_target_spec(
+                {
+                    "schema_version": "1.0",
+                    "target": {"type": "ssh", "host": "arm-host", "remote_module": "autotune.cli;echo nope"},
+                }
+            )
+
+    def test_rejects_ssh_without_host(self) -> None:
+        with self.assertRaises(ArmTuneConfigError):
+            parse_target_spec({"schema_version": "1.0", "target": {"type": "ssh"}})
+
+    def test_load_json_config(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "target.json"
+            path.write_text('{"schema_version": "1.0", "target": {"type": "local"}}', encoding="utf-8")
+
+            spec = load_target_spec(path)
+
+        self.assertEqual(spec.type, "local")
+
+    def test_sanitized_dict_redacts_identity_file_path(self) -> None:
+        spec = parse_target_spec(
+            {
+                "schema_version": "1.0",
+                "target": {"type": "ssh", "host": "arm-host", "identity_file": "~/.ssh/id_ed25519"},
+            }
+        )
+
+        self.assertEqual(spec.sanitized_dict()["identity_file"], "<configured>")
+
+
+if __name__ == "__main__":
+    unittest.main()

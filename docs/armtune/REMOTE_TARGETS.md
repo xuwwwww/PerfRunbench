@@ -1,0 +1,114 @@
+# Remote Targets
+
+## Supported Initial Targets
+
+ArmTune should initially support:
+
+- `local`: production benchmark only when the local machine is Linux Arm64.
+- `ssh`: remote Linux Arm64 target over the system OpenSSH client.
+
+Controller-only operations such as config validation, report generation, and
+fixture-based tests may run on x86_64.
+
+## Local Target Rules
+
+`LocalArmTarget` must:
+
+- Accept production benchmark execution only on Linux Arm64.
+- Reject Windows, macOS, WSL x86_64, and Linux x86_64 production benchmark
+  execution.
+- Permit fixture and report operations on the controller.
+- Preserve the distinction between controller inspection and production target
+  inspection.
+
+## SSH Target Rules
+
+`SshArmTarget` must:
+
+- Use the system OpenSSH client for the MVP.
+- Use strict host-key verification by default.
+- Support host, user, port, identity file, SSH executable, SCP executable,
+  remote Python executable, remote Python module, remote work directory,
+  connect timeout, command timeout, and remote artifact retention.
+- Never log private key contents.
+- Never store credentials in run artifacts.
+- Preserve stdout, stderr, exit status, and timeout information.
+- Validate that the target identifies as Linux Arm64 before production
+  benchmark commands run.
+- Upload job specs and invoke a fixed worker command rather than composing
+  large arbitrary shell scripts.
+- Never use `shell=True`.
+- Never accept arbitrary remote worker command strings.
+- Not add Paramiko unless the system OpenSSH approach has a documented blocker.
+- Clean temporary directories when safe, while allowing configured artifact
+  retention for debugging.
+
+## Versioned Worker Protocol
+
+Controller flow:
+
+1. Validate configuration.
+2. Create a versioned JSON job specification.
+3. Upload only required files.
+4. Invoke a fixed remote ArmTune worker command.
+5. Download versioned result manifests and artifacts.
+6. Validate schema versions and artifact digests.
+
+Remote worker flow:
+
+1. Receive only a job-spec path and run directory.
+2. Validate every field in the job spec.
+3. Execute an allowlisted operation.
+4. Write versioned structured results.
+5. Preserve raw stdout and stderr.
+6. Perform cleanup.
+
+The protocol boundary is the only place where SSH command-line quoting should
+be needed. The remote command shape is fixed; user-provided benchmark commands
+must be represented inside the uploaded JSON job spec and validated by the
+worker before execution.
+
+## Remote Prerequisite Checks
+
+Before production benchmark execution, the controller must check:
+
+- Python executable availability through the configured `remote_python`.
+- Worker module import availability through the configured `remote_module`.
+- Worker protocol compatibility through a versioned `check_prerequisites`
+  operation.
+- Linux operating system.
+- Arm64 architecture.
+- Writable remote work directory.
+
+The MVP may require PerfRunbench to be installed manually on the remote target.
+ArmTune must not perform automatic remote installation or cloud provisioning.
+
+## Model Handling
+
+The MVP should not upload a model unless explicitly configured. When the model
+already exists on the remote target, ArmTune should validate basename, size, and
+expected SHA-256 when provided.
+
+Model weights must not be committed or copied into run artifacts.
+
+## Worker Entry Point
+
+The internal worker command should be documented as internal:
+
+```text
+python3 -m autotune.cli arm worker --job-spec <remote-json-path> --run-dir <remote-run-dir>
+```
+
+The normal user workflow should remain controller-side commands such as:
+
+```text
+autotuneai arm doctor --target-config <path>
+autotuneai arm inspect-host --target-config <path>
+```
+
+## Timeouts and Cleanup
+
+All target operations should use bounded timeouts. Child processes must be
+terminated and reaped on success, failure, timeout, SIGINT, and SIGTERM.
+
+Temporary tuning must be restored after benchmark failure.

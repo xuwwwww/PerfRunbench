@@ -76,6 +76,11 @@ def build_parser() -> argparse.ArgumentParser:
     executors.add_argument("--check-sudo-cache", action="store_true")
     executors.set_defaults(handler=_cmd_executors)
 
+    arm = subparsers.add_parser("arm", help="Run ArmTune target inspection and validation commands.", add_help=False)
+    arm.add_argument("--help", action="store_true", dest="arm_help")
+    arm.add_argument("arm_args", nargs=argparse.REMAINDER)
+    arm.set_defaults(handler=_cmd_arm)
+
     run = subparsers.add_parser("run", help="Run a command with resource monitoring and optional limits.")
     _add_budget_args(run)
     run.add_argument("workload", nargs=argparse.REMAINDER)
@@ -353,6 +358,20 @@ def _cmd_executors(args: argparse.Namespace) -> int:
     )
     print(json.dumps(capabilities, indent=2, sort_keys=True))
     return 0
+
+
+def _cmd_arm(args: argparse.Namespace) -> int:
+    from autotune.arm_tune.cli import main as arm_main
+
+    arm_args = list(args.arm_args)
+    if getattr(args, "arm_help", False):
+        arm_args.insert(0, "--help")
+    try:
+        return arm_main(arm_args)
+    except SystemExit as exc:
+        if isinstance(exc.code, int):
+            return exc.code
+        return 0
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
