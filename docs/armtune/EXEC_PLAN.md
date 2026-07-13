@@ -399,3 +399,82 @@ production_benchmark_ready: false
 `autotuneai arm doctor` may return exit code 0 when diagnostics complete even
 when `production_benchmark_ready` is false. `--require-production` returns a
 non-zero exit code when no configured Linux Arm64 production target is ready.
+
+## Phase 2A Plan: Minimal llama-bench Vertical Slice
+
+Status: planned only. Do not implement during the Phase 1 hardening checkpoint.
+
+Phase 2A implements only the smallest end-to-end llama-bench path needed to
+prove the controller/worker protocol, artifact handling, and defensive parsing
+shape.
+
+Allowed scope:
+
+- Inspect an existing `llama-bench` binary.
+- Capture binary version, help output, and system information.
+- Record binary SHA-256.
+- Validate a supplied model path.
+- Record model SHA-256.
+- Use a fixed benchmark configuration.
+- Send a controller-to-worker JSON benchmark job.
+- Execute through `LocalArmTarget` and `SshArmTarget`.
+- Preserve raw stdout and stderr artifacts.
+- Implement a defensive `llama-bench` parser.
+- Capture prefill throughput.
+- Capture decode throughput.
+- Record trial status and parse status separately.
+- Write a versioned benchmark result.
+- Download result manifests and artifacts from SSH targets.
+- Add `autotuneai arm benchmark`.
+- Add fake executable integration tests.
+
+Out of scope for Phase 2A:
+
+- `llama-server`.
+- HTTP or streaming benchmarks.
+- Time to first token.
+- Concurrency.
+- Candidate search.
+- Quality gates.
+- Build profiles.
+- Arm Performix.
+- Performance Passport generation.
+- Automatic model download.
+- Cloud provisioning.
+
+Planned file additions:
+
+```text
+autotune/arm_tune/benchmark/__init__.py
+autotune/arm_tune/benchmark/llama_bench.py
+autotune/arm_tune/benchmark/parser.py
+autotune/arm_tune/benchmark/artifacts.py
+autotune/arm_tune/benchmark/hashes.py
+tests/test_arm_tune_benchmark.py
+tests/test_arm_tune_llama_bench_parser.py
+tests/fixtures/arm_tune/fake_llama_bench.py
+```
+
+Planned file updates:
+
+```text
+autotune/arm_tune/schemas.py
+autotune/arm_tune/cli.py
+autotune/arm_tune/targets/base.py
+autotune/arm_tune/targets/local.py
+autotune/arm_tune/targets/ssh.py
+autotune/arm_tune/targets/protocol.py
+autotune/arm_tune/targets/worker.py
+docs/armtune/BENCHMARK_METHODOLOGY.md
+docs/armtune/LIMITATIONS.md
+docs/armtune/RESULTS_TEMPLATE.md
+```
+
+Phase 2A test requirements:
+
+- Tests must use fake executables and synthetic fixture output only.
+- Tests must not require Arm hardware, an SSH server, network access, a real
+  model, root privileges, Arm Performix, or cloud credentials.
+- Parser failures must produce explicit parse status, not zero-valued metrics.
+- Host capability evidence and workload execution evidence must remain separate
+  schemas.
