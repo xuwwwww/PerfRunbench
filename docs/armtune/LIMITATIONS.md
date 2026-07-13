@@ -57,10 +57,19 @@ should be labeled unverified.
 
 - GitHub native Arm64 CI proves packaging, CLI, host inspection, focused tests,
   and fixture benchmark plumbing on an Arm64 Linux runner only.
+- The completed GitHub run
+  `https://github.com/xuwwwww/PerfRunbench/actions/runs/29270842566` validated
+  commit `2074dfac80e699ba22178774b28c66e79afae475` on Linux `aarch64`
+  kernel `6.17.0-1018-azure`.
+- Downloaded artifact validation passed for artifact
+  `armtune-arm64-smoke-artifacts`; 13 artifacts were checked and
+  `result_origin` remained `test_fixture`.
 - GitHub native Arm64 CI does not prove real model performance, inference
   optimization, KleidiAI usage, Performix support, or competition benchmark
   results.
 - Workflow timing is not benchmark data.
+- Fixture values such as `321.5 tokens/s` prefill and `87.25 tokens/s` decode
+  are fake workload constants and must not be reported as Arm performance.
 - Fake llama-bench output remains `test_fixture` on real Arm hardware.
 - Phase 2B does not use AWS, external SSH servers, cloud provisioning, real
   models, `llama-server`, time to first token, candidate search, quality gates,

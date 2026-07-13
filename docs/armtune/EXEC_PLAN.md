@@ -494,8 +494,8 @@ Phase 2A completion criteria:
 
 ## Phase 2B Plan: Native Arm64 CI Validation and Benchmark Pipeline Hardening
 
-Status: implemented locally; GitHub-hosted Arm64 workflow still requires an
-actual GitHub run before it can be claimed as validated.
+Status: completed. The GitHub-hosted native Arm64 workflow was executed
+successfully after the Phase 2B implementation was pushed.
 
 Phase 2B validates that the Phase 2A benchmark slice can run its fixture smoke
 path on a GitHub-hosted native Arm64 Linux runner while hardening benchmark
@@ -571,3 +571,41 @@ Phase 2B completion criteria:
   explicit user-supplied binary/model paths plus an acknowledgement flag.
 - No real model, external SSH server, AWS/cloud resource, Performix, candidate
   search, quality gate, build profile, or Performance Passport is implemented.
+
+Phase 2B validation evidence:
+
+```text
+Workflow: ArmTune Native Arm64 Smoke
+Workflow file: .github/workflows/armtune-arm64-smoke.yml
+GitHub run URL: https://github.com/xuwwwww/PerfRunbench/actions/runs/29270842566
+GitHub run ID: 29270842566
+GitHub job URL: https://github.com/xuwwwww/PerfRunbench/actions/runs/29270842566/job/86887839990
+GitHub job ID: 86887839990
+Event: push
+Conclusion: success
+Started: 2026-07-13T17:32:35Z
+Tested commit: 2074dfac80e699ba22178774b28c66e79afae475
+Runner OS: Linux
+Runner architecture: aarch64
+Kernel: 6.17.0-1018-azure
+Uploaded artifact name: armtune-arm64-smoke-artifacts
+Artifact run ID: 20260713_173254_650848
+Focused ArmTune suite at tested commit: 94 tests
+Downloaded artifact digest validation: passed, 13 artifacts checked
+Benchmark result_origin: test_fixture
+Benchmark parse_status: parsed
+Benchmark status: passed
+```
+
+The fixture metrics parsed from the fake llama-bench output were
+`321.5 tokens/s` for prefill and `87.25 tokens/s` for decode. These are
+fixture constants and are not Arm performance results.
+
+This evidence supports the following claim only:
+
+> ArmTune's controller, worker, provenance, parser, and artifact-validation
+> pipeline was validated natively on a GitHub-hosted Linux Arm64 runner.
+
+This evidence does not show real llama.cpp execution, real model inference,
+KleidiAI usage, candidate search, quality validation, Performix support, or an
+ArmTune optimization result.

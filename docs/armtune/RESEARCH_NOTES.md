@@ -70,3 +70,36 @@ Access date for all entries: 2026-07-13.
   integrated path was used.
 - Unresolved uncertainty: The initial llama.cpp vertical slice must verify
   whether and how the chosen llama.cpp version exposes KleidiAI evidence.
+
+## Native Arm64 CI Validation
+
+- Source: GitHub Actions
+- Workflow: `ArmTune Native Arm64 Smoke`
+- Workflow file: `.github/workflows/armtune-arm64-smoke.yml`
+- Run URL: https://github.com/xuwwwww/PerfRunbench/actions/runs/29270842566
+- Run ID: `29270842566`
+- Job URL: https://github.com/xuwwwww/PerfRunbench/actions/runs/29270842566/job/86887839990
+- Job ID: `86887839990`
+- Event: `push`
+- Conclusion: `success`
+- Tested commit: `2074dfac80e699ba22178774b28c66e79afae475`
+- Runner evidence from downloaded artifact:
+  - OS: `Linux`
+  - architecture: `aarch64`
+  - kernel: `6.17.0-1018-azure`
+- Uploaded artifact name: `armtune-arm64-smoke-artifacts`
+- Artifact run ID: `20260713_173254_650848`
+- Benchmark result origin: `test_fixture`
+- Benchmark parse status: `parsed`
+- Downloaded artifact digest validation: `passed`; 13 artifacts checked.
+- Focused ArmTune suite at the tested commit: 94 tests.
+- Relevant conclusion: ArmTune's controller, worker, provenance, parser, and
+  artifact-validation pipeline was validated natively on a GitHub-hosted Linux
+  Arm64 runner.
+- Claim boundary: the parsed fixture values `321.5 tokens/s` and
+  `87.25 tokens/s` are fake workload constants, not Arm performance results.
+- Implementation impact: Phase 2C can move to a real SSH Linux Arm64 target,
+  real `llama-bench` binary, and user-supplied small GGUF model for a
+  preliminary measured baseline.
+- Unresolved uncertainty: real llama.cpp, model execution, optimized-path
+  evidence, quality validation, Performix, and search remain unvalidated.
