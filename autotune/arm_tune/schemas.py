@@ -9,6 +9,11 @@ from autotune.arm_tune import SCHEMA_VERSION
 
 
 UNKNOWN = "unknown"
+RESULT_ORIGINS = {"measured", "test_fixture", "unverified"}
+VALIDATION_STATUSES = {"passed", "failed"}
+EXECUTION_STATUSES = {"completed", "failed", "timeout", "not_run"}
+PARSE_STATUSES = {"parsed", "partially_parsed", "unsupported_format", "malformed_output", "no_metrics", "ambiguous_output"}
+BENCHMARK_STATUSES = {"passed", "failed"}
 
 
 def utc_now() -> str:
@@ -265,19 +270,48 @@ class LlamaBenchJobSpec:
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "LlamaBenchJobSpec":
         require_schema_version(payload)
+        executable_payload = _required_object(payload, "executable")
+        model_payload = _required_object(payload, "model")
+        benchmark_payload = _required_object(payload, "benchmark")
+        artifacts_payload = payload.get("artifacts", {})
+        if not isinstance(artifacts_payload, dict):
+            raise ValueError("artifacts must be an object")
+        additional = benchmark_payload.get("additional_supported_options", {})
+        if additional is None:
+            additional = {}
+        if not isinstance(additional, dict):
+            raise ValueError("benchmark.additional_supported_options must be an object")
+        result_origin = _optional_str(payload.get("result_origin", "unverified"), "result_origin")
+        _ensure_enum(result_origin, RESULT_ORIGINS, "result_origin")
         return cls(
-            protocol_version=str(payload["protocol_version"]),
-            operation=str(payload["operation"]),
-            run_id=str(payload["run_id"]),
-            target_run_directory=str(payload["target_run_directory"]),
-            executable=BenchmarkExecutableSpec(**_without_schema(payload["executable"])),
-            model=BenchmarkModelSpec(**_without_schema(payload["model"])),
-            benchmark=LlamaBenchSettings(**_without_schema(payload["benchmark"])),
-            artifacts=BenchmarkArtifactsSpec(**_without_schema(payload.get("artifacts", {}))),
-            target_type=str(payload.get("target_type", "local")),
-            remote_module=str(payload.get("remote_module", "autotune.cli")),
-            result_origin=str(payload.get("result_origin", "measured")),
-            created_at_utc=str(payload.get("created_at_utc", utc_now())),
+            protocol_version=_required_str(payload, "protocol_version"),
+            operation=_required_str(payload, "operation"),
+            run_id=_required_str(payload, "run_id"),
+            target_run_directory=_required_str(payload, "target_run_directory"),
+            executable=BenchmarkExecutableSpec(
+                path=_required_str(executable_payload, "path"),
+                expected_sha256=_optional_text(executable_payload.get("expected_sha256"), "expected_sha256"),
+            ),
+            model=BenchmarkModelSpec(
+                path=_required_str(model_payload, "path"),
+                expected_sha256=_optional_text(model_payload.get("expected_sha256"), "expected_sha256"),
+            ),
+            benchmark=LlamaBenchSettings(
+                threads=_required_int(benchmark_payload, "threads"),
+                prompt_tokens=_required_int(benchmark_payload, "prompt_tokens"),
+                generation_tokens=_required_int(benchmark_payload, "generation_tokens"),
+                repetitions=_required_int(benchmark_payload, "repetitions"),
+                timeout_seconds=_required_float(benchmark_payload, "timeout_seconds"),
+                additional_supported_options=dict(additional),
+            ),
+            artifacts=BenchmarkArtifactsSpec(
+                preserve_raw_stdout=_optional_bool(artifacts_payload.get("preserve_raw_stdout", True), "preserve_raw_stdout"),
+                preserve_raw_stderr=_optional_bool(artifacts_payload.get("preserve_raw_stderr", True), "preserve_raw_stderr"),
+            ),
+            target_type=_optional_str(payload.get("target_type", "local"), "target_type"),
+            remote_module=_optional_str(payload.get("remote_module", "autotune.cli"), "remote_module"),
+            result_origin=result_origin,
+            created_at_utc=_optional_str(payload.get("created_at_utc", utc_now()), "created_at_utc"),
         )
 
 
@@ -310,6 +344,7 @@ class LlamaBenchInspection:
     raw_help_stderr_path: str
     supported_flags: list[str] = field(default_factory=list)
     source_commit: str = UNKNOWN
+    fixture_marker_detected: bool = False
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -340,6 +375,8 @@ class ParsedMetric:
     source: str
     parser_strategy: str
     raw_source_line: str
+    raw_line_reference: int | None = None
+    validation_status: str = "passed"
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -385,6 +422,43 @@ class BenchmarkArtifactManifest:
 
 
 @dataclass(frozen=True)
+class BenchmarkProvenance:
+    result_origin: str
+    requested_origin: str
+    decision_reason: str
+    evidence: list[str] = field(default_factory=list)
+    host_production_ready: bool = False
+    fake_executable_marker: bool = False
+    test_only_host_override: bool = False
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class ArtifactValidationIssue:
+    label: str
+    path: str
+    issue: str
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class ArtifactValidationResult:
+    validation_status: str = "not_checked"
+    checked_artifacts: int = 0
+    issues: list[ArtifactValidationIssue] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
 class ArmBenchmarkResult:
     run_id: str
     operation: str
@@ -400,6 +474,8 @@ class ArmBenchmarkResult:
     inspection: LlamaBenchInspection | None = None
     trial: BenchmarkTrialResult | None = None
     artifacts: BenchmarkArtifactManifest = field(default_factory=BenchmarkArtifactManifest)
+    provenance: BenchmarkProvenance | None = None
+    artifact_validation: ArtifactValidationResult = field(default_factory=ArtifactValidationResult)
     artifact_directory: str = ""
     message: str = ""
     created_at_utc: str = field(default_factory=utc_now)
@@ -411,6 +487,20 @@ class ArmBenchmarkResult:
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "ArmBenchmarkResult":
         require_schema_version(payload)
+        result_origin = _required_str(payload, "result_origin")
+        validation_status = _required_str(payload, "validation_status")
+        execution_status = _required_str(payload, "execution_status")
+        parse_status = _required_str(payload, "parse_status")
+        benchmark_status = _required_str(payload, "benchmark_status")
+        _ensure_enum(result_origin, RESULT_ORIGINS, "result_origin")
+        _ensure_enum(validation_status, VALIDATION_STATUSES, "validation_status")
+        _ensure_enum(execution_status, EXECUTION_STATUSES, "execution_status")
+        _ensure_enum(parse_status, PARSE_STATUSES, "parse_status")
+        _ensure_enum(benchmark_status, BENCHMARK_STATUSES, "benchmark_status")
+        if benchmark_status == "passed" and (
+            validation_status != "passed" or execution_status != "completed" or parse_status != "parsed"
+        ):
+            raise ValueError("benchmark_status passed requires validation passed, execution completed, and parse parsed")
         host_payload = payload["host"]
         host = HostInfo(
             architecture=ArchitectureInfo(**_without_schema(host_payload["architecture"])),
@@ -421,20 +511,22 @@ class ArmBenchmarkResult:
             cgroup_limits=host_payload.get("cgroup_limits", {}),
         )
         return cls(
-            run_id=str(payload["run_id"]),
-            operation=str(payload["operation"]),
-            target_type=str(payload["target_type"]),
-            result_origin=str(payload["result_origin"]),
-            validation_status=str(payload["validation_status"]),
-            execution_status=str(payload["execution_status"]),
-            parse_status=str(payload["parse_status"]),
-            benchmark_status=str(payload["benchmark_status"]),
+            run_id=_required_str(payload, "run_id"),
+            operation=_required_str(payload, "operation"),
+            target_type=_required_str(payload, "target_type"),
+            result_origin=result_origin,
+            validation_status=validation_status,
+            execution_status=execution_status,
+            parse_status=parse_status,
+            benchmark_status=benchmark_status,
             host=host,
             executable=_file_manifest_from_payload(payload.get("executable")),
             model=_file_manifest_from_payload(payload.get("model")),
             inspection=_inspection_from_payload(payload.get("inspection")),
             trial=_trial_from_payload(payload.get("trial")),
             artifacts=BenchmarkArtifactManifest(artifacts=payload.get("artifacts", {}).get("artifacts", {})),
+            provenance=_provenance_from_payload(payload.get("provenance")),
+            artifact_validation=_artifact_validation_from_payload(payload.get("artifact_validation")),
             artifact_directory=str(payload.get("artifact_directory", "")),
             message=str(payload.get("message", "")),
             created_at_utc=str(payload.get("created_at_utc", utc_now())),
@@ -546,6 +638,59 @@ def _without_schema(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if key != "schema_version"}
 
 
+def _required_object(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    value = payload.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    return value
+
+
+def _required_str(payload: dict[str, Any], key: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{key} must be a non-empty string")
+    return value
+
+
+def _optional_str(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{label} must be a non-empty string")
+    return value
+
+
+def _optional_text(value: Any, label: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string when provided")
+    return value
+
+
+def _required_int(payload: dict[str, Any], key: str) -> int:
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{key} must be an integer")
+    return value
+
+
+def _required_float(payload: dict[str, Any], key: str) -> float:
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be a number")
+    return float(value)
+
+
+def _optional_bool(value: Any, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{label} must be a boolean")
+    return value
+
+
+def _ensure_enum(value: str, allowed: set[str], label: str) -> None:
+    if value not in allowed:
+        raise ValueError(f"{label} must be one of {sorted(allowed)}")
+
+
 def _file_manifest_from_payload(payload: dict[str, Any] | None) -> BenchmarkFileManifest | None:
     if payload is None:
         return None
@@ -588,4 +733,20 @@ def _trial_from_payload(payload: dict[str, Any] | None) -> BenchmarkTrialResult 
         message=str(payload.get("message", "")),
         invocation=_invocation_from_payload(payload.get("invocation")),
         parse_result=_parse_result_from_payload(payload.get("parse_result")),
+    )
+
+
+def _provenance_from_payload(payload: dict[str, Any] | None) -> BenchmarkProvenance | None:
+    if payload is None:
+        return None
+    return BenchmarkProvenance(**_without_schema(payload))
+
+
+def _artifact_validation_from_payload(payload: dict[str, Any] | None) -> ArtifactValidationResult:
+    if payload is None:
+        return ArtifactValidationResult()
+    return ArtifactValidationResult(
+        validation_status=str(payload.get("validation_status", "not_checked")),
+        checked_artifacts=int(payload.get("checked_artifacts", 0)),
+        issues=[ArtifactValidationIssue(**_without_schema(issue)) for issue in payload.get("issues", [])],
     )

@@ -86,7 +86,11 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             validation=configured_validation,
             error=configured_error,
         ),
-        production_benchmark_ready=bool(target_configured and configured_validation and configured_validation.valid),
+        production_benchmark_ready=_production_ready(
+            target_configured=target_configured,
+            local_validation=local_validation,
+            configured_validation=configured_validation,
+        ),
     )
     payload = {
         "schema_version": SCHEMA_VERSION,
@@ -192,6 +196,17 @@ def _configured_status(
     return _status_from_validation(validation)
 
 
+def _production_ready(
+    *,
+    target_configured: bool,
+    local_validation: ProductionValidation,
+    configured_validation: ProductionValidation | None,
+) -> bool:
+    if target_configured:
+        return bool(configured_validation and configured_validation.valid)
+    return local_validation.valid
+
+
 def _doctor_notes(spec: TargetSpec, statuses: DoctorStatuses) -> list[str]:
     notes = [
         "Host capabilities and workload execution evidence are separate ArmTune schemas.",
@@ -200,6 +215,8 @@ def _doctor_notes(spec: TargetSpec, statuses: DoctorStatuses) -> list[str]:
     ]
     if spec.type == "ssh" and spec.strict_host_key_checking:
         notes.append("SSH strict host-key checking is enabled.")
+    if spec.type == "local" and statuses.production_benchmark_ready:
+        notes.append("The local machine is a Linux Arm64 production benchmark target.")
     if not statuses.production_benchmark_ready:
         notes.append("Production benchmark execution requires a configured Linux Arm64 target.")
     return notes

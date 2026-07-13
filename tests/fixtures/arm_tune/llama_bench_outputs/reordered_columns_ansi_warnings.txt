@@ -1,0 +1,6 @@
+warning: fixture table follows
+| t/s | model | test | extra |
+| --- | --- | --- | --- |
+| 310.0 +/- 1.0 | fake | [32mpp128[0m | ignored |
+| 77.0 +/- 0.5 | fake | tg64 | ignored |
+warning: fixture table ended

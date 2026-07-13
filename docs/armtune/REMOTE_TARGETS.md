@@ -112,3 +112,30 @@ All target operations should use bounded timeouts. Child processes must be
 terminated and reaped on success, failure, timeout, SIGINT, and SIGTERM.
 
 Temporary tuning must be restored after benchmark failure.
+
+## Phase 2B Artifact Trust Boundary
+
+Remote result JSON is not trusted merely because the worker returned it. After
+download, the controller validates `artifact_manifest.json` against files under
+the local run directory.
+
+The controller rejects:
+
+- digest mismatches
+- missing artifacts
+- duplicate manifest relative paths
+- path traversal attempts
+- manifest paths outside the run directory
+- symlink escapes
+- unsupported artifact manifest schema versions
+
+The controller must not trust absolute paths supplied by a remote result JSON
+when deciding which local files to validate. Artifact records should contain
+run-directory-relative paths and SHA-256 digests.
+
+Failed artifact validation prevents a successful benchmark status while
+preserving the downloaded files for debugging.
+
+The native Arm64 GitHub workflow does not exercise an external SSH server.
+Remote-target production validation with a real SSH host remains a later
+phase.

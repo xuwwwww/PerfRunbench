@@ -51,4 +51,21 @@ should be labeled unverified.
   `unsupported_format` rather than converted into metrics.
 - Phase 2A fake executable tests are `test_fixture` results, not measured Arm
   results.
-- Real production Arm benchmark validation remains deferred to Phase 6.
+- Real production Arm benchmark validation remains out of scope for Phase 2A.
+
+## Phase 2B Limitations
+
+- GitHub native Arm64 CI proves packaging, CLI, host inspection, focused tests,
+  and fixture benchmark plumbing on an Arm64 Linux runner only.
+- GitHub native Arm64 CI does not prove real model performance, inference
+  optimization, KleidiAI usage, Performix support, or competition benchmark
+  results.
+- Workflow timing is not benchmark data.
+- Fake llama-bench output remains `test_fixture` on real Arm hardware.
+- Phase 2B does not use AWS, external SSH servers, cloud provisioning, real
+  models, `llama-server`, time to first token, candidate search, quality gates,
+  build profiles, Performix, or Performance Passport generation.
+- Real-Arm smoke scaffolding is skipped by default and requires explicit
+  user-supplied binary and model paths plus acknowledgement.
+- Phase 2C must provide a real model, real target, and explicit measured-data
+  handling before any preliminary measured result is run.

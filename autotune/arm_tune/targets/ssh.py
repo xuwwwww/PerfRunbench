@@ -6,6 +6,7 @@ import tempfile
 from dataclasses import replace
 from pathlib import Path
 
+from autotune.arm_tune.benchmark.artifact_validation import apply_artifact_validation, validate_artifact_manifest
 from autotune.arm_tune.benchmark.llama_bench import ensure_benchmark_operation
 from autotune.arm_tune.errors import TargetExecutionError
 from autotune.arm_tune.schemas import (
@@ -98,7 +99,11 @@ class SshArmTarget(ArmTuneTarget):
             raise TargetExecutionError("remote benchmark worker did not return valid JSON") from exc
         if payload.get("status") != "ok":
             raise TargetExecutionError(f"remote benchmark worker failed: {payload.get('error')}")
-        return ArmBenchmarkResult.from_dict(payload["result"])
+        benchmark_result = ArmBenchmarkResult.from_dict(payload["result"])
+        validation = validate_artifact_manifest(local_dir)
+        validated = apply_artifact_validation(benchmark_result, validation, local_dir)
+        atomic_write_json(local_dir / "benchmark_result.json", validated.to_dict())
+        return validated
 
     def check_prerequisites(self) -> RemotePrerequisiteResult:
         self._run_checked(self.build_python_version_command(), timeout_seconds=self.spec.connect_timeout_seconds)

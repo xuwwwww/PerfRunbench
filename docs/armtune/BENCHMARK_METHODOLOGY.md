@@ -101,10 +101,15 @@ The parser records explicit parse outcomes:
 - `unsupported_format`
 - `malformed_output`
 - `no_metrics`
+- `ambiguous_output`
 
 Missing metrics are reported as `Not available`, never as zero. A process that
 exits successfully but prints no parseable required metrics is not a successful
 benchmark result.
+
+Duplicate or multiple rows for the same required metric are ambiguous. ArmTune
+keeps the rows as audit evidence and fails the parse as `ambiguous_output`
+rather than choosing the fastest or largest value.
 
 Phase 2A does not claim KleidiAI, Neon, DotProd, I8MM, BF16, SVE, SVE2, SME, or
 another optimized path. Optimized-path evidence requires later phases with
@@ -131,4 +136,33 @@ Before public publication, every measured result should point to:
 
 No current repository benchmark result is an ArmTune production Arm result.
 
-Real Arm validation is deferred to Phase 6.
+Real production validation remains a later phase. Phase 2C may run preliminary
+real-Arm smoke validation only with a real target and user-supplied model.
+
+## Phase 2B Native Arm64 CI Method
+
+The GitHub-hosted Arm64 workflow runs fixture validation on a native Linux
+Arm64 runner. It checks package installation, CLI availability, local
+production-target readiness, host inspection serialization, focused ArmTune
+tests, and a fake llama-bench public CLI E2E.
+
+This CI smoke test is not an AI inference optimization result. It uses a fake
+executable and a synthetic model placeholder, so its benchmark output remains
+`result_origin: test_fixture` even on native Arm64 hardware.
+
+Measured results require all of the following:
+
+- real Linux Arm64 target
+- real executable
+- real model
+- real benchmark execution
+- no test-only host override
+- no fake executable marker
+- validated artifact manifest and digests
+
+CI timing, workflow duration, fake fixture throughput, and parser fixture
+values must not be used as competition benchmark data.
+
+Real measured smoke execution is prepared for Phase 2C through an explicit
+opt-in script that requires user-supplied binary and model paths. It must not
+download models automatically.

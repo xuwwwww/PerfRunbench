@@ -10,7 +10,8 @@ from typing import Any
 
 from autotune.arm_tune.benchmark.artifacts import artifact_record, write_artifact_manifest, write_text_artifact
 from autotune.arm_tune.benchmark.hashes import sha256_file
-from autotune.arm_tune.benchmark.parser import parse_llama_bench_output, required_metric_values
+from autotune.arm_tune.benchmark.parser import parse_llama_bench_streams, required_metric_values
+from autotune.arm_tune.benchmark.provenance import decide_benchmark_provenance
 from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.platform.environment import collect_host_inspection
 from autotune.arm_tune.schemas import (
@@ -49,7 +50,8 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
     raw_dir.mkdir(parents=True, exist_ok=True)
     atomic_write_json(benchmark_dir / "benchmark_job.json", job.to_dict())
     host_inspection = collect_host_inspection(target_type=job.target_type)
-    if job.result_origin != "test_fixture" and not host_inspection.production_validation.valid:
+    provenance = decide_benchmark_provenance(job, host_inspection)
+    if provenance.result_origin != "test_fixture" and not host_inspection.production_validation.valid:
         artifacts = _collect_artifacts(benchmark_dir, raw_dir)
         return _write_result(
             benchmark_dir,
@@ -57,13 +59,14 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
                 run_id=job.run_id,
                 operation=job.operation,
                 target_type=job.target_type,
-                result_origin=job.result_origin,
+                result_origin=provenance.result_origin,
                 validation_status="failed",
                 execution_status="not_run",
                 parse_status="no_metrics",
                 benchmark_status="failed",
                 host=host_inspection.host,
                 artifacts=BenchmarkArtifactManifest(artifacts=artifacts),
+                provenance=provenance,
                 artifact_directory=str(benchmark_dir),
                 message=host_inspection.production_validation.reason,
             ),
@@ -72,6 +75,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
     executable = validation.get("executable")
     model = validation.get("model")
     _write_file_manifests(benchmark_dir, executable, model)
+    provenance = decide_benchmark_provenance(job, host_inspection, executable=executable)
     if validation["status"] != "passed":
         artifacts = _collect_artifacts(benchmark_dir, raw_dir)
         return _write_result(
@@ -80,7 +84,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
                 run_id=job.run_id,
                 operation=job.operation,
                 target_type=job.target_type,
-                result_origin=job.result_origin,
+                result_origin=provenance.result_origin,
                 validation_status="failed",
                 execution_status="not_run",
                 parse_status="no_metrics",
@@ -89,12 +93,37 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
                 executable=executable,
                 model=model,
                 artifacts=BenchmarkArtifactManifest(artifacts=artifacts),
+                provenance=provenance,
                 artifact_directory=str(benchmark_dir),
                 message=validation["message"],
             ),
         )
     inspection = inspect_llama_bench(job, benchmark_dir)
     atomic_write_json(benchmark_dir / "inspection.json", inspection.to_dict())
+    provenance = decide_benchmark_provenance(job, host_inspection, executable=executable, inspection=inspection)
+    if provenance.result_origin == "unverified":
+        artifacts = _collect_artifacts(benchmark_dir, raw_dir)
+        return _write_result(
+            benchmark_dir,
+            ArmBenchmarkResult(
+                run_id=job.run_id,
+                operation=job.operation,
+                target_type=job.target_type,
+                result_origin=provenance.result_origin,
+                validation_status="failed",
+                execution_status="not_run",
+                parse_status="no_metrics",
+                benchmark_status="failed",
+                host=host_inspection.host,
+                executable=executable,
+                model=model,
+                inspection=inspection,
+                artifacts=BenchmarkArtifactManifest(artifacts=artifacts),
+                provenance=provenance,
+                artifact_directory=str(benchmark_dir),
+                message=provenance.decision_reason,
+            ),
+        )
     flags = select_required_flags(inspection.supported_flags)
     missing = [name for name, value in flags.items() if value is None]
     if missing:
@@ -105,7 +134,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
                 run_id=job.run_id,
                 operation=job.operation,
                 target_type=job.target_type,
-                result_origin=job.result_origin,
+                result_origin=provenance.result_origin,
                 validation_status="failed",
                 execution_status="not_run",
                 parse_status="no_metrics",
@@ -115,6 +144,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
                 model=model,
                 inspection=inspection,
                 artifacts=BenchmarkArtifactManifest(artifacts=artifacts),
+                provenance=provenance,
                 artifact_directory=str(benchmark_dir),
                 message=f"llama-bench help is missing required flags: {', '.join(missing)}",
             ),
@@ -129,7 +159,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
                 run_id=job.run_id,
                 operation=job.operation,
                 target_type=job.target_type,
-                result_origin=job.result_origin,
+                result_origin=provenance.result_origin,
                 validation_status="failed",
                 execution_status="not_run",
                 parse_status="no_metrics",
@@ -139,6 +169,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
                 model=model,
                 inspection=inspection,
                 artifacts=BenchmarkArtifactManifest(artifacts=artifacts),
+                provenance=provenance,
                 artifact_directory=str(benchmark_dir),
                 message=f"llama-bench help is missing configured optional flags: {', '.join(unsupported_additional)}",
             ),
@@ -151,7 +182,8 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
     )
     atomic_write_json(benchmark_dir / "invocation.json", invocation.to_dict())
     stdout_text = Path(invocation.raw_stdout_path).read_text(encoding="utf-8", errors="replace")
-    parse_result = parse_llama_bench_output(stdout_text)
+    stderr_text = Path(invocation.raw_stderr_path).read_text(encoding="utf-8", errors="replace")
+    parse_result = parse_llama_bench_streams(stdout_text, stderr_text)
     atomic_write_json(benchmark_dir / "parse_result.json", parse_result.to_dict())
     execution_status = "timeout" if invocation.timed_out else ("completed" if invocation.exit_code == 0 else "failed")
     prefill, decode = required_metric_values(parse_result)
@@ -173,7 +205,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
         run_id=job.run_id,
         operation=job.operation,
         target_type=job.target_type,
-        result_origin=job.result_origin,
+        result_origin=provenance.result_origin,
         validation_status="passed",
         execution_status=execution_status,
         parse_status=parse_result.parse_status,
@@ -184,6 +216,7 @@ def run_llama_bench_worker(job: LlamaBenchJobSpec, run_dir: str | Path) -> ArmBe
         inspection=inspection,
         trial=trial,
         artifacts=BenchmarkArtifactManifest(artifacts=artifacts),
+        provenance=provenance,
         artifact_directory=str(benchmark_dir),
         message=trial.message,
     )
@@ -199,6 +232,7 @@ def inspect_llama_bench(job: LlamaBenchJobSpec, benchmark_dir: Path) -> LlamaBen
     version_stderr = write_text_artifact(raw_dir / "inspection_version_stderr.txt", version.stderr)
     help_stdout = write_text_artifact(raw_dir / "inspection_help_stdout.txt", help_result.stdout)
     help_stderr = write_text_artifact(raw_dir / "inspection_help_stderr.txt", help_result.stderr)
+    inspection_text = version.stdout + "\n" + version.stderr + "\n" + help_result.stdout + "\n" + help_result.stderr
     supported_flags = sorted(_extract_supported_flags(help_result.stdout + "\n" + help_result.stderr))
     return LlamaBenchInspection(
         version_command=[executable, "--version"],
@@ -213,6 +247,7 @@ def inspect_llama_bench(job: LlamaBenchJobSpec, benchmark_dir: Path) -> LlamaBen
         raw_help_stderr_path=str(help_stderr),
         supported_flags=supported_flags,
         source_commit=_extract_commit(version.stdout + "\n" + version.stderr),
+        fixture_marker_detected=_contains_fixture_marker(inspection_text),
     )
 
 
@@ -377,21 +412,26 @@ def _extract_commit(text: str) -> str:
     return match.group(1) if match else "unknown"
 
 
+def _contains_fixture_marker(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in ("fake", "fixture", "synthetic"))
+
+
 def _collect_artifacts(benchmark_dir: Path, raw_dir: Path) -> dict[str, dict[str, Any]]:
     artifacts = {
-        "benchmark_job": artifact_record(benchmark_dir / "benchmark_job.json", label="benchmark_job"),
-        "executable_manifest": artifact_record(benchmark_dir / "executable_manifest.json", label="executable_manifest"),
-        "model_manifest": artifact_record(benchmark_dir / "model_manifest.json", label="model_manifest"),
-        "inspection": artifact_record(benchmark_dir / "inspection.json", label="inspection"),
-        "invocation": artifact_record(benchmark_dir / "invocation.json", label="invocation"),
-        "parse_result": artifact_record(benchmark_dir / "parse_result.json", label="parse_result"),
-        "trial_result": artifact_record(benchmark_dir / "trials" / "0001" / "trial_result.json", label="trial_result"),
-        "benchmark_stdout": artifact_record(raw_dir / "benchmark_stdout.txt", label="benchmark_stdout"),
-        "benchmark_stderr": artifact_record(raw_dir / "benchmark_stderr.txt", label="benchmark_stderr"),
-        "inspection_version_stdout": artifact_record(raw_dir / "inspection_version_stdout.txt", label="inspection_version_stdout"),
-        "inspection_version_stderr": artifact_record(raw_dir / "inspection_version_stderr.txt", label="inspection_version_stderr"),
-        "inspection_help_stdout": artifact_record(raw_dir / "inspection_help_stdout.txt", label="inspection_help_stdout"),
-        "inspection_help_stderr": artifact_record(raw_dir / "inspection_help_stderr.txt", label="inspection_help_stderr"),
+        "benchmark_job": artifact_record(benchmark_dir / "benchmark_job.json", label="benchmark_job", root=benchmark_dir),
+        "executable_manifest": artifact_record(benchmark_dir / "executable_manifest.json", label="executable_manifest", root=benchmark_dir),
+        "model_manifest": artifact_record(benchmark_dir / "model_manifest.json", label="model_manifest", root=benchmark_dir),
+        "inspection": artifact_record(benchmark_dir / "inspection.json", label="inspection", root=benchmark_dir),
+        "invocation": artifact_record(benchmark_dir / "invocation.json", label="invocation", root=benchmark_dir),
+        "parse_result": artifact_record(benchmark_dir / "parse_result.json", label="parse_result", root=benchmark_dir),
+        "trial_result": artifact_record(benchmark_dir / "trials" / "0001" / "trial_result.json", label="trial_result", root=benchmark_dir),
+        "benchmark_stdout": artifact_record(raw_dir / "benchmark_stdout.txt", label="benchmark_stdout", root=benchmark_dir),
+        "benchmark_stderr": artifact_record(raw_dir / "benchmark_stderr.txt", label="benchmark_stderr", root=benchmark_dir),
+        "inspection_version_stdout": artifact_record(raw_dir / "inspection_version_stdout.txt", label="inspection_version_stdout", root=benchmark_dir),
+        "inspection_version_stderr": artifact_record(raw_dir / "inspection_version_stderr.txt", label="inspection_version_stderr", root=benchmark_dir),
+        "inspection_help_stdout": artifact_record(raw_dir / "inspection_help_stdout.txt", label="inspection_help_stdout", root=benchmark_dir),
+        "inspection_help_stderr": artifact_record(raw_dir / "inspection_help_stderr.txt", label="inspection_help_stderr", root=benchmark_dir),
     }
     write_artifact_manifest(benchmark_dir / "artifact_manifest.json", artifacts)
     return artifacts

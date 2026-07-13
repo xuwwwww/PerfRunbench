@@ -182,8 +182,9 @@ Doctor output separates:
 - `local_target_status`: whether the controller machine itself is a supported
   local production target.
 - `configured_target_status`: whether a supplied target configuration is ready.
-- `production_benchmark_ready`: whether a configured target is ready for real
-  Linux Arm64 production benchmark execution.
+- `production_benchmark_ready`: whether the configured target, or the local
+  machine when no target config is supplied, is ready for real Linux Arm64
+  production benchmark execution.
 
 A Windows or x86_64 controller can have `controller_status: ready` while
 `local_target_status: unsupported` and `production_benchmark_ready: false`.
@@ -272,3 +273,62 @@ CLI exit codes:
 
 Fixture runs must set `result_origin: test_fixture`. A real production
 benchmark result must identify the target as Linux Arm64.
+
+## Phase 2B Native Arm64 CI and Hardening
+
+Phase 2B adds a GitHub-hosted native Arm64 smoke workflow. The workflow proves
+that ArmTune can install, serialize host evidence, run focused tests, and
+execute the fake llama-bench fixture path on `ubuntu-24.04-arm`.
+
+The workflow does not prove inference optimization, real model performance,
+KleidiAI usage, Arm optimized-path usage, or competition benchmark results. CI
+wall-clock timing is not benchmark data and must not be published as
+performance evidence.
+
+Measured-origin rules:
+
+- `test_fixture`: fake executable, parser fixture, simulated host identity, or
+  CI smoke benchmark using a fake workload.
+- `measured`: real Linux Arm64 target, real executable, real model, real
+  benchmark execution, no test-only platform injection, and no fake executable
+  marker.
+- `unverified`: missing provenance, unsupported production target, or a result
+  that cannot satisfy measured-origin criteria.
+
+The job JSON `result_origin` field is treated as a requested origin, not as a
+trusted fact. The worker writes `provenance` evidence explaining the selected
+origin. Native Arm hardware alone cannot convert a fake benchmark into a
+measured result.
+
+Artifact trust boundary:
+
+- The worker writes artifact records with relative paths and SHA-256 digests.
+- The controller validates downloaded artifacts against
+  `artifact_manifest.json` before reporting benchmark success.
+- Missing artifacts, digest mismatches, duplicate manifest paths, traversal
+  attempts, paths outside the run directory, and symlink escapes fail artifact
+  validation.
+- Suspicious artifacts are preserved for debugging; ArmTune does not delete
+  them automatically.
+
+Schema compatibility:
+
+- Critical configuration and worker job fields reject unknown or invalid
+  fields.
+- `benchmark_result.json` may ignore unknown additive top-level fields during
+  round-trip loading.
+- Unsupported future `schema_version` values and missing `schema_version`
+  fields are rejected.
+
+Parser ambiguity policy:
+
+- Multiple rows matching the same required metric produce
+  `parse_status: ambiguous_output`.
+- ArmTune returns all matched rows for audit but does not select the largest,
+  fastest, or last value.
+- `nan`, `inf`, negative throughput, malformed decimal values, and missing
+  throughput are not converted to zero.
+
+Phase 2C must use a real model and a real target before any preliminary
+measured data is produced. Phase 2B only prepares skipped-by-default
+real-Arm smoke scaffolding.

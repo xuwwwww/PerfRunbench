@@ -494,7 +494,8 @@ Phase 2A completion criteria:
 
 ## Phase 2B Plan: Native Arm64 CI Validation and Benchmark Pipeline Hardening
 
-Status: planned after Phase 2A approval.
+Status: implemented locally; GitHub-hosted Arm64 workflow still requires an
+actual GitHub run before it can be claimed as validated.
 
 Phase 2B validates that the Phase 2A benchmark slice can run its fixture smoke
 path on a GitHub-hosted native Arm64 Linux runner while hardening benchmark

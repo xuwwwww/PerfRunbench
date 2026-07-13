@@ -114,9 +114,9 @@ def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBe
         timeout_seconds=_positive_float(benchmark.get("timeout_seconds"), "benchmark.timeout_seconds"),
         additional_supported_options={key: _positive_int(value, f"benchmark.additional_supported_options.{key}") for key, value in additional.items()},
     )
-    result_origin = str(payload.get("result_origin", "measured"))
-    if result_origin not in {"measured", "test_fixture"}:
-        raise ArmTuneConfigError("result_origin must be 'measured' or 'test_fixture'")
+    result_origin = str(payload.get("result_origin", "unverified"))
+    if result_origin not in {"measured", "test_fixture", "unverified"}:
+        raise ArmTuneConfigError("result_origin must be 'measured', 'test_fixture', or 'unverified'")
     job = LlamaBenchJobSpec(
         protocol_version=PROTOCOL_VERSION,
         operation=BENCHMARK_OPERATION,

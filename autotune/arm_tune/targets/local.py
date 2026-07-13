@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+from autotune.arm_tune.benchmark.artifact_validation import apply_artifact_validation, validate_artifact_manifest
 from autotune.arm_tune.benchmark.llama_bench import ensure_benchmark_operation
 from autotune.arm_tune.platform.environment import collect_host_inspection
 from autotune.arm_tune.schemas import ArmBenchmarkResult, HostInspectionResult, LlamaBenchJobSpec, ProductionValidation, TargetSpec
@@ -29,4 +30,8 @@ class LocalArmTarget(ArmTuneTarget):
         job_path = benchmark_dir / "benchmark_job.json"
         atomic_write_json(job_path, local_job.to_dict())
         worker_result = run_worker(job_path, benchmark_dir)
-        return ArmBenchmarkResult.from_dict(worker_result.result)
+        result = ArmBenchmarkResult.from_dict(worker_result.result)
+        validation = validate_artifact_manifest(benchmark_dir)
+        validated = apply_artifact_validation(result, validation, benchmark_dir)
+        atomic_write_json(benchmark_dir / "benchmark_result.json", validated.to_dict())
+        return validated

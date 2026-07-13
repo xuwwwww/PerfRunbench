@@ -63,6 +63,26 @@ class ArmTuneCliTest(unittest.TestCase):
 
         self.assertEqual(code, 2)
 
+    def test_arm_doctor_require_production_accepts_native_linux_arm64_local_target(self) -> None:
+        output = io.StringIO()
+        validation = ProductionValidation(
+            valid=True,
+            reason="target is Linux Arm64",
+            observed_system="Linux",
+            observed_machine="aarch64",
+        )
+        with patch("autotune.arm_tune.cli.collect_executor_capabilities", return_value={"recommended_executor": "local"}):
+            with patch("autotune.arm_tune.cli.LocalArmTarget.validate_production_target", return_value=validation):
+                with redirect_stdout(output):
+                    code = main(["arm", "doctor", "--require-production"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["controller_status"]["status"], "ready")
+        self.assertEqual(payload["local_target_status"]["status"], "ready")
+        self.assertEqual(payload["configured_target_status"]["status"], "not_configured")
+        self.assertTrue(payload["production_benchmark_ready"])
+
     def test_top_level_arm_parser_preserves_remaining_args(self) -> None:
         args = build_parser().parse_args(["arm", "doctor", "--require-production"])
 

@@ -69,17 +69,26 @@ def atomic_write_json(path: str | Path, payload: dict[str, Any]) -> Path:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    with tempfile.NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        dir=str(target.parent),
-        prefix=f".{target.name}.",
-        suffix=".tmp",
-        delete=False,
-    ) as handle:
-        handle.write(data)
-        temp_name = handle.name
-    os.replace(temp_name, target)
+    temp_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=str(target.parent),
+            prefix=f".{target.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            handle.write(data)
+            temp_name = handle.name
+        os.replace(temp_name, target)
+    except Exception:
+        if temp_name:
+            try:
+                Path(temp_name).unlink()
+            except OSError:
+                pass
+        raise
     return target
 
 
@@ -116,8 +125,8 @@ def _validate_benchmark_job(payload: dict[str, Any]) -> None:
     for key in ["run_id", "target_run_directory", "executable", "model", "benchmark", "artifacts"]:
         if key not in payload:
             raise ArmTuneProtocolError(f"benchmark job missing required field: {key}")
-    if payload.get("result_origin", "measured") not in {"measured", "test_fixture"}:
-        raise ArmTuneProtocolError("result_origin must be 'measured' or 'test_fixture'")
+    if payload.get("result_origin", "unverified") not in {"measured", "test_fixture", "unverified"}:
+        raise ArmTuneProtocolError("result_origin must be 'measured', 'test_fixture', or 'unverified'")
     _validate_object(payload["executable"], EXECUTABLE_KEYS, "executable")
     _validate_object(payload["model"], MODEL_KEYS, "model")
     _validate_object(payload["benchmark"], BENCHMARK_KEYS, "benchmark")
