@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "measured",
+  "target": {
+    "type": "ssh",
+    "host": "arm-target.example",
+    "user": "ubuntu",
+    "port": 22,
+    "identity_file": "~/.ssh/id_ed25519",
+    "remote_python": "python3",
+    "remote_module": "autotune.cli",
+    "remote_workdir": "~/armtune-runs",
+    "strict_host_key_checking": true
+  },
+  "executable": {
+    "path": "/opt/llama.cpp/build/bin/llama-bench",
+    "expected_sha256": null
+  },
+  "model": {
+    "path": "/models/placeholder-model.gguf",
+    "expected_sha256": null
+  },
+  "benchmark": {
+    "threads": 8,
+    "prompt_tokens": 128,
+    "generation_tokens": 64,
+    "repetitions": 1,
+    "timeout_seconds": 120,
+    "additional_supported_options": {}
+  },
+  "artifacts": {
+    "preserve_raw_stdout": true,
+    "preserve_raw_stderr": true
+  }
+}

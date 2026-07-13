@@ -200,3 +200,75 @@ Every serialized top-level ArmTune artifact includes:
 
 Unknown future fields may be preserved where safe. Unknown critical
 configuration fields should be rejected with actionable errors.
+
+## Phase 2A Benchmark Slice
+
+Phase 2A adds a minimal llama-bench vertical slice. It is a benchmark execution
+path, not an optimization search and not a production performance claim.
+
+The public command is:
+
+```text
+autotuneai arm benchmark --config <path>
+```
+
+The command creates a PerfRunbench run directory and stores ArmTune artifacts
+under:
+
+```text
+.autotuneai/runs/<run_id>/armtune/benchmark/
+```
+
+The worker operation is allowlisted as:
+
+```text
+benchmark.llama_bench
+```
+
+The benchmark job models only explicit llama-bench fields: executable path and
+optional expected hash, model path and optional expected hash, threads, prompt
+tokens, generation tokens, repetitions, timeout, and a small allowlist of
+additional supported options. It must not accept a generic command list or
+`extra_command` field.
+
+The worker validates the target architecture for measured results, validates
+the binary and model, hashes both files with streaming SHA-256, inspects
+`--version` and `--help`, checks required flags, executes one fixed invocation,
+preserves raw stdout/stderr, parses metrics defensively, and writes versioned
+JSON artifacts atomically.
+
+Phase 2A artifact schema:
+
+```text
+benchmark_job.json
+executable_manifest.json
+model_manifest.json
+inspection.json
+invocation.json
+parse_result.json
+artifact_manifest.json
+benchmark_result.json
+raw/inspection_version_stdout.txt
+raw/inspection_version_stderr.txt
+raw/inspection_help_stdout.txt
+raw/inspection_help_stderr.txt
+raw/benchmark_stdout.txt
+raw/benchmark_stderr.txt
+trials/0001/trial_result.json
+```
+
+`benchmark_result.json` is the final top-level result and separates
+`validation_status`, `execution_status`, `parse_status`, and
+`benchmark_status`.
+
+CLI exit codes:
+
+```text
+0 = benchmark completed and required metrics parsed
+1 = execution completed but benchmark failed or required metrics missing
+2 = invalid configuration, unsupported target, protocol mismatch, or validation failure
+3 = internal/runtime error
+```
+
+Fixture runs must set `result_origin: test_fixture`. A real production
+benchmark result must identify the target as Linux Arm64.

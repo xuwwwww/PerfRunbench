@@ -3,7 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Protocol
 
-from autotune.arm_tune.schemas import CommandResult, HostInspectionResult, ProductionValidation, TargetSpec
+from pathlib import Path
+
+from autotune.arm_tune.schemas import ArmBenchmarkResult, CommandResult, HostInspectionResult, LlamaBenchJobSpec, ProductionValidation, TargetSpec
 
 
 class CommandRunner(Protocol):
@@ -21,4 +23,7 @@ class ArmTuneTarget(ABC):
 
     @abstractmethod
     def validate_production_target(self) -> ProductionValidation:
+        raise NotImplementedError
+
+    def run_benchmark(self, job: LlamaBenchJobSpec, local_artifact_dir: str | Path) -> ArmBenchmarkResult:
         raise NotImplementedError

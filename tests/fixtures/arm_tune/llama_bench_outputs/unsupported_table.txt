@@ -1,0 +1,3 @@
+| name | latency_ms |
+| --- | --- |
+| fake | 12.3 |

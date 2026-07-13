@@ -200,6 +200,248 @@ class WorkloadExecutionEvidence:
 
 
 @dataclass(frozen=True)
+class BenchmarkExecutableSpec:
+    path: str
+    expected_sha256: str | None = None
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BenchmarkModelSpec:
+    path: str
+    expected_sha256: str | None = None
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaBenchSettings:
+    threads: int
+    prompt_tokens: int
+    generation_tokens: int
+    repetitions: int
+    timeout_seconds: float
+    additional_supported_options: dict[str, str | int | float | bool] = field(default_factory=dict)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BenchmarkArtifactsSpec:
+    preserve_raw_stdout: bool = True
+    preserve_raw_stderr: bool = True
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaBenchJobSpec:
+    protocol_version: str
+    operation: str
+    run_id: str
+    target_run_directory: str
+    executable: BenchmarkExecutableSpec
+    model: BenchmarkModelSpec
+    benchmark: LlamaBenchSettings
+    artifacts: BenchmarkArtifactsSpec = field(default_factory=BenchmarkArtifactsSpec)
+    target_type: str = "local"
+    remote_module: str = "autotune.cli"
+    result_origin: str = "measured"
+    created_at_utc: str = field(default_factory=utc_now)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "LlamaBenchJobSpec":
+        require_schema_version(payload)
+        return cls(
+            protocol_version=str(payload["protocol_version"]),
+            operation=str(payload["operation"]),
+            run_id=str(payload["run_id"]),
+            target_run_directory=str(payload["target_run_directory"]),
+            executable=BenchmarkExecutableSpec(**_without_schema(payload["executable"])),
+            model=BenchmarkModelSpec(**_without_schema(payload["model"])),
+            benchmark=LlamaBenchSettings(**_without_schema(payload["benchmark"])),
+            artifacts=BenchmarkArtifactsSpec(**_without_schema(payload.get("artifacts", {}))),
+            target_type=str(payload.get("target_type", "local")),
+            remote_module=str(payload.get("remote_module", "autotune.cli")),
+            result_origin=str(payload.get("result_origin", "measured")),
+            created_at_utc=str(payload.get("created_at_utc", utc_now())),
+        )
+
+
+@dataclass(frozen=True)
+class BenchmarkFileManifest:
+    path: str
+    basename: str
+    size_bytes: int
+    sha256: str
+    expected_sha256: str | None = None
+    validation_status: str = "passed"
+    validation_message: str = ""
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaBenchInspection:
+    version_command: list[str]
+    help_command: list[str]
+    version_exit_code: int
+    help_exit_code: int
+    version_status: str
+    help_status: str
+    raw_version_stdout_path: str
+    raw_version_stderr_path: str
+    raw_help_stdout_path: str
+    raw_help_stderr_path: str
+    supported_flags: list[str] = field(default_factory=list)
+    source_commit: str = UNKNOWN
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaBenchInvocation:
+    command: list[str]
+    started_at_utc: str
+    ended_at_utc: str
+    duration_seconds: float
+    exit_code: int | None
+    timed_out: bool
+    raw_stdout_path: str
+    raw_stderr_path: str
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class ParsedMetric:
+    name: str
+    value: float
+    unit: str
+    source: str
+    parser_strategy: str
+    raw_source_line: str
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaBenchParseResult:
+    parse_status: str
+    metrics: list[ParsedMetric] = field(default_factory=list)
+    parser_strategy: str = "none"
+    unparsed_lines: list[str] = field(default_factory=list)
+    message: str = ""
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BenchmarkTrialResult:
+    trial_index: int
+    validation_status: str
+    execution_status: str
+    parse_status: str
+    benchmark_status: str
+    message: str
+    invocation: LlamaBenchInvocation | None = None
+    parse_result: LlamaBenchParseResult | None = None
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BenchmarkArtifactManifest:
+    artifacts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class ArmBenchmarkResult:
+    run_id: str
+    operation: str
+    target_type: str
+    result_origin: str
+    validation_status: str
+    execution_status: str
+    parse_status: str
+    benchmark_status: str
+    host: HostInfo
+    executable: BenchmarkFileManifest | None = None
+    model: BenchmarkFileManifest | None = None
+    inspection: LlamaBenchInspection | None = None
+    trial: BenchmarkTrialResult | None = None
+    artifacts: BenchmarkArtifactManifest = field(default_factory=BenchmarkArtifactManifest)
+    artifact_directory: str = ""
+    message: str = ""
+    created_at_utc: str = field(default_factory=utc_now)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "ArmBenchmarkResult":
+        require_schema_version(payload)
+        host_payload = payload["host"]
+        host = HostInfo(
+            architecture=ArchitectureInfo(**_without_schema(host_payload["architecture"])),
+            cpu_identity=ArmCpuIdentity(**_without_schema(host_payload["cpu_identity"])),
+            host_capabilities=ArmHostCapabilities(**_without_schema(host_payload["host_capabilities"])),
+            topology=CpuTopology(**_without_schema(host_payload["topology"])),
+            os_release=host_payload.get("os_release", UNKNOWN),
+            cgroup_limits=host_payload.get("cgroup_limits", {}),
+        )
+        return cls(
+            run_id=str(payload["run_id"]),
+            operation=str(payload["operation"]),
+            target_type=str(payload["target_type"]),
+            result_origin=str(payload["result_origin"]),
+            validation_status=str(payload["validation_status"]),
+            execution_status=str(payload["execution_status"]),
+            parse_status=str(payload["parse_status"]),
+            benchmark_status=str(payload["benchmark_status"]),
+            host=host,
+            executable=_file_manifest_from_payload(payload.get("executable")),
+            model=_file_manifest_from_payload(payload.get("model")),
+            inspection=_inspection_from_payload(payload.get("inspection")),
+            trial=_trial_from_payload(payload.get("trial")),
+            artifacts=BenchmarkArtifactManifest(artifacts=payload.get("artifacts", {}).get("artifacts", {})),
+            artifact_directory=str(payload.get("artifact_directory", "")),
+            message=str(payload.get("message", "")),
+            created_at_utc=str(payload.get("created_at_utc", utc_now())),
+        )
+
+
+@dataclass(frozen=True)
 class RemotePrerequisiteResult:
     python_executable: str
     python_available: bool
@@ -302,3 +544,48 @@ class WorkerResult:
 
 def _without_schema(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if key != "schema_version"}
+
+
+def _file_manifest_from_payload(payload: dict[str, Any] | None) -> BenchmarkFileManifest | None:
+    if payload is None:
+        return None
+    return BenchmarkFileManifest(**_without_schema(payload))
+
+
+def _inspection_from_payload(payload: dict[str, Any] | None) -> LlamaBenchInspection | None:
+    if payload is None:
+        return None
+    return LlamaBenchInspection(**_without_schema(payload))
+
+
+def _parse_result_from_payload(payload: dict[str, Any] | None) -> LlamaBenchParseResult | None:
+    if payload is None:
+        return None
+    return LlamaBenchParseResult(
+        parse_status=str(payload["parse_status"]),
+        metrics=[ParsedMetric(**_without_schema(metric)) for metric in payload.get("metrics", [])],
+        parser_strategy=str(payload.get("parser_strategy", "none")),
+        unparsed_lines=list(payload.get("unparsed_lines", [])),
+        message=str(payload.get("message", "")),
+    )
+
+
+def _invocation_from_payload(payload: dict[str, Any] | None) -> LlamaBenchInvocation | None:
+    if payload is None:
+        return None
+    return LlamaBenchInvocation(**_without_schema(payload))
+
+
+def _trial_from_payload(payload: dict[str, Any] | None) -> BenchmarkTrialResult | None:
+    if payload is None:
+        return None
+    return BenchmarkTrialResult(
+        trial_index=int(payload["trial_index"]),
+        validation_status=str(payload["validation_status"]),
+        execution_status=str(payload["execution_status"]),
+        parse_status=str(payload["parse_status"]),
+        benchmark_status=str(payload["benchmark_status"]),
+        message=str(payload.get("message", "")),
+        invocation=_invocation_from_payload(payload.get("invocation")),
+        parse_result=_parse_result_from_payload(payload.get("parse_result")),
+    )

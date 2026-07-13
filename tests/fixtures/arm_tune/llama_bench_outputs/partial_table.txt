@@ -1,0 +1,3 @@
+| model | threads | test | t/s |
+| --- | --- | --- | --- |
+| fake | 4 | pp128 | 321.50 |

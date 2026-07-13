@@ -3,16 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import replace
 from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
-from autotune.arm_tune.config import default_local_target, load_target_spec
+from autotune.arm_tune.config import default_local_target, load_benchmark_config, load_target_spec
 from autotune.arm_tune.errors import ArmTuneError
-from autotune.arm_tune.schemas import DoctorStatuses, ProductionValidation, StatusCheck, TargetSpec
+from autotune.arm_tune.schemas import ArmBenchmarkResult, DoctorStatuses, LlamaBenchParseResult, ProductionValidation, StatusCheck, TargetSpec
 from autotune.arm_tune.targets.local import LocalArmTarget
 from autotune.arm_tune.targets.ssh import SshArmTarget
 from autotune.arm_tune.targets.worker import main as worker_main
+from autotune.resource.budget import ResourceBudget
 from autotune.resource.executor_capabilities import collect_executor_capabilities
+from autotune.resource.run_state import create_run, finish_run
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="autotuneai arm", description="ArmTune target inspection and validation.")
-    subparsers = parser.add_subparsers(dest="arm_command", metavar="{doctor,inspect-host}")
+    subparsers = parser.add_subparsers(dest="arm_command", metavar="{doctor,inspect-host,benchmark}")
 
     doctor = subparsers.add_parser("doctor", help="Validate ArmTune controller and target configuration.")
     doctor.add_argument("--target-config")
@@ -40,6 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_host = subparsers.add_parser("inspect-host", help="Inspect an ArmTune local or SSH target host.")
     inspect_host.add_argument("--target-config")
     inspect_host.set_defaults(handler=_cmd_inspect_host)
+
+    benchmark = subparsers.add_parser("benchmark", help="Run a fixed ArmTune llama-bench benchmark job.")
+    benchmark.add_argument("--config", required=True)
+    benchmark.set_defaults(handler=_cmd_benchmark)
 
     worker = subparsers.add_parser("worker", help=argparse.SUPPRESS)
     worker.add_argument("--job-spec", required=True)
@@ -110,6 +117,37 @@ def _cmd_inspect_host(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_benchmark(args: argparse.Namespace) -> int:
+    spec, job = load_benchmark_config(args.config)
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "benchmark", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    benchmark_dir = run_dir / "armtune" / "benchmark"
+    benchmark_dir.mkdir(parents=True, exist_ok=True)
+    target = _target_from_spec(spec)
+    job = replace(
+        job,
+        run_id=manifest.run_id,
+        target_type=spec.type,
+        remote_module=spec.remote_module,
+        target_run_directory=str(benchmark_dir),
+    )
+    try:
+        result = target.run_benchmark(job, benchmark_dir)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = _benchmark_exit_code(result)
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_benchmark_summary(result))
+    return exit_code
+
+
 def _cmd_worker(args: argparse.Namespace) -> int:
     return worker_main(["--job-spec", args.job_spec, "--run-dir", args.run_dir])
 
@@ -165,3 +203,51 @@ def _doctor_notes(spec: TargetSpec, statuses: DoctorStatuses) -> list[str]:
     if not statuses.production_benchmark_ready:
         notes.append("Production benchmark execution requires a configured Linux Arm64 target.")
     return notes
+
+
+def _benchmark_exit_code(result: ArmBenchmarkResult) -> int:
+    if result.validation_status != "passed":
+        return 2
+    if result.execution_status == "completed" and result.parse_status == "parsed" and result.benchmark_status == "passed":
+        return 0
+    return 1
+
+
+def _benchmark_summary(result: ArmBenchmarkResult) -> str:
+    prefill, decode = _summary_metrics(result.trial.parse_result if result.trial else None)
+    binary_hash = result.executable.sha256[:12] if result.executable and result.executable.sha256 else "Not available"
+    model_hash = result.model.sha256[:12] if result.model and result.model.sha256 else "Not available"
+    binary_name = result.executable.basename if result.executable else "Not available"
+    model_name = result.model.basename if result.model else "Not available"
+    architecture = result.host.architecture.normalized_machine
+    lines = [
+        f"run_id: {result.run_id}",
+        f"target_type: {result.target_type}",
+        f"target_architecture: {architecture}",
+        f"result_origin: {result.result_origin}",
+        f"binary: {binary_name} sha256={binary_hash}",
+        f"model: {model_name} sha256={model_hash}",
+        f"execution_status: {result.execution_status}",
+        f"parse_status: {result.parse_status}",
+        f"prefill_tokens_per_second: {_format_metric(prefill)}",
+        f"decode_tokens_per_second: {_format_metric(decode)}",
+        f"artifact_directory: {result.artifact_directory}",
+    ]
+    return "\n".join(lines)
+
+
+def _summary_metrics(parse_result: LlamaBenchParseResult | None) -> tuple[float | None, float | None]:
+    if parse_result is None:
+        return None, None
+    prefill = None
+    decode = None
+    for metric in parse_result.metrics:
+        if metric.name == "prefill_tokens_per_second":
+            prefill = metric.value
+        if metric.name == "decode_tokens_per_second":
+            decode = metric.value
+    return prefill, decode
+
+
+def _format_metric(value: float | None) -> str:
+    return "Not available" if value is None else f"{value:.3f}"

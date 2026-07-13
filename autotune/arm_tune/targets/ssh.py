@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 import subprocess
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
+from autotune.arm_tune.benchmark.llama_bench import ensure_benchmark_operation
 from autotune.arm_tune.errors import TargetExecutionError
 from autotune.arm_tune.schemas import (
+    ArmBenchmarkResult,
     CommandResult,
     HostInspectionResult,
+    LlamaBenchJobSpec,
     ProductionValidation,
     RemotePrerequisiteResult,
     TargetSpec,
@@ -62,6 +66,39 @@ class SshArmTarget(ArmTuneTarget):
 
     def validate_production_target(self) -> ProductionValidation:
         return self.inspect().production_validation
+
+    def run_benchmark(self, job: LlamaBenchJobSpec, local_artifact_dir: str | Path) -> ArmBenchmarkResult:
+        local_dir = Path(local_artifact_dir)
+        local_dir.mkdir(parents=True, exist_ok=True)
+        remote_run_dir = safe_remote_path(f"{self.spec.remote_workdir.rstrip('/')}/{job.run_id}/armtune/benchmark")
+        remote_job = safe_remote_path(f"{remote_run_dir}/benchmark_job.json")
+        remote_job_spec = replace(
+            job,
+            target_type="ssh",
+            target_run_directory=remote_run_dir,
+            remote_module=self.spec.remote_module,
+        )
+        ensure_benchmark_operation(remote_job_spec)
+        with tempfile.TemporaryDirectory(prefix="armtune-ssh-benchmark-") as temp_dir:
+            local_job = Path(temp_dir) / "benchmark_job.json"
+            atomic_write_json(local_job, remote_job_spec.to_dict())
+            self._run_checked(self.build_ssh_command(["mkdir", "-p", remote_run_dir]), timeout_seconds=self.spec.connect_timeout_seconds)
+            self._run_checked(self.build_scp_upload_command(local_job, remote_job), timeout_seconds=self.spec.connect_timeout_seconds)
+            result = self._run_checked(
+                self.build_worker_command(remote_job, remote_run_dir),
+                timeout_seconds=self.spec.command_timeout_seconds,
+            )
+            self._run_checked(
+                self.build_scp_download_command(f"{remote_run_dir}/.", local_dir),
+                timeout_seconds=self.spec.command_timeout_seconds,
+            )
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise TargetExecutionError("remote benchmark worker did not return valid JSON") from exc
+        if payload.get("status") != "ok":
+            raise TargetExecutionError(f"remote benchmark worker failed: {payload.get('error')}")
+        return ArmBenchmarkResult.from_dict(payload["result"])
 
     def check_prerequisites(self) -> RemotePrerequisiteResult:
         self._run_checked(self.build_python_version_command(), timeout_seconds=self.spec.connect_timeout_seconds)
@@ -151,6 +188,25 @@ class SshArmTarget(ArmTuneTarget):
         if self.spec.identity_file:
             command.extend(["-i", self.spec.identity_file])
         command.extend([str(local_path), destination])
+        return command
+
+    def build_scp_download_command(self, remote_path: str, local_path: str | Path) -> list[str]:
+        source = f"{self._destination()}:{safe_remote_path(remote_path)}"
+        command = [
+            self.spec.scp_executable,
+            "-r",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            f"StrictHostKeyChecking={'yes' if self.spec.strict_host_key_checking else 'no'}",
+            "-o",
+            f"ConnectTimeout={self.spec.connect_timeout_seconds}",
+            "-P",
+            str(self.spec.port),
+        ]
+        if self.spec.identity_file:
+            command.extend(["-i", self.spec.identity_file])
+        command.extend([source, str(local_path)])
         return command
 
     def _destination(self) -> str:

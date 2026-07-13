@@ -36,3 +36,19 @@ used.
 
 Any future result missing raw artifacts, provenance, or comparability checks
 should be labeled unverified.
+
+## Phase 2A Limitations
+
+- Phase 2A is a minimal llama-bench execution slice, not an optimization
+  system.
+- Phase 2A runs one fixed configured invocation only.
+- Phase 2A does not implement candidate search, warmup logic, paired
+  baselines, confirmation runs, or noise-band decisions.
+- Phase 2A does not implement a quality gate.
+- Phase 2A does not verify KleidiAI or any other optimized Arm path.
+- Phase 2A parser support is limited to explicit llama-bench table/text
+  strategies covered by fixtures. Unknown formats are reported as
+  `unsupported_format` rather than converted into metrics.
+- Phase 2A fake executable tests are `test_fixture` results, not measured Arm
+  results.
+- Real production Arm benchmark validation remains deferred to Phase 6.

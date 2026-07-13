@@ -5,12 +5,29 @@ import re
 from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
+from autotune.arm_tune.benchmark.llama_bench import BENCHMARK_OPERATION, PROTOCOL_VERSION
 from autotune.arm_tune.errors import ArmTuneConfigError
-from autotune.arm_tune.schemas import TargetSpec
+from autotune.arm_tune.schemas import (
+    BenchmarkArtifactsSpec,
+    BenchmarkExecutableSpec,
+    BenchmarkModelSpec,
+    LlamaBenchJobSpec,
+    LlamaBenchSettings,
+    TargetSpec,
+)
 from autotune.utils.config import load_config
 
 
 TOP_LEVEL_KEYS = {"schema_version", "target"}
+BENCHMARK_TOP_LEVEL_KEYS = {
+    "schema_version",
+    "target",
+    "result_origin",
+    "executable",
+    "model",
+    "benchmark",
+    "artifacts",
+}
 TARGET_KEYS = {
     "type",
     "host",
@@ -27,6 +44,18 @@ TARGET_KEYS = {
     "keep_remote_artifacts",
     "strict_host_key_checking",
 }
+EXECUTABLE_KEYS = {"path", "expected_sha256"}
+MODEL_KEYS = {"path", "expected_sha256"}
+BENCHMARK_KEYS = {
+    "threads",
+    "prompt_tokens",
+    "generation_tokens",
+    "repetitions",
+    "timeout_seconds",
+    "additional_supported_options",
+}
+ARTIFACT_KEYS = {"preserve_raw_stdout", "preserve_raw_stderr"}
+ADDITIONAL_SUPPORTED_OPTION_KEYS = {"batch_size", "ubatch_size"}
 PYTHON_MODULE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
 
@@ -35,6 +64,82 @@ def load_target_spec(path: str | Path) -> TargetSpec:
     if not isinstance(payload, dict):
         raise ArmTuneConfigError("target config must be an object")
     return parse_target_spec(payload)
+
+
+def load_benchmark_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSpec]:
+    payload = load_config(path)
+    if not isinstance(payload, dict):
+        raise ArmTuneConfigError("benchmark config must be an object")
+    return parse_benchmark_config(payload)
+
+
+def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBenchJobSpec]:
+    unknown = set(payload) - BENCHMARK_TOP_LEVEL_KEYS
+    if unknown:
+        raise ArmTuneConfigError(f"unknown benchmark config field(s): {sorted(unknown)}")
+    schema_version = str(payload.get("schema_version", SCHEMA_VERSION))
+    if schema_version != SCHEMA_VERSION:
+        raise ArmTuneConfigError(f"unsupported schema_version: {schema_version!r}")
+    raw_target = payload.get("target")
+    if not isinstance(raw_target, dict):
+        raise ArmTuneConfigError("target must be an object")
+    target = parse_target_spec({"schema_version": schema_version, "target": raw_target})
+    executable = _object_field(payload, "executable")
+    model = _object_field(payload, "model")
+    benchmark = _object_field(payload, "benchmark")
+    artifacts = payload.get("artifacts", {})
+    if artifacts is None:
+        artifacts = {}
+    if not isinstance(artifacts, dict):
+        raise ArmTuneConfigError("artifacts must be an object")
+    _reject_unknown(executable, EXECUTABLE_KEYS, "executable")
+    _reject_unknown(model, MODEL_KEYS, "model")
+    _reject_unknown(benchmark, BENCHMARK_KEYS, "benchmark")
+    _reject_unknown(artifacts, ARTIFACT_KEYS, "artifacts")
+    executable_path = _absolute_path_field(executable.get("path"), "executable.path")
+    model_path = _absolute_path_field(model.get("path"), "model.path")
+    additional = benchmark.get("additional_supported_options", {})
+    if additional is None:
+        additional = {}
+    if not isinstance(additional, dict):
+        raise ArmTuneConfigError("benchmark.additional_supported_options must be an object")
+    extra_unknown = set(additional) - ADDITIONAL_SUPPORTED_OPTION_KEYS
+    if extra_unknown:
+        raise ArmTuneConfigError(f"unsupported benchmark.additional_supported_options field(s): {sorted(extra_unknown)}")
+    settings = LlamaBenchSettings(
+        threads=_positive_int(benchmark.get("threads"), "benchmark.threads"),
+        prompt_tokens=_positive_int(benchmark.get("prompt_tokens"), "benchmark.prompt_tokens"),
+        generation_tokens=_positive_int(benchmark.get("generation_tokens"), "benchmark.generation_tokens"),
+        repetitions=_positive_int(benchmark.get("repetitions"), "benchmark.repetitions"),
+        timeout_seconds=_positive_float(benchmark.get("timeout_seconds"), "benchmark.timeout_seconds"),
+        additional_supported_options={key: _positive_int(value, f"benchmark.additional_supported_options.{key}") for key, value in additional.items()},
+    )
+    result_origin = str(payload.get("result_origin", "measured"))
+    if result_origin not in {"measured", "test_fixture"}:
+        raise ArmTuneConfigError("result_origin must be 'measured' or 'test_fixture'")
+    job = LlamaBenchJobSpec(
+        protocol_version=PROTOCOL_VERSION,
+        operation=BENCHMARK_OPERATION,
+        run_id="pending",
+        target_run_directory="pending",
+        executable=BenchmarkExecutableSpec(
+            path=executable_path,
+            expected_sha256=_optional_sha256(executable.get("expected_sha256"), "executable.expected_sha256"),
+        ),
+        model=BenchmarkModelSpec(
+            path=model_path,
+            expected_sha256=_optional_sha256(model.get("expected_sha256"), "model.expected_sha256"),
+        ),
+        benchmark=settings,
+        artifacts=BenchmarkArtifactsSpec(
+            preserve_raw_stdout=bool(artifacts.get("preserve_raw_stdout", True)),
+            preserve_raw_stderr=bool(artifacts.get("preserve_raw_stderr", True)),
+        ),
+        target_type=target.type,
+        remote_module=target.remote_module,
+        result_origin=result_origin,
+    )
+    return target, job
 
 
 def parse_target_spec(payload: dict[str, Any]) -> TargetSpec:
@@ -119,4 +224,55 @@ def _python_module(value: Any) -> str:
     text = str(value).strip()
     if not PYTHON_MODULE_PATTERN.fullmatch(text):
         raise ArmTuneConfigError("target.remote_module must be a Python module path")
+    return text
+
+
+def _object_field(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    value = payload.get(key)
+    if not isinstance(value, dict):
+        raise ArmTuneConfigError(f"{key} must be an object")
+    return value
+
+
+def _reject_unknown(payload: dict[str, Any], allowed: set[str], label: str) -> None:
+    unknown = set(payload) - allowed
+    if unknown:
+        raise ArmTuneConfigError(f"unknown {label} field(s): {sorted(unknown)}")
+
+
+def _absolute_path_field(value: Any, label: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise ArmTuneConfigError(f"{label} is required")
+    if not (Path(text).is_absolute() or text.startswith("/")):
+        raise ArmTuneConfigError(f"{label} must be absolute on the target")
+    return text
+
+
+def _positive_int(value: Any, label: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ArmTuneConfigError(f"{label} must be an integer") from exc
+    if parsed < 1:
+        raise ArmTuneConfigError(f"{label} must be >= 1")
+    return parsed
+
+
+def _positive_float(value: Any, label: str) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ArmTuneConfigError(f"{label} must be a number") from exc
+    if parsed <= 0:
+        raise ArmTuneConfigError(f"{label} must be > 0")
+    return parsed
+
+
+def _optional_sha256(value: Any, label: str) -> str | None:
+    if value in {None, ""}:
+        return None
+    text = str(value).strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", text):
+        raise ArmTuneConfigError(f"{label} must be a 64-character hex SHA-256 digest")
     return text

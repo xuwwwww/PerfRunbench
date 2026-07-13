@@ -402,7 +402,7 @@ non-zero exit code when no configured Linux Arm64 production target is ready.
 
 ## Phase 2A Plan: Minimal llama-bench Vertical Slice
 
-Status: planned only. Do not implement during the Phase 1 hardening checkpoint.
+Status: implementation in progress after the Phase 2A plan checkpoint.
 
 Phase 2A implements only the smallest end-to-end llama-bench path needed to
 prove the controller/worker protocol, artifact handling, and defensive parsing
@@ -478,3 +478,16 @@ Phase 2A test requirements:
 - Parser failures must produce explicit parse status, not zero-valued metrics.
 - Host capability evidence and workload execution evidence must remain separate
   schemas.
+
+Phase 2A completion criteria:
+
+- `autotuneai arm benchmark --config <path>` runs one fixed llama-bench
+  invocation through the versioned worker protocol.
+- The worker preserves raw inspection and benchmark stdout/stderr artifacts.
+- The final result records separate validation, execution, parse, and benchmark
+  statuses.
+- The CLI returns documented exit codes and prints `Not available` for missing
+  metrics.
+- Fake executable integration tests exercise the public CLI without Arm
+  hardware, external SSH, a real model, real llama.cpp, internet access, root,
+  Arm Performix, or cloud credentials.

@@ -1,0 +1,5 @@
+warning: fixture output, not a measured Arm run
+| model | size | params | backend | threads | test | t/s |
+| --- | --- | --- | --- | --- | --- | --- |
+| fake-q4 | 4.0 GiB | 7 B | CPU | 4 | pp128 | 321.50 +/- 1.0 |
+| fake-q4 | 4.0 GiB | 7 B | CPU | 4 | tg64 | 87.25 +/- 0.5 |
