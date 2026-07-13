@@ -491,3 +491,82 @@ Phase 2A completion criteria:
 - Fake executable integration tests exercise the public CLI without Arm
   hardware, external SSH, a real model, real llama.cpp, internet access, root,
   Arm Performix, or cloud credentials.
+
+## Phase 2B Plan: Native Arm64 CI Validation and Benchmark Pipeline Hardening
+
+Status: planned after Phase 2A approval.
+
+Phase 2B validates that the Phase 2A benchmark slice can run its fixture smoke
+path on a GitHub-hosted native Arm64 Linux runner while hardening benchmark
+provenance, schemas, parser behavior, and artifact trust boundaries.
+
+Allowed scope:
+
+- GitHub-hosted native Arm64 smoke validation.
+- Linux Arm64 package and CLI validation.
+- Fixture benchmark execution on a native Arm64 runner.
+- Result-origin integrity.
+- Artifact and digest hardening.
+- Schema round-trip hardening.
+- Parser robustness.
+- Real-Arm integration-test scaffolding that is skipped by default.
+
+Out of scope for Phase 2B:
+
+- Real model benchmark.
+- AWS or any other cloud provisioning.
+- External SSH server validation.
+- `llama-server`.
+- Time to first token.
+- Candidate search.
+- Quality gate.
+- Build profiles.
+- Arm Performix.
+- Performance Passport generation.
+- Paid infrastructure actions.
+
+Planned file additions:
+
+```text
+.github/workflows/armtune-arm64-smoke.yml
+autotune/arm_tune/benchmark/artifact_validation.py
+autotune/arm_tune/benchmark/provenance.py
+scripts/run_armtune_real_smoke.py
+tests/test_arm_tune_benchmark_origin.py
+tests/test_arm_tune_benchmark_schema_roundtrip.py
+tests/test_arm_tune_artifact_validation.py
+tests/fixtures/arm_tune/llama_bench_outputs/*.txt
+```
+
+Planned file updates:
+
+```text
+autotune/arm_tune/benchmark/artifacts.py
+autotune/arm_tune/benchmark/llama_bench.py
+autotune/arm_tune/benchmark/parser.py
+autotune/arm_tune/config.py
+autotune/arm_tune/schemas.py
+autotune/arm_tune/targets/local.py
+autotune/arm_tune/targets/ssh.py
+docs/armtune/ARCHITECTURE.md
+docs/armtune/BENCHMARK_METHODOLOGY.md
+docs/armtune/LIMITATIONS.md
+docs/armtune/REMOTE_TARGETS.md
+```
+
+Phase 2B completion criteria:
+
+- A GitHub Actions workflow exists for native Arm64 fixture smoke validation on
+  `ubuntu-24.04-arm`.
+- The workflow runs only for ArmTune-relevant path changes and manual dispatch.
+- The workflow validates architecture, package installation, CLI help, doctor,
+  inspect-host, focused ArmTune tests, and a public CLI fake llama-bench E2E.
+- The fixture E2E remains `result_origin: test_fixture` even on native Arm64.
+- Controller-side artifact validation checks downloaded manifests before a
+  benchmark can be reported successful.
+- Parser ambiguity, invalid numeric values, duplicate rows, and stderr-only
+  metrics have explicit outcomes and do not become zero-valued metrics.
+- Real-Arm smoke scaffolding is available but skipped by default and requires
+  explicit user-supplied binary/model paths plus an acknowledgement flag.
+- No real model, external SSH server, AWS/cloud resource, Performix, candidate
+  search, quality gate, build profile, or Performance Passport is implemented.
