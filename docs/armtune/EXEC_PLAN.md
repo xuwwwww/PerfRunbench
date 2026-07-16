@@ -659,3 +659,73 @@ execution pipeline on a burstable AWS T4g instance. It is not evidence of
 optimization, KleidiAI execution, build-profile improvement, thread-search
 improvement, quality preservation, stable production performance, or formal
 competition benchmark results.
+
+## Phase 3A Plan: Repeated Benchmark Search Foundation
+
+Status: planned. Phase 3A adds repeated `llama-bench` measurement and a
+conservative Arm-aware candidate search foundation. It must not run a real AWS
+search as part of implementation; tests use fake executables and synthetic
+fixtures only.
+
+Allowed scope:
+
+- Configurable warm-up runs, search repetitions, confirmation repetitions,
+  cooldown seconds, random seed, and paired-baseline insertion cadence.
+- Separate raw stdout/stderr artifacts for every repetition.
+- Randomized candidate order with the recorded seed.
+- Periodic paired-baseline insertion during search.
+- Trial failure preservation without converting failures to zero metrics.
+- Metric distributions with valid count, failed count, median, p95 when
+  meaningful, min, max, and IQR or standard deviation.
+- Warnings when sample counts are too small for meaningful percentiles.
+- Thread candidates generated from visible and allowed CPU topology.
+- `threads-batch`, batch, and ubatch candidates only when the inspected
+  `llama-bench` help output supports the relevant flags.
+- Process-level affinity candidates: `scheduler-default`, `compact`, `spread`,
+  `reserve-one-core`, and `numa-local` only when meaningful.
+- Deterministic staged search:
+  1. thread count
+  2. threads-batch and batch parameters
+  3. affinity
+  4. confirmation of baseline and selected candidate
+- Noise-band and inconclusive classification.
+- Performance-only recommendations with `quality_gate_status:
+  not_evaluated`.
+
+Out of scope:
+
+- `llama-server`, HTTP, streaming, and TTFT.
+- BootTrace and semantic quality validation.
+- Build-profile comparison.
+- KleidiAI claims.
+- Arm Performix.
+- Performance Passport generation.
+- Cloud provisioning or automatic instance control.
+- Full Cartesian product search by default.
+
+Default protocol controls:
+
+```text
+warmup_runs: 2
+search_runs: 5
+confirmation_runs: 10
+cooldown_seconds: 2
+random_seed: 42
+insert_paired_baseline_every: 4
+noise_band_percent: 2.0
+```
+
+Every repetition records candidate ID, repetition index, start/end UTC, raw
+stdout/stderr artifact paths, execution status, parse status, parsed metrics,
+host fingerprint, allowed CPU mask, target load when available, and failure
+reason.
+
+Phase 3A recommendations must use wording such as:
+
+> Best observed performance candidate under the tested llama-bench
+> configuration.
+
+They must not recommend candidates that failed required trials, missed required
+metrics, are statistically indistinguishable within the configured noise band
+unless marked inconclusive, or differ in model, binary, target,
+prompt/generation counts, or protocol.

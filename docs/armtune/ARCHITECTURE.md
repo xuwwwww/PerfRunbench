@@ -332,3 +332,60 @@ Parser ambiguity policy:
 Phase 2C must use a real model and a real target before any preliminary
 measured data is produced. Phase 2B only prepares skipped-by-default
 real-Arm smoke scaffolding.
+
+## Phase 3A Repeated Search Architecture
+
+Phase 3A introduces `autotuneai arm optimize` as a performance-only search
+command built on top of the Phase 2A/2B `benchmark.llama_bench` worker
+operation. It does not introduce arbitrary remote shell commands and does not
+add cloud instance control.
+
+The controller owns search orchestration:
+
+- load and validate the same benchmark target, executable, model, and token
+  configuration used by `autotuneai arm benchmark`
+- inspect the target once before search
+- inspect the `llama-bench` binary help output before generating optional flags
+- generate a small staged candidate set from visible target topology
+- randomize candidate order with a recorded seed
+- insert paired baseline trials at a configured cadence
+- run repeated fixed worker jobs through the existing target abstraction
+- aggregate distributions and classify results with a noise band
+- write a versioned search result with `quality_gate_status: not_evaluated`
+
+The target continues to execute only the allowlisted benchmark worker job. Each
+search repetition is a normal benchmark job with a candidate-specific
+configuration and its own raw artifacts. Failed repetitions are retained and
+are not converted to zero-valued metrics.
+
+Phase 3A artifact layout:
+
+```text
+.autotuneai/runs/<run_id>/armtune/optimize/
+  optimize_config.json
+  search_plan.json
+  search_result.json
+  candidates/<candidate_id>/...
+  repetitions/<sequence_index>/
+    benchmark_result.json
+    artifact_manifest.json
+    raw/...
+```
+
+Initial search stages:
+
+1. thread count
+2. threads-batch and batch parameters when supported by the inspected binary
+3. affinity
+4. confirmation of baseline and selected candidate
+
+The search is intentionally staged and pruned. A full Cartesian product is not
+the default behavior.
+
+Recommendation semantics are conservative:
+
+- recommendations are performance-only
+- `quality_gate_status` is always `not_evaluated` in Phase 3A
+- inconclusive candidates remain inconclusive within the configured noise band
+- incompatible model, binary, target, token count, or protocol evidence prevents
+  recommendation

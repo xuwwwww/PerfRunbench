@@ -166,3 +166,66 @@ values must not be used as competition benchmark data.
 Real measured smoke execution is prepared for Phase 2C through an explicit
 opt-in script that requires user-supplied binary and model paths. It must not
 download models automatically.
+
+## Phase 3A Repeated llama-bench Search Method
+
+Phase 3A turns the single fixed benchmark invocation into a repeated
+measurement protocol for performance-only search. It still uses
+`llama-bench`, not `llama-server`, and it does not measure TTFT, streaming
+latency, semantic quality, or build-profile differences.
+
+Default controls are configurable:
+
+```text
+warmup_runs: 2
+search_runs: 5
+confirmation_runs: 10
+cooldown_seconds: 2
+random_seed: 42
+insert_paired_baseline_every: 4
+noise_band_percent: 2.0
+```
+
+Warm-up repetitions are preserved as artifacts but excluded from performance
+distributions. Measured repetitions retain candidate ID, repetition index,
+start/end UTC, raw stdout/stderr, execution status, parse status, parsed
+metrics, host fingerprint, allowed CPU mask, target load when available, and
+failure reason.
+
+Failed trials are counted separately and are never aggregated as zero.
+Distribution summaries include:
+
+- valid count
+- failed count
+- median
+- p95 when sample count supports it
+- min
+- max
+- IQR or standard deviation
+
+ArmTune emits a warning when sample count is too small for a meaningful
+percentile.
+
+Candidate generation is topology-aware and conservative. Thread candidates are
+generated from visible and allowed CPUs, deduplicated, and validated. Optional
+`llama-bench` flags are generated only when the inspected binary help output
+proves support for those flags. Unsupported flags fail validation rather than
+being used silently.
+
+The search is staged:
+
+1. thread count
+2. threads-batch and batch parameters
+3. affinity
+4. confirmation of baseline and selected candidate
+
+Phase 3A recommendations are performance-only and include
+`quality_gate_status: not_evaluated`. ArmTune must not call a candidate
+generally optimal. The allowed wording is:
+
+> Best observed performance candidate under the tested llama-bench
+> configuration.
+
+Candidates that failed required trials, missed required metrics, are within the
+configured noise band, or differ in model, binary, target, token counts, or
+protocol are not recommended as improvements.

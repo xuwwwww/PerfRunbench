@@ -99,3 +99,15 @@ should be labeled unverified.
 - Phase 2C did not run candidate search, repeated confirmation, paired
   baselines, quality gates, `llama-server`, streaming, TTFT, or automated cloud
   instance control.
+
+## Phase 3A Planned Limitations
+
+- Phase 3A is limited to repeated `llama-bench` measurement and
+  performance-only candidate search.
+- Phase 3A recommendations use `quality_gate_status: not_evaluated` and do not
+  prove semantic quality preservation.
+- Phase 3A does not implement `llama-server`, HTTP, streaming, TTFT, BootTrace,
+  build-profile comparison, KleidiAI claims, Performix, Performance Passport
+  generation, cloud provisioning, or automatic instance control.
+- Phase 3A defaults are intended to make the search protocol testable and
+  auditable, not to establish final stable production performance.
