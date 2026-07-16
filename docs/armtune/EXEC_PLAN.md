@@ -609,3 +609,53 @@ This evidence supports the following claim only:
 This evidence does not show real llama.cpp execution, real model inference,
 KleidiAI usage, candidate search, quality validation, Performix support, or an
 ArmTune optimization result.
+
+## Phase 2C Plan: Real SSH Arm64 Baseline Validation
+
+Status: completed. A user-provisioned AWS T4g instance was used only as an
+existing Linux Arm64 target; ArmTune did not provision, resize, start, stop, or
+otherwise control cloud resources.
+
+Phase 2C validated the real-target path:
+
+```text
+Windows controller
+  -> system OpenSSH
+  -> Linux Arm64 target
+  -> real llama-bench binary
+  -> real GGUF model
+  -> measured result
+  -> downloaded artifact digest validation
+```
+
+Phase 2C validation evidence:
+
+```text
+Evidence file: docs/armtune/results/PHASE_2C_AWS_GRAVITON2.md
+Run ID: 20260716_231915_147773
+Target type: ssh
+Target architecture: aarch64
+Target OS: Ubuntu 24.04.4 LTS
+Kernel: 6.17.0-1017-aws
+CPU model: Neoverse-N1
+Result origin: measured
+Validation status: passed
+Execution status: completed
+Parse status: parsed
+Benchmark status: passed
+Artifact validation: passed
+Checked artifacts: 13
+Fake executable marker: false
+Prefill throughput: 43.8 tokens/s
+Decode throughput: 30.13 tokens/s
+PerfRunbench commit: 41b57b70b318a94977a5dd822314782e855295f6
+llama.cpp commit: b15ca938ad00aa6b3ee6c2edda7363fd02826b18
+llama-bench SHA-256: 990d4eee8877ed2b6758afd198b61546c87092a606e2ee696d08c34f896b01b8
+Model SHA-256: 041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55
+```
+
+This is a preliminary measured baseline used to validate the real SSH Arm64
+execution pipeline on a burstable AWS T4g instance. It is not evidence of
+optimization, KleidiAI execution, build-profile improvement, thread-search
+improvement, quality preservation, stable production performance, or formal
+competition benchmark results.

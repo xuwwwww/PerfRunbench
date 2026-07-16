@@ -78,3 +78,24 @@ should be labeled unverified.
   user-supplied binary and model paths plus acknowledgement.
 - Phase 2C must provide a real model, real target, and explicit measured-data
   handling before any preliminary measured result is run.
+
+## Phase 2C Limitations
+
+- Phase 2C produced one preliminary measured baseline on a user-provisioned
+  burstable AWS T4g instance. It validates the real SSH Arm64 execution
+  pipeline, not stable production performance.
+- The Phase 2C evidence is recorded in
+  `docs/armtune/results/PHASE_2C_AWS_GRAVITON2.md`.
+- The run `20260716_231915_147773` used a real `llama-bench` binary and a real
+  GGUF model on Linux `aarch64`, with `result_origin: measured`.
+- Parsed preliminary throughput was `43.8 tokens/s` prefill and
+  `30.13 tokens/s` decode. These values are pipeline-validation measurements,
+  not final competition benchmark results.
+- Artifact digest validation passed after download, with 13 artifacts checked.
+- Phase 2C does not prove optimization, KleidiAI execution, build-profile
+  improvement, thread-search improvement, quality preservation, stable
+  production performance, Performix support, Performance Passport generation,
+  or formal benchmark conclusions.
+- Phase 2C did not run candidate search, repeated confirmation, paired
+  baselines, quality gates, `llama-server`, streaming, TTFT, or automated cloud
+  instance control.
