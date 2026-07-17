@@ -38,6 +38,7 @@ REQUIRED_FLAGS = {
     "repetitions": ["-r", "--repetitions"],
 }
 OPTIONAL_FLAGS = {
+    "threads_batch": ["--threads-batch"],
     "batch_size": ["--batch-size"],
     "ubatch_size": ["--ubatch-size"],
 }
@@ -275,7 +276,7 @@ def execute_llama_bench(
         command.extend([additional_flags[key], str(value)])
     started = utc_now()
     start_monotonic = time.monotonic()
-    result = _run_command(command, timeout_seconds=job.benchmark.timeout_seconds)
+    result = _run_command(command, timeout_seconds=job.benchmark.timeout_seconds, cpu_affinity=job.benchmark.cpu_affinity)
     ended = utc_now()
     duration = time.monotonic() - start_monotonic
     stdout_path = write_text_artifact(raw_dir / "benchmark_stdout.txt", result.stdout)
@@ -377,7 +378,15 @@ def _is_executable(path: Path) -> bool:
     return os.access(path, os.X_OK)
 
 
-def _run_command(command: list[str], *, timeout_seconds: float):
+def _run_command(command: list[str], *, timeout_seconds: float, cpu_affinity: list[int] | None = None):
+    preexec_fn = None
+    if cpu_affinity and os.name != "nt" and hasattr(os, "sched_setaffinity"):
+        affinity = set(cpu_affinity)
+
+        def _set_child_affinity() -> None:
+            os.sched_setaffinity(0, affinity)
+
+        preexec_fn = _set_child_affinity
     try:
         completed = subprocess.run(
             command,
@@ -387,6 +396,7 @@ def _run_command(command: list[str], *, timeout_seconds: float):
             encoding="utf-8",
             errors="replace",
             timeout=timeout_seconds,
+            preexec_fn=preexec_fn,
         )
         return replaceable_command_result(command, completed.returncode, completed.stdout or "", completed.stderr or "", False)
     except subprocess.TimeoutExpired as exc:

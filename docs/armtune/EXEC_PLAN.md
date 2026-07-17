@@ -662,10 +662,10 @@ competition benchmark results.
 
 ## Phase 3A Plan: Repeated Benchmark Search Foundation
 
-Status: planned. Phase 3A adds repeated `llama-bench` measurement and a
-conservative Arm-aware candidate search foundation. It must not run a real AWS
-search as part of implementation; tests use fake executables and synthetic
-fixtures only.
+Status: implemented. Phase 3A adds repeated `llama-bench` measurement and a
+conservative Arm-aware candidate search foundation. No real AWS search was run
+as part of implementation; tests use fake executables and synthetic fixtures
+only.
 
 Allowed scope:
 

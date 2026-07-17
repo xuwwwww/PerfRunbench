@@ -38,9 +38,11 @@ BENCHMARK_KEYS = {
     "repetitions",
     "timeout_seconds",
     "additional_supported_options",
+    "cpu_affinity",
+    "affinity_mode",
 }
 ARTIFACT_KEYS = {"schema_version", "preserve_raw_stdout", "preserve_raw_stderr"}
-ADDITIONAL_SUPPORTED_OPTION_KEYS = {"batch_size", "ubatch_size"}
+ADDITIONAL_SUPPORTED_OPTION_KEYS = {"threads_batch", "batch_size", "ubatch_size"}
 REMOTE_PATH_PATTERN = re.compile(r"^[A-Za-z0-9._~/:@+-]+$")
 PYTHON_MODULE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
@@ -147,6 +149,10 @@ def _validate_benchmark_job(payload: dict[str, Any]) -> None:
         raise ArmTuneProtocolError(f"unsupported benchmark.additional_supported_options field(s): {sorted(unknown_options)}")
     for key, value in additional.items():
         _positive_int(value, f"benchmark.additional_supported_options.{key}")
+    _optional_cpu_affinity(benchmark.get("cpu_affinity"), "benchmark.cpu_affinity")
+    affinity_mode = str(benchmark.get("affinity_mode", "scheduler-default"))
+    if affinity_mode not in {"scheduler-default", "compact", "spread", "reserve-one-core", "numa-local"}:
+        raise ArmTuneProtocolError("benchmark.affinity_mode is unsupported")
 
 
 def _validate_object(value: Any, allowed: set[str], label: str) -> None:
@@ -177,3 +183,21 @@ def _positive_float(value: Any, label: str) -> None:
         raise ArmTuneProtocolError(f"{label} must be a number") from exc
     if parsed <= 0:
         raise ArmTuneProtocolError(f"{label} must be > 0")
+
+
+def _optional_cpu_affinity(value: Any, label: str) -> None:
+    if value is None:
+        return
+    if not isinstance(value, list):
+        raise ArmTuneProtocolError(f"{label} must be a list of CPU indexes")
+    seen: set[int] = set()
+    for item in value:
+        try:
+            parsed = int(item)
+        except (TypeError, ValueError) as exc:
+            raise ArmTuneProtocolError(f"{label} must contain only integers") from exc
+        if parsed < 0:
+            raise ArmTuneProtocolError(f"{label} must contain non-negative CPU indexes")
+        if parsed in seen:
+            raise ArmTuneProtocolError(f"{label} must not contain duplicate CPU indexes")
+        seen.add(parsed)

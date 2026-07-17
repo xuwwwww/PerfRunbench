@@ -15,6 +15,7 @@ from autotune.arm_tune.schemas import (
     LlamaBenchSettings,
     TargetSpec,
 )
+from autotune.arm_tune.search.runner import SearchConfig
 from autotune.utils.config import load_config
 
 
@@ -28,6 +29,7 @@ BENCHMARK_TOP_LEVEL_KEYS = {
     "benchmark",
     "artifacts",
 }
+OPTIMIZE_TOP_LEVEL_KEYS = BENCHMARK_TOP_LEVEL_KEYS | {"search"}
 TARGET_KEYS = {
     "type",
     "host",
@@ -53,9 +55,20 @@ BENCHMARK_KEYS = {
     "repetitions",
     "timeout_seconds",
     "additional_supported_options",
+    "cpu_affinity",
+    "affinity_mode",
 }
 ARTIFACT_KEYS = {"preserve_raw_stdout", "preserve_raw_stderr"}
-ADDITIONAL_SUPPORTED_OPTION_KEYS = {"batch_size", "ubatch_size"}
+ADDITIONAL_SUPPORTED_OPTION_KEYS = {"threads_batch", "batch_size", "ubatch_size"}
+SEARCH_KEYS = {
+    "warmup_runs",
+    "search_runs",
+    "confirmation_runs",
+    "cooldown_seconds",
+    "random_seed",
+    "insert_paired_baseline_every",
+    "noise_band_percent",
+}
 PYTHON_MODULE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
 
@@ -71,6 +84,13 @@ def load_benchmark_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSp
     if not isinstance(payload, dict):
         raise ArmTuneConfigError("benchmark config must be an object")
     return parse_benchmark_config(payload)
+
+
+def load_optimize_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSpec, SearchConfig]:
+    payload = load_config(path)
+    if not isinstance(payload, dict):
+        raise ArmTuneConfigError("optimize config must be an object")
+    return parse_optimize_config(payload)
 
 
 def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBenchJobSpec]:
@@ -113,6 +133,8 @@ def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBe
         repetitions=_positive_int(benchmark.get("repetitions"), "benchmark.repetitions"),
         timeout_seconds=_positive_float(benchmark.get("timeout_seconds"), "benchmark.timeout_seconds"),
         additional_supported_options={key: _positive_int(value, f"benchmark.additional_supported_options.{key}") for key, value in additional.items()},
+        cpu_affinity=_optional_cpu_affinity(benchmark.get("cpu_affinity"), "benchmark.cpu_affinity"),
+        affinity_mode=_affinity_mode(benchmark.get("affinity_mode", "scheduler-default")),
     )
     result_origin = str(payload.get("result_origin", "unverified"))
     if result_origin not in {"measured", "test_fixture", "unverified"}:
@@ -140,6 +162,33 @@ def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBe
         result_origin=result_origin,
     )
     return target, job
+
+
+def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBenchJobSpec, SearchConfig]:
+    unknown = set(payload) - OPTIMIZE_TOP_LEVEL_KEYS
+    if unknown:
+        raise ArmTuneConfigError(f"unknown optimize config field(s): {sorted(unknown)}")
+    benchmark_payload = {key: value for key, value in payload.items() if key != "search"}
+    target, job = parse_benchmark_config(benchmark_payload)
+    search_payload = payload.get("search", {})
+    if search_payload is None:
+        search_payload = {}
+    if not isinstance(search_payload, dict):
+        raise ArmTuneConfigError("search must be an object")
+    _reject_unknown(search_payload, SEARCH_KEYS, "search")
+    config = SearchConfig(
+        warmup_runs=_non_negative_int(search_payload.get("warmup_runs", 2), "search.warmup_runs"),
+        search_runs=_positive_int(search_payload.get("search_runs", 5), "search.search_runs"),
+        confirmation_runs=_positive_int(search_payload.get("confirmation_runs", 10), "search.confirmation_runs"),
+        cooldown_seconds=_non_negative_float(search_payload.get("cooldown_seconds", 2.0), "search.cooldown_seconds"),
+        random_seed=_int_field(search_payload.get("random_seed", 42), "search.random_seed"),
+        insert_paired_baseline_every=_non_negative_int(
+            search_payload.get("insert_paired_baseline_every", 4),
+            "search.insert_paired_baseline_every",
+        ),
+        noise_band_percent=_positive_float(search_payload.get("noise_band_percent", 2.0), "search.noise_band_percent"),
+    )
+    return target, job, config
 
 
 def parse_target_spec(payload: dict[str, Any]) -> TargetSpec:
@@ -259,6 +308,16 @@ def _positive_int(value: Any, label: str) -> int:
     return parsed
 
 
+def _non_negative_int(value: Any, label: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ArmTuneConfigError(f"{label} must be an integer") from exc
+    if parsed < 0:
+        raise ArmTuneConfigError(f"{label} must be >= 0")
+    return parsed
+
+
 def _positive_float(value: Any, label: str) -> float:
     try:
         parsed = float(value)
@@ -267,6 +326,43 @@ def _positive_float(value: Any, label: str) -> float:
     if parsed <= 0:
         raise ArmTuneConfigError(f"{label} must be > 0")
     return parsed
+
+
+def _non_negative_float(value: Any, label: str) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ArmTuneConfigError(f"{label} must be a number") from exc
+    if parsed < 0:
+        raise ArmTuneConfigError(f"{label} must be >= 0")
+    return parsed
+
+
+def _optional_cpu_affinity(value: Any, label: str) -> list[int] | None:
+    if value is None or value == "":
+        return None
+    if not isinstance(value, list):
+        raise ArmTuneConfigError(f"{label} must be a list of CPU indexes")
+    parsed: list[int] = []
+    for item in value:
+        try:
+            cpu = int(item)
+        except (TypeError, ValueError) as exc:
+            raise ArmTuneConfigError(f"{label} must contain only integers") from exc
+        if cpu < 0:
+            raise ArmTuneConfigError(f"{label} must contain non-negative CPU indexes")
+        parsed.append(cpu)
+    if len(set(parsed)) != len(parsed):
+        raise ArmTuneConfigError(f"{label} must not contain duplicate CPU indexes")
+    return parsed
+
+
+def _affinity_mode(value: Any) -> str:
+    text = str(value or "scheduler-default").strip()
+    allowed = {"scheduler-default", "compact", "spread", "reserve-one-core", "numa-local"}
+    if text not in allowed:
+        raise ArmTuneConfigError(f"benchmark.affinity_mode must be one of {sorted(allowed)}")
+    return text
 
 
 def _optional_sha256(value: Any, label: str) -> str | None:

@@ -232,6 +232,8 @@ class LlamaBenchSettings:
     repetitions: int
     timeout_seconds: float
     additional_supported_options: dict[str, str | int | float | bool] = field(default_factory=dict)
+    cpu_affinity: list[int] | None = None
+    affinity_mode: str = "scheduler-default"
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -303,6 +305,8 @@ class LlamaBenchJobSpec:
                 repetitions=_required_int(benchmark_payload, "repetitions"),
                 timeout_seconds=_required_float(benchmark_payload, "timeout_seconds"),
                 additional_supported_options=dict(additional),
+                cpu_affinity=_optional_int_list(benchmark_payload.get("cpu_affinity"), "cpu_affinity"),
+                affinity_mode=str(benchmark_payload.get("affinity_mode", "scheduler-default")),
             ),
             artifacts=BenchmarkArtifactsSpec(
                 preserve_raw_stdout=_optional_bool(artifacts_payload.get("preserve_raw_stdout", True), "preserve_raw_stdout"),
@@ -671,6 +675,19 @@ def _required_int(payload: dict[str, Any], key: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"{key} must be an integer")
     return value
+
+
+def _optional_int_list(value: Any, label: str) -> list[int] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError(f"{label} must be a list of integers when provided")
+    parsed: list[int] = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, int):
+            raise ValueError(f"{label} must be a list of integers")
+        parsed.append(item)
+    return parsed
 
 
 def _required_float(payload: dict[str, Any], key: str) -> float:

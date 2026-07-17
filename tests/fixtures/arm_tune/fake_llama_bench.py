@@ -22,6 +22,17 @@ HELP_MISSING_GENERATION = """fake llama-bench fixture
   -r, --repetitions N
 """
 
+HELP_FULL = """fake llama-bench fixture
+  -m, --model FILE
+  -t, --threads N
+  --threads-batch N
+  -p, --n-prompt N
+  -n, --n-gen N
+  -r, --repetitions N
+  --batch-size N
+  --ubatch-size N
+"""
+
 VALID_OUTPUT = """warning: fixture output, not a measured Arm run
 | model | threads | test | t/s |
 | --- | --- | --- | --- |
@@ -50,7 +61,13 @@ def main() -> int:
         print("fake llama-bench fixture version 1.0")
         return 0
     if "--help" in args:
-        print(HELP_MISSING_GENERATION if os.environ.get("FAKE_LLAMA_BENCH_HELP_MODE") == "missing_generation" else HELP)
+        help_mode = os.environ.get("FAKE_LLAMA_BENCH_HELP_MODE")
+        if help_mode == "missing_generation":
+            print(HELP_MISSING_GENERATION)
+        elif help_mode == "full":
+            print(HELP_FULL)
+        else:
+            print(HELP)
         return 0
     mode = os.environ.get("FAKE_LLAMA_BENCH_MODE", "valid")
     if mode == "timeout":
@@ -68,8 +85,32 @@ def main() -> int:
     if mode == "partial":
         print(PARTIAL_OUTPUT)
         return 0
-    print(VALID_OUTPUT)
+    print(_valid_output(args))
     return 0
+
+
+def _valid_output(args: list[str]) -> str:
+    if os.environ.get("FAKE_LLAMA_BENCH_SCALE_BY_THREADS") != "1":
+        return VALID_OUTPUT
+    threads = _arg_int(args, "-t", "--threads", default=1)
+    prefill = 300.0 + threads * 10.0
+    decode = 80.0 + threads * 2.0
+    return f"""warning: fixture output, not a measured Arm run
+| model | threads | test | t/s |
+| --- | --- | --- | --- |
+| fake-q4 | {threads} | pp128 | {prefill:.2f} +/- 1.0 |
+| fake-q4 | {threads} | tg64 | {decode:.2f} +/- 0.5 |
+"""
+
+
+def _arg_int(args: list[str], short: str, long: str, *, default: int) -> int:
+    for index, token in enumerate(args):
+        if token in {short, long} and index + 1 < len(args):
+            try:
+                return int(args[index + 1])
+            except ValueError:
+                return default
+    return default
 
 
 if __name__ == "__main__":

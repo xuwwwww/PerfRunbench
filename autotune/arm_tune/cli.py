@@ -7,9 +7,10 @@ from dataclasses import replace
 from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
-from autotune.arm_tune.config import default_local_target, load_benchmark_config, load_target_spec
+from autotune.arm_tune.config import default_local_target, load_benchmark_config, load_optimize_config, load_target_spec
 from autotune.arm_tune.errors import ArmTuneError
 from autotune.arm_tune.schemas import ArmBenchmarkResult, DoctorStatuses, LlamaBenchParseResult, ProductionValidation, StatusCheck, TargetSpec
+from autotune.arm_tune.search.runner import SearchConfig, run_search
 from autotune.arm_tune.targets.local import LocalArmTarget
 from autotune.arm_tune.targets.ssh import SshArmTarget
 from autotune.arm_tune.targets.worker import main as worker_main
@@ -33,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="autotuneai arm", description="ArmTune target inspection and validation.")
-    subparsers = parser.add_subparsers(dest="arm_command", metavar="{doctor,inspect-host,benchmark}")
+    subparsers = parser.add_subparsers(dest="arm_command", metavar="{doctor,inspect-host,benchmark,optimize}")
 
     doctor = subparsers.add_parser("doctor", help="Validate ArmTune controller and target configuration.")
     doctor.add_argument("--target-config")
@@ -47,6 +48,17 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark = subparsers.add_parser("benchmark", help="Run a fixed ArmTune llama-bench benchmark job.")
     benchmark.add_argument("--config", required=True)
     benchmark.set_defaults(handler=_cmd_benchmark)
+
+    optimize = subparsers.add_parser("optimize", help="Run repeated ArmTune llama-bench performance search.")
+    optimize.add_argument("--config", required=True)
+    optimize.add_argument("--warmup-runs", type=int)
+    optimize.add_argument("--search-runs", type=int)
+    optimize.add_argument("--confirmation-runs", type=int)
+    optimize.add_argument("--cooldown-seconds", type=float)
+    optimize.add_argument("--random-seed", type=int)
+    optimize.add_argument("--insert-paired-baseline-every", type=int)
+    optimize.add_argument("--noise-band-percent", type=float)
+    optimize.set_defaults(handler=_cmd_optimize)
 
     worker = subparsers.add_parser("worker", help=argparse.SUPPRESS)
     worker.add_argument("--job-spec", required=True)
@@ -152,8 +164,76 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def _cmd_optimize(args: argparse.Namespace) -> int:
+    spec, job, search_config = load_optimize_config(args.config)
+    search_config = _search_config_from_args(search_config, args)
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "optimize", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    optimize_dir = run_dir / "armtune" / "optimize"
+    optimize_dir.mkdir(parents=True, exist_ok=True)
+    target = _target_from_spec(spec)
+    job = replace(
+        job,
+        run_id=manifest.run_id,
+        target_type=spec.type,
+        remote_module=spec.remote_module,
+        target_run_directory=str(optimize_dir),
+    )
+    try:
+        result = run_search(
+            target=target,
+            base_job=job,
+            config=search_config,
+            run_id=manifest.run_id,
+            optimize_dir=optimize_dir,
+        )
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = 0 if result.status == "completed" else 1
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_optimize_summary(result))
+    return exit_code
+
+
 def _cmd_worker(args: argparse.Namespace) -> int:
     return worker_main(["--job-spec", args.job_spec, "--run-dir", args.run_dir])
+
+
+def _search_config_from_args(config: SearchConfig, args: argparse.Namespace) -> SearchConfig:
+    updates: dict[str, object] = {}
+    for attr in [
+        "warmup_runs",
+        "search_runs",
+        "confirmation_runs",
+        "cooldown_seconds",
+        "random_seed",
+        "insert_paired_baseline_every",
+        "noise_band_percent",
+    ]:
+        value = getattr(args, attr, None)
+        if value is not None:
+            updates[attr] = value
+    merged = replace(config, **updates) if updates else config
+    if merged.warmup_runs < 0:
+        raise ArmTuneError("warmup_runs must be >= 0")
+    if merged.search_runs < 1:
+        raise ArmTuneError("search_runs must be >= 1")
+    if merged.confirmation_runs < 1:
+        raise ArmTuneError("confirmation_runs must be >= 1")
+    if merged.cooldown_seconds < 0:
+        raise ArmTuneError("cooldown_seconds must be >= 0")
+    if merged.insert_paired_baseline_every < 0:
+        raise ArmTuneError("insert_paired_baseline_every must be >= 0")
+    if merged.noise_band_percent <= 0:
+        raise ArmTuneError("noise_band_percent must be > 0")
+    return merged
 
 
 def _target_spec_from_args(args: argparse.Namespace) -> TargetSpec:
@@ -248,6 +328,24 @@ def _benchmark_summary(result: ArmBenchmarkResult) -> str:
         f"parse_status: {result.parse_status}",
         f"prefill_tokens_per_second: {_format_metric(prefill)}",
         f"decode_tokens_per_second: {_format_metric(decode)}",
+        f"artifact_directory: {result.artifact_directory}",
+    ]
+    return "\n".join(lines)
+
+
+def _optimize_summary(result) -> str:
+    decision = result.recommendation.noise_band_decision
+    delta = "Not available" if decision is None or decision.delta_percent is None else f"{decision.delta_percent:.3f}%"
+    classification = decision.classification if decision else "not_comparable"
+    lines = [
+        f"run_id: {result.run_id}",
+        f"search_status: {result.status}",
+        f"quality_gate_status: {result.quality_gate_status}",
+        f"primary_metric: {result.primary_metric}",
+        f"selected_candidate: {result.selected_candidate.candidate_id}",
+        f"recommendation_status: {result.recommendation.status}",
+        f"noise_band_classification: {classification}",
+        f"delta_percent: {delta}",
         f"artifact_directory: {result.artifact_directory}",
     ]
     return "\n".join(lines)
