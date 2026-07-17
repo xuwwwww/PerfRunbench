@@ -144,3 +144,53 @@ Access date for all entries: 2026-07-13.
 - Unresolved uncertainty: optimized-path evidence, quality validation,
   Performix, Performance Passport generation, and stable production
   performance remain unvalidated.
+
+## Phase 3A.1 Real Search Validation
+
+- Source: user-provisioned AWS Graviton2 Linux Arm64 development target
+- Evidence file: `docs/armtune/results/PHASE_3A_REAL_SEARCH_VALIDATION.md`
+- Run ID: `20260718_001757_718789`
+- Target type: `ssh`
+- Target architecture: `aarch64`
+- Target OS: `Ubuntu 24.04.4 LTS`
+- Kernel: `6.17.0-1017-aws`
+- CPU model: `Neoverse-N1`
+- Logical CPUs: `2`
+- PerfRunbench commit: `ee4cbb305d788e8405e65ab839b1848cb743a2eb`
+- llama.cpp commit: `b15ca938ad00aa6b3ee6c2edda7363fd02826b18`
+- llama-bench SHA-256:
+  `990d4eee8877ed2b6758afd198b61546c87092a606e2ee696d08c34f896b01b8`
+- Model SHA-256:
+  `041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55`
+- Search protocol: `warmup_runs=1`, `search_runs=3`,
+  `confirmation_runs=5`, `cooldown_seconds=2.0`, `random_seed=42`,
+  `insert_paired_baseline_every=2`, `noise_band_percent=5.0`.
+- Candidate plan: `baseline`, `threads-1`, `affinity-compact-0_1`,
+  `affinity-spread-0_1`, `affinity-reserve-one-core-0`.
+- `llama-bench` help supported `--batch-size` and `--ubatch-size`; it did not
+  expose `--threads-batch`.
+- Result origin: `measured`
+- Search status: `completed`
+- Parse statuses: `parsed=34`
+- Benchmark statuses: `passed=34`
+- Failed repetitions: `0`
+- Artifact validation: `passed`; 34 repetition manifests and 442 artifact
+  records checked.
+- Selected candidate: `affinity-spread-0_1`
+- Recommendation status: `inconclusive`
+- Noise-band classification: `inconclusive`
+- Delta percent: `0.116029`
+- Quality gate status: `not_evaluated`
+- Relevant conclusion: ArmTune's repeated benchmark, staged search,
+  statistics, conservative recommendation, SSH worker, provenance, parser, and
+  artifact-validation pipeline worked against a real `llama-bench` workload on
+  Linux Arm64.
+- Claim boundary: this is a pipeline validation run, not final optimization,
+  stable production performance, KleidiAI evidence, quality validation,
+  build-profile comparison, Performix evidence, Performance Passport evidence,
+  or a formal competition benchmark result.
+- Implementation impact: Phase 3 hardening should add a configurable candidate
+  cap or affinity-mode allowlist for small real-target smoke profiles.
+- Unresolved uncertainty: optimized-path evidence, semantic quality,
+  build-profile comparisons, Performix, Performance Passport generation, and
+  stable production performance remain unvalidated.

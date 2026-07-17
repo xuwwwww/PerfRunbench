@@ -663,9 +663,12 @@ competition benchmark results.
 ## Phase 3A Plan: Repeated Benchmark Search Foundation
 
 Status: implemented. Phase 3A adds repeated `llama-bench` measurement and a
-conservative Arm-aware candidate search foundation. No real AWS search was run
-as part of implementation; tests use fake executables and synthetic fixtures
-only.
+conservative Arm-aware candidate search foundation. Implementation tests use
+fake executables and synthetic fixtures only.
+
+A later Phase 3A.1 validation run exercised the implemented search pipeline on
+a user-provisioned AWS Graviton2 development instance. ArmTune did not
+provision, resize, start, stop, or otherwise control cloud resources.
 
 Allowed scope:
 
@@ -729,3 +732,41 @@ They must not recommend candidates that failed required trials, missed required
 metrics, are statistically indistinguishable within the configured noise band
 unless marked inconclusive, or differ in model, binary, target,
 prompt/generation counts, or protocol.
+
+Phase 3A.1 validation evidence:
+
+```text
+Evidence file: docs/armtune/results/PHASE_3A_REAL_SEARCH_VALIDATION.md
+Run ID: 20260718_001757_718789
+Target type: ssh
+Target architecture: aarch64
+Target OS: Ubuntu 24.04.4 LTS
+Kernel: 6.17.0-1017-aws
+CPU model: Neoverse-N1
+Logical CPUs: 2
+PerfRunbench commit: ee4cbb305d788e8405e65ab839b1848cb743a2eb
+llama.cpp commit: b15ca938ad00aa6b3ee6c2edda7363fd02826b18
+llama-bench SHA-256: 990d4eee8877ed2b6758afd198b61546c87092a606e2ee696d08c34f896b01b8
+Model SHA-256: 041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55
+Search status: completed
+Result origin: measured
+Parse statuses: parsed=34
+Benchmark statuses: passed=34
+Failed repetitions: 0
+Artifact validation: passed
+Validated repetition manifests: 34
+Checked artifact records: 442
+Quality gate status: not_evaluated
+Selected candidate: affinity-spread-0_1
+Recommendation status: inconclusive
+Noise-band classification: inconclusive
+Delta percent: 0.116029
+Noise band percent: 5.0
+```
+
+This evidence supports a real-target validation claim for repeated benchmark,
+staged search, statistics, conservative recommendation, SSH worker,
+provenance, parser, and artifact-validation plumbing only. It does not show
+final optimization, stable production performance, KleidiAI usage,
+quality-gate validation, build-profile comparison, Performix, Performance
+Passport generation, or formal competition benchmark results.

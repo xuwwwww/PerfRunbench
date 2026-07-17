@@ -100,12 +100,31 @@ should be labeled unverified.
   baselines, quality gates, `llama-server`, streaming, TTFT, or automated cloud
   instance control.
 
-## Phase 3A Planned Limitations
+## Phase 3A Limitations
 
 - Phase 3A is limited to repeated `llama-bench` measurement and
   performance-only candidate search.
 - Phase 3A recommendations use `quality_gate_status: not_evaluated` and do not
   prove semantic quality preservation.
+- The Phase 3A.1 evidence is recorded in
+  `docs/armtune/results/PHASE_3A_REAL_SEARCH_VALIDATION.md`.
+- The run `20260718_001757_718789` validated repeated benchmark, staged search,
+  statistics, conservative recommendation, SSH worker, provenance, parser, and
+  artifact-validation plumbing against a real `llama-bench` workload on Linux
+  `aarch64`.
+- The run completed 34 measured repetitions with 0 failed trials and passed
+  artifact digest validation for 34 repetition manifests covering 442 artifact
+  records.
+- The selected observed candidate was `affinity-spread-0_1`, but the
+  recommendation was `inconclusive` because the primary-metric delta
+  `0.116029%` was inside the configured 5% noise band.
+- Phase 3A.1 used a user-provisioned burstable AWS Graviton2 development
+  instance. The results are pipeline-validation measurements, not stable
+  production performance or formal competition benchmark results.
+- Current Phase 3A config does not provide a hard candidate cap or
+  affinity-mode allowlist. On the 2-vCPU validation target, the actual
+  candidate plan contained five candidates rather than the desired
+  three-or-fewer smoke profile.
 - Phase 3A does not implement `llama-server`, HTTP, streaming, TTFT, BootTrace,
   build-profile comparison, KleidiAI claims, Performix, Performance Passport
   generation, cloud provisioning, or automatic instance control.
