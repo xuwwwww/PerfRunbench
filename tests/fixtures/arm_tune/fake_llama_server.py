@@ -184,6 +184,8 @@ def _case_id_from_prompt(prompt: str) -> str:
 def _status_for_case(case_id: str) -> str:
     if case_id == "boot_retry_recovered":
         return "warning"
+    if case_id in {"boot_device_timeout", "boot_firmware_component_failure"}:
+        return "failure"
     return "ok"
 
 
@@ -192,6 +194,8 @@ def _latency_for_case(case_id: str) -> float:
         "boot_success": 83.0,
         "boot_retry_recovered": 142.0,
         "boot_config_missing": 36.0,
+        "boot_device_timeout": 842.0,
+        "boot_firmware_component_failure": 315.0,
     }.get(case_id, 50.0)
 
 
@@ -200,6 +204,10 @@ def _summary_for_case(case_id: str) -> str:
         return "Boot completed after one retry using cited BootTrace evidence."
     if case_id == "boot_config_missing":
         return "Boot failed because a required configuration line is missing."
+    if case_id == "boot_device_timeout":
+        return "Boot failed because the NVMe controller timed out before recovery shell entry."
+    if case_id == "boot_firmware_component_failure":
+        return "Boot failed because a firmware component checksum failure was reported before rollback."
     return "Boot completed successfully using cited BootTrace evidence."
 
 
@@ -208,6 +216,8 @@ def _evidence_for_case(case_id: str) -> list[str]:
         "boot_success": ["L001", "L002", "L003"],
         "boot_retry_recovered": ["L010", "L011", "L012", "L013"],
         "boot_config_missing": ["L020", "L021"],
+        "boot_device_timeout": ["L030", "L031", "L032"],
+        "boot_firmware_component_failure": ["L040", "L041", "L042", "L043"],
     }.get(case_id, ["L001"])
 
 

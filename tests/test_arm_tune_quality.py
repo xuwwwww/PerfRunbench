@@ -20,20 +20,32 @@ class ArmTuneQualityTest(unittest.TestCase):
         suite_id, cases, manifest, payload = load_quality_suite(QUALITY_SUITE)
 
         self.assertEqual(suite_id, "synthetic_boottrace_quality_v1")
-        self.assertEqual(manifest.case_count, 3)
-        self.assertEqual(manifest.required_case_count, 3)
+        self.assertEqual(manifest.case_count, 5)
+        self.assertEqual(manifest.required_case_count, 5)
         self.assertEqual(len(manifest.suite_digest), 64)
         self.assertEqual(payload["schema_version"], "1.0")
-        self.assertEqual([case.case_id for case in cases], ["boot_success", "boot_retry_recovered", "boot_config_missing"])
+        self.assertEqual(
+            [case.case_id for case in cases],
+            [
+                "boot_success",
+                "boot_retry_recovered",
+                "boot_config_missing",
+                "boot_device_timeout",
+                "boot_firmware_component_failure",
+            ],
+        )
 
     def test_valid_response_passes_all_validators(self) -> None:
         _, cases, _, _ = load_quality_suite(QUALITY_SUITE)
-        response = (FIXTURES / "boot_success_response.json").read_text(encoding="utf-8")
+        cases_by_id = {case.case_id: case for case in cases}
 
-        result = validate_quality_case(cases[0], response)
+        for case_id in ["boot_success", "boot_device_timeout", "boot_firmware_component_failure"]:
+            with self.subTest(case_id=case_id):
+                response = (FIXTURES / f"{case_id}_response.json").read_text(encoding="utf-8")
+                result = validate_quality_case(cases_by_id[case_id], response)
 
-        self.assertEqual(result.status, "passed")
-        self.assertTrue(all(item.status == "passed" for item in result.validator_results))
+                self.assertEqual(result.status, "passed")
+                self.assertTrue(all(item.status == "passed" for item in result.validator_results))
 
     def test_invalid_json_and_invented_evidence_fail(self) -> None:
         _, cases, _, _ = load_quality_suite(QUALITY_SUITE)

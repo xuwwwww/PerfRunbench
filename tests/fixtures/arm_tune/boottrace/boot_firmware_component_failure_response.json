@@ -1,0 +1,8 @@
+{
+  "case_id": "boot_firmware_component_failure",
+  "status": "failure",
+  "event_sequence_valid": true,
+  "latency_ms": 315.0,
+  "summary": "Boot failed because a firmware component checksum failure was reported before rollback.",
+  "evidence_line_ids": ["L040", "L041", "L042", "L043"]
+}

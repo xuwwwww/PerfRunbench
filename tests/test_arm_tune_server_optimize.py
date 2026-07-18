@@ -57,7 +57,7 @@ class ArmTuneServerOptimizeTest(unittest.TestCase):
                         "FAKE_LLAMA_SERVER_QUALITY_MODE": "boottrace",
                         "FAKE_LLAMA_SERVER_DELAY_PROFILE": "quality",
                         "FAKE_LLAMA_SERVER_EVENT_DELAY": "0.001",
-                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "3",
+                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "5",
                     },
                 ):
                     with redirect_stdout(output):
@@ -101,7 +101,7 @@ class ArmTuneServerOptimizeTest(unittest.TestCase):
                     {
                         "FAKE_LLAMA_SERVER_QUALITY_MODE": "boottrace_fail_all",
                         "FAKE_LLAMA_SERVER_EVENT_DELAY": "0.001",
-                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "3",
+                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "5",
                     },
                 ):
                     with redirect_stdout(output):
