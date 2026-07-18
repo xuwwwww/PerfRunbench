@@ -185,8 +185,17 @@ should be labeled unverified.
   root privilege, or cloud credentials.
 - Fake-server quality and timing values are fixtures and must not be reported
   as Arm performance.
-- Until a bounded real-target Phase 4 run is completed and documented, Phase 4
-  does not prove measured quality-aware tuning on real Arm hardware.
+- Phase 4-R completed a bounded real-target run on a user-provisioned AWS
+  T4g / Graviton2 Linux Arm64 development target. The run validated real
+  server execution, streaming latency measurement, deterministic quality
+  evaluation, quality-aware rejection, cleanup, and artifact digest validation.
+- Phase 4-R did not produce an eligible candidate. All three measured
+  candidates were rejected by the quality gate, so Phase 4 has not yet shown a
+  quality-preserving measured recommendation on real Arm hardware.
+- The Phase 4-R generated outputs were preserved as artifacts and showed
+  systematic strict-output failures, including Markdown-fenced JSON and
+  failure cases mislabeled as `success`. The validators were not weakened to
+  force a pass.
 - Phase 4 uses a public synthetic BootTrace suite. It does not validate private
   firmware logs, production customer logs, or NDA-protected data.
 - Phase 4 does not compare build profiles, verify KleidiAI, modify llama.cpp,

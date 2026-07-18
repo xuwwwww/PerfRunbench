@@ -1018,11 +1018,11 @@ Phase 3B.2 remains out of scope for the Phase 3B.1 implementation.
 
 ## Phase 4 Plan: Quality-Aware Server Autotuning MVP
 
-Status: implemented locally; real-target validation pending. Phase 4 combines
-deterministic BootTrace quality validation with bounded `llama-server`
-candidate search. It remains an MVP focused on a small public synthetic
-quality suite, not on final competition benchmarking or optimized Arm execution
-claims.
+Status: implemented and real-target rejection validation completed. Phase 4
+combines deterministic BootTrace quality validation with bounded
+`llama-server` candidate search. It remains an MVP focused on a small public
+synthetic quality suite, not on final competition benchmarking or optimized Arm
+execution claims.
 
 Allowed scope:
 
@@ -1045,6 +1045,9 @@ Allowed scope:
   `affinity_modes`.
 - Initial server candidates limited to safe dimensions proven by inspected
   help output: thread count, batch size, ubatch size, and process affinity.
+  The Phase 4 MVP implementation tests staged candidates in this order:
+  baseline, batch/ubatch parameters, thread count, affinity, then confirmation
+  when an eligible selected candidate exists.
 - Candidate quality eligibility and conservative recommendation states:
   `recommended`, `inconclusive`, `rejected_quality`,
   `rejected_execution`, `insufficient_evidence`, and
@@ -1110,3 +1113,38 @@ Phase 4 recommendation wording must be bounded, for example:
 Phase 4 must not describe any result as the best Arm configuration, globally
 optimal, production optimal, stable production performance, KleidiAI evidence,
 or a formal competition benchmark result.
+
+Phase 4 real-target validation evidence:
+
+```text
+Evidence file: docs/armtune/results/PHASE_4_REAL_QUALITY_AWARE_TUNING.md
+Run ID: 20260719_035956_457526
+Target type: ssh
+Target architecture: aarch64
+Target OS: Ubuntu 24.04.4 LTS
+Kernel: 6.17.0-1019-aws
+CPU model: Neoverse-N1
+Logical CPUs: 2
+PerfRunbench commit: 33504d731bdb11316d439609cb3bf3145401b9e8
+llama.cpp commit: b15ca938ad00aa6b3ee6c2edda7363fd02826b18
+llama-server SHA-256: 6faba7459f6d4ed13564bc5ec876e0bde0c0aa538fb371865dd89e03b11b254e
+Model SHA-256: 041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55
+Result origin: measured
+Runtime adapter: llama_server
+Quality suite ID: synthetic_boottrace_quality_v1
+Quality suite digest: 42a784ba1da5c624f14dfb9d2d89917768650c8e60ad0918f98c2e4da96d1169
+Required quality cases: 5
+Candidate count: 3
+Eligible candidate count: 0
+Quality gate status: failed
+Recommendation state: no_eligible_candidate
+Artifact validation: passed
+Checked artifacts: 224
+Cleanup status: passed
+```
+
+This evidence validates real Arm execution, server lifecycle, streaming
+metrics, deterministic quality evaluation, quality-aware rejection, cleanup,
+and artifact validation. It does not validate a quality-preserving
+recommendation because every measured candidate failed the canonical BootTrace
+quality gate.

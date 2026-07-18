@@ -299,3 +299,56 @@ Access date for all entries: 2026-07-13.
   responses are fixtures. They prove pipeline behavior only and must not be
   reported as Arm performance, model quality, or optimized Arm execution
   evidence.
+
+## Phase 4-R Real Quality-Aware Rejection Validation
+
+- Source: user-provisioned AWS T4g / Graviton2 Linux Arm64 development target.
+- Evidence file:
+  `docs/armtune/results/PHASE_4_REAL_QUALITY_AWARE_TUNING.md`
+- Run ID: `20260719_035956_457526`
+- Target type: `ssh`
+- Target architecture: `aarch64`
+- Target OS: `Ubuntu 24.04.4 LTS`
+- Kernel: `6.17.0-1019-aws`
+- CPU model: `Neoverse-N1`
+- Logical CPUs: `2`
+- PerfRunbench commit:
+  `33504d731bdb11316d439609cb3bf3145401b9e8`
+- llama.cpp commit:
+  `b15ca938ad00aa6b3ee6c2edda7363fd02826b18`
+- llama-server SHA-256:
+  `6faba7459f6d4ed13564bc5ec876e0bde0c0aa538fb371865dd89e03b11b254e`
+- Model SHA-256:
+  `041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55`
+- Quality suite ID: `synthetic_boottrace_quality_v1`
+- Quality suite digest:
+  `42a784ba1da5c624f14dfb9d2d89917768650c8e60ad0918f98c2e4da96d1169`
+- Protocol: loopback-only `llama-server`, target-local HTTP client, five
+  synthetic BootTrace quality cases, `warmup_runs=1`, `search_runs=2`,
+  `confirmation_runs=2`, `max_candidates=3`, and
+  `affinity_modes=[scheduler-default, compact]`.
+- Candidate plan: `baseline`, `server-batch256-ubatch128`, `threads-1`.
+- Result origin: `measured`
+- Candidate count: `3`
+- Eligible candidate count: `0`
+- Failed candidate count: `3`
+- Recommendation state: `no_eligible_candidate`
+- Quality gate status: `failed`
+- Required quality cases passed: `0/5`
+- Artifact validation: `passed`; 224 artifact records checked.
+- CLI exit code: `1`
+- Cleanup evidence: every candidate reported `cleanup_status: passed`; a
+  post-run process check found no residual `llama-server` or ArmTune worker
+  processes.
+- Performance pipeline evidence: all candidates completed real measured server
+  requests with `request_status: completed`, `stream_parse_status: parsed`,
+  `benchmark_status: passed`, and `failed_request_count: 0`.
+- Quality rejection evidence: all candidates were marked `rejected_quality`
+  because generated outputs were not raw JSON and failure cases were repeatedly
+  mislabeled as `success`.
+- Claim boundary: this validates real Arm execution, streaming latency
+  measurement, deterministic quality evaluation, quality-aware rejection,
+  cleanup, and artifact validation. It does not validate a quality-preserving
+  recommendation, final optimization, stable production performance, KleidiAI,
+  build-profile improvement, Performix, Performance Passport output, or formal
+  competition benchmark results.
