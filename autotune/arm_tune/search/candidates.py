@@ -173,21 +173,34 @@ def generate_batch_candidates(
     ]
 
 
-def generate_affinity_candidates(base: SearchCandidate, topology: CpuTopology) -> list[SearchCandidate]:
+def generate_affinity_candidates(
+    base: SearchCandidate,
+    topology: CpuTopology,
+    *,
+    allowed_modes: list[str] | None = None,
+) -> list[SearchCandidate]:
     cpus = visible_cpu_indexes(topology)
     threads = min(base.threads, len(cpus))
     if threads <= 0:
         return []
+    allowed = set(allowed_modes) if allowed_modes is not None else None
     candidates: list[SearchCandidate] = []
     seen: set[str] = set()
-    _add_affinity(candidates, seen, base, "compact", cpus[:threads])
-    _add_affinity(candidates, seen, base, "spread", _spread(cpus, threads))
+    if _affinity_mode_allowed("compact", allowed):
+        _add_affinity(candidates, seen, base, "compact", cpus[:threads])
+    if _affinity_mode_allowed("spread", allowed):
+        _add_affinity(candidates, seen, base, "spread", _spread(cpus, threads))
     if len(cpus) > 1:
         reserve = cpus[:-1]
-        _add_affinity(candidates, seen, base, "reserve-one-core", reserve[: min(threads, len(reserve))])
-    if topology.numa_nodes and topology.numa_nodes > 1:
+        if _affinity_mode_allowed("reserve-one-core", allowed):
+            _add_affinity(candidates, seen, base, "reserve-one-core", reserve[: min(threads, len(reserve))])
+    if topology.numa_nodes and topology.numa_nodes > 1 and _affinity_mode_allowed("numa-local", allowed):
         _add_affinity(candidates, seen, base, "numa-local", cpus[:threads])
     return candidates
+
+
+def _affinity_mode_allowed(mode: str, allowed: set[str] | None) -> bool:
+    return allowed is None or mode in allowed
 
 
 def _add_affinity(

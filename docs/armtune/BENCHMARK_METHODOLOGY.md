@@ -212,6 +212,18 @@ generated from visible and allowed CPUs, deduplicated, and validated. Optional
 proves support for those flags. Unsupported flags fail validation rather than
 being used silently.
 
+Phase 3B adds optional search-space controls for bounded validation profiles:
+
+- `search.max_candidates` caps the total candidate plan, including the
+  baseline.
+- `search.affinity_modes` allowlists generated affinity candidates.
+- Defaults preserve the Phase 3A candidate generation behavior when these
+  fields are omitted.
+
+The cap is applied in deterministic stage order. This keeps smoke runs small
+without changing the benchmark operation, parser, artifact preservation,
+statistics, or recommendation semantics.
+
 The search is staged:
 
 1. thread count

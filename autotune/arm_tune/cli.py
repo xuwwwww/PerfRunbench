@@ -7,7 +7,7 @@ from dataclasses import replace
 from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
-from autotune.arm_tune.config import default_local_target, load_benchmark_config, load_optimize_config, load_target_spec
+from autotune.arm_tune.config import AFFINITY_MODE_CHOICES, default_local_target, load_benchmark_config, load_optimize_config, load_target_spec
 from autotune.arm_tune.errors import ArmTuneError
 from autotune.arm_tune.schemas import ArmBenchmarkResult, DoctorStatuses, LlamaBenchParseResult, ProductionValidation, StatusCheck, TargetSpec
 from autotune.arm_tune.search.runner import SearchConfig, run_search
@@ -58,6 +58,8 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--random-seed", type=int)
     optimize.add_argument("--insert-paired-baseline-every", type=int)
     optimize.add_argument("--noise-band-percent", type=float)
+    optimize.add_argument("--max-candidates", type=int)
+    optimize.add_argument("--affinity-modes", help="Comma-separated affinity modes to include in search.")
     optimize.set_defaults(handler=_cmd_optimize)
 
     worker = subparsers.add_parser("worker", help=argparse.SUPPRESS)
@@ -216,10 +218,13 @@ def _search_config_from_args(config: SearchConfig, args: argparse.Namespace) -> 
         "random_seed",
         "insert_paired_baseline_every",
         "noise_band_percent",
+        "max_candidates",
     ]:
         value = getattr(args, attr, None)
         if value is not None:
             updates[attr] = value
+    if getattr(args, "affinity_modes", None) is not None:
+        updates["affinity_modes"] = _parse_affinity_modes(args.affinity_modes)
     merged = replace(config, **updates) if updates else config
     if merged.warmup_runs < 0:
         raise ArmTuneError("warmup_runs must be >= 0")
@@ -233,7 +238,21 @@ def _search_config_from_args(config: SearchConfig, args: argparse.Namespace) -> 
         raise ArmTuneError("insert_paired_baseline_every must be >= 0")
     if merged.noise_band_percent <= 0:
         raise ArmTuneError("noise_band_percent must be > 0")
+    if merged.max_candidates is not None and merged.max_candidates < 1:
+        raise ArmTuneError("max_candidates must be >= 1")
+    if merged.affinity_modes is not None:
+        invalid = [mode for mode in merged.affinity_modes if mode not in AFFINITY_MODE_CHOICES]
+        if invalid:
+            raise ArmTuneError(f"affinity_modes contains unsupported mode(s): {invalid}")
     return merged
+
+
+def _parse_affinity_modes(value: str) -> list[str]:
+    modes = [item.strip() for item in value.split(",") if item.strip()]
+    invalid = [mode for mode in modes if mode not in AFFINITY_MODE_CHOICES]
+    if invalid:
+        raise ArmTuneError(f"affinity_modes contains unsupported mode(s): {invalid}")
+    return list(dict.fromkeys(modes))
 
 
 def _target_spec_from_args(args: argparse.Namespace) -> TargetSpec:

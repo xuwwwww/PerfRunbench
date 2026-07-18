@@ -140,6 +140,51 @@ class ArmTuneSearchTest(unittest.TestCase):
             self.assertTrue(candidate.cpu_affinity)
             self.assertEqual(len(candidate.cpu_affinity), len(set(candidate.cpu_affinity)))
 
+    def test_affinity_candidates_honor_allowed_modes(self) -> None:
+        base = SearchCandidate(candidate_id="threads-2", stage="thread_count", threads=2)
+        topology = CpuTopology(logical_cpus=4, online_cpus="0-3", numa_nodes=1)
+
+        compact_only = generate_affinity_candidates(base, topology, allowed_modes=["scheduler-default", "compact"])
+        disabled = generate_affinity_candidates(base, topology, allowed_modes=[])
+
+        self.assertEqual([candidate.affinity_mode for candidate in compact_only], ["compact"])
+        self.assertEqual(disabled, [])
+
+    def test_search_config_caps_candidates_and_filters_affinity_modes(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            executable = _fake_executable(root)
+            model = _model_file(root)
+            _, job, search_config = parse_optimize_config(_config(executable, model))
+            target = _SyntheticLocalTarget(logical_cpus=2)
+            optimize_dir = root / "run" / "armtune" / "optimize"
+            search_config = replace(
+                search_config,
+                warmup_runs=0,
+                search_runs=1,
+                confirmation_runs=1,
+                cooldown_seconds=0,
+                random_seed=3,
+                max_candidates=3,
+                affinity_modes=["compact"],
+            )
+
+            with patch.dict(os.environ, {"FAKE_LLAMA_BENCH_SCALE_BY_THREADS": "1"}):
+                result = run_search(
+                    target=target,
+                    base_job=replace(job, run_id="capped-search", target_run_directory=str(optimize_dir)),
+                    config=search_config,
+                    run_id="capped-search",
+                    optimize_dir=optimize_dir,
+                )
+
+            candidate_ids = [candidate.candidate_id for candidate in result.candidates]
+            affinity_stage = next(stage for stage in result.stages if stage.stage == "affinity")
+
+            self.assertEqual(candidate_ids, ["baseline", "threads-2", "affinity-compact-0_1"])
+            self.assertLessEqual(len(candidate_ids), 3)
+            self.assertEqual(affinity_stage.candidate_ids, ["threads-2", "affinity-compact-0_1"])
+
     def test_fake_full_search_e2e_records_quality_gate_and_warmup_exclusion(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -206,6 +251,8 @@ class ArmTuneSearchTest(unittest.TestCase):
             arm_main(["optimize", "--help"])
         self.assertEqual(raised.exception.code, 0)
         self.assertIn("--warmup-runs", help_output.getvalue())
+        self.assertIn("--max-candidates", help_output.getvalue())
+        self.assertIn("--affinity-modes", help_output.getvalue())
 
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -227,7 +274,17 @@ class ArmTuneSearchTest(unittest.TestCase):
             )
             with _cwd(root), patch("autotune.arm_tune.cli._target_from_spec", return_value=_SyntheticLocalTarget(logical_cpus=2)):
                 with patch.dict(os.environ, {"FAKE_LLAMA_BENCH_HELP_MODE": "full"}), redirect_stdout(io.StringIO()):
-                    exit_code = arm_main(["optimize", "--config", str(config_path)])
+                    exit_code = arm_main(
+                        [
+                            "optimize",
+                            "--config",
+                            str(config_path),
+                            "--max-candidates",
+                            "2",
+                            "--affinity-modes",
+                            "compact",
+                        ]
+                    )
 
         self.assertEqual(exit_code, 0)
 

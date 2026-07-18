@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from autotune.arm_tune.config import load_target_spec, parse_target_spec
+from autotune.arm_tune.config import load_target_spec, parse_optimize_config, parse_target_spec
 from autotune.arm_tune.errors import ArmTuneConfigError
 
 
@@ -90,6 +90,46 @@ class ArmTuneConfigTest(unittest.TestCase):
         )
 
         self.assertEqual(spec.sanitized_dict()["identity_file"], "<configured>")
+
+    def test_parse_optimize_config_accepts_candidate_controls(self) -> None:
+        _, _, search = parse_optimize_config(
+            _optimize_config(
+                search={
+                    "max_candidates": 3,
+                    "affinity_modes": ["scheduler-default", "compact", "compact"],
+                }
+            )
+        )
+
+        self.assertEqual(search.max_candidates, 3)
+        self.assertEqual(search.affinity_modes, ["scheduler-default", "compact"])
+
+    def test_parse_optimize_config_rejects_invalid_candidate_controls(self) -> None:
+        with self.assertRaises(ArmTuneConfigError):
+            parse_optimize_config(_optimize_config(search={"max_candidates": 0}))
+
+        with self.assertRaises(ArmTuneConfigError):
+            parse_optimize_config(_optimize_config(search={"affinity_modes": ["compact", "shell"]}))
+
+
+def _optimize_config(*, search: dict | None = None) -> dict:
+    payload = {
+        "schema_version": "1.0",
+        "result_origin": "test_fixture",
+        "target": {"type": "local"},
+        "executable": {"path": "/bin/echo"},
+        "model": {"path": "/tmp/model.gguf"},
+        "benchmark": {
+            "threads": 1,
+            "prompt_tokens": 16,
+            "generation_tokens": 8,
+            "repetitions": 1,
+            "timeout_seconds": 5,
+        },
+    }
+    if search is not None:
+        payload["search"] = search
+    return payload
 
 
 if __name__ == "__main__":

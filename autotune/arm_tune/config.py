@@ -19,6 +19,7 @@ from autotune.arm_tune.search.runner import SearchConfig
 from autotune.utils.config import load_config
 
 
+AFFINITY_MODE_CHOICES = {"scheduler-default", "compact", "spread", "reserve-one-core", "numa-local"}
 TOP_LEVEL_KEYS = {"schema_version", "target"}
 BENCHMARK_TOP_LEVEL_KEYS = {
     "schema_version",
@@ -68,6 +69,8 @@ SEARCH_KEYS = {
     "random_seed",
     "insert_paired_baseline_every",
     "noise_band_percent",
+    "max_candidates",
+    "affinity_modes",
 }
 PYTHON_MODULE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
@@ -187,6 +190,8 @@ def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBen
             "search.insert_paired_baseline_every",
         ),
         noise_band_percent=_positive_float(search_payload.get("noise_band_percent", 2.0), "search.noise_band_percent"),
+        max_candidates=_optional_positive_int(search_payload.get("max_candidates"), "search.max_candidates"),
+        affinity_modes=_optional_affinity_modes(search_payload.get("affinity_modes"), "search.affinity_modes"),
     )
     return target, job, config
 
@@ -318,6 +323,13 @@ def _non_negative_int(value: Any, label: str) -> int:
     return parsed
 
 
+def _optional_positive_int(value: Any, label: str) -> int | None:
+    if value is None:
+        return None
+    parsed = _positive_int(value, label)
+    return parsed
+
+
 def _positive_float(value: Any, label: str) -> float:
     try:
         parsed = float(value)
@@ -359,10 +371,24 @@ def _optional_cpu_affinity(value: Any, label: str) -> list[int] | None:
 
 def _affinity_mode(value: Any) -> str:
     text = str(value or "scheduler-default").strip()
-    allowed = {"scheduler-default", "compact", "spread", "reserve-one-core", "numa-local"}
-    if text not in allowed:
-        raise ArmTuneConfigError(f"benchmark.affinity_mode must be one of {sorted(allowed)}")
+    if text not in AFFINITY_MODE_CHOICES:
+        raise ArmTuneConfigError(f"benchmark.affinity_mode must be one of {sorted(AFFINITY_MODE_CHOICES)}")
     return text
+
+
+def _optional_affinity_modes(value: Any, label: str) -> list[str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ArmTuneConfigError(f"{label} must be a list of affinity mode names")
+    modes: list[str] = []
+    for item in value:
+        mode = str(item).strip()
+        if mode not in AFFINITY_MODE_CHOICES:
+            raise ArmTuneConfigError(f"{label} entries must be one of {sorted(AFFINITY_MODE_CHOICES)}")
+        if mode not in modes:
+            modes.append(mode)
+    return modes
 
 
 def _optional_sha256(value: Any, label: str) -> str | None:

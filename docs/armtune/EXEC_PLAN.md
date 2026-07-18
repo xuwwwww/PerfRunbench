@@ -770,3 +770,51 @@ provenance, parser, and artifact-validation plumbing only. It does not show
 final optimization, stable production performance, KleidiAI usage,
 quality-gate validation, build-profile comparison, Performix, Performance
 Passport generation, or formal competition benchmark results.
+
+## Phase 3B Plan: Search-Space Control Hardening
+
+Status: implemented. Phase 3B adds explicit controls for small, bounded
+real-target smoke profiles without changing the Phase 3A performance-only
+claim boundary.
+
+Allowed scope:
+
+- Add `search.max_candidates` to cap the total planned search candidate count,
+  including the baseline.
+- Keep the baseline candidate even when the cap is one.
+- Apply the cap in deterministic stage order: baseline, thread candidates,
+  supported batch candidate, affinity candidates.
+- Add `search.affinity_modes` to allowlist generated affinity candidates.
+- Keep default behavior backward compatible when these fields are omitted.
+- Expose matching CLI overrides for `autotuneai arm optimize`.
+- Add fake-executable tests for config parsing, affinity filtering, and capped
+  candidate plans.
+
+Out of scope:
+
+- New real-target benchmark evidence.
+- New optimization claims.
+- Quality gate.
+- Build-profile comparison.
+- KleidiAI claims.
+- Performix.
+- Performance Passport.
+- Cloud provisioning or instance control.
+
+New optional search controls:
+
+```text
+max_candidates: optional positive integer
+affinity_modes: optional list from scheduler-default, compact, spread,
+  reserve-one-core, numa-local
+```
+
+`scheduler-default` is accepted in `affinity_modes` for configuration symmetry
+with benchmark affinity settings, but generated affinity candidates are the
+non-default modes. The baseline remains the scheduler-default comparison point
+unless the benchmark config explicitly sets another baseline affinity.
+
+This hardening addresses the Phase 3A.1 limitation where the real-target smoke
+run requested a very small candidate set but the implementation still planned
+five candidates on a 2-vCPU target. It does not retroactively change the
+recorded Phase 3A.1 evidence.

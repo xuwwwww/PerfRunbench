@@ -121,10 +121,12 @@ should be labeled unverified.
 - Phase 3A.1 used a user-provisioned burstable AWS Graviton2 development
   instance. The results are pipeline-validation measurements, not stable
   production performance or formal competition benchmark results.
-- Current Phase 3A config does not provide a hard candidate cap or
-  affinity-mode allowlist. On the 2-vCPU validation target, the actual
-  candidate plan contained five candidates rather than the desired
-  three-or-fewer smoke profile.
+- The Phase 3A.1 validation run predates Phase 3B candidate controls. On the
+  2-vCPU validation target, that historical run planned five candidates rather
+  than the desired three-or-fewer smoke profile.
+- Phase 3B adds `search.max_candidates` and `search.affinity_modes` for future
+  bounded smoke profiles, but no new real-target benchmark evidence has been
+  collected with those controls yet.
 - Phase 3A does not implement `llama-server`, HTTP, streaming, TTFT, BootTrace,
   build-profile comparison, KleidiAI claims, Performix, Performance Passport
   generation, cloud provisioning, or automatic instance control.

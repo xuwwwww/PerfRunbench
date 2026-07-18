@@ -33,6 +33,8 @@ class SearchConfig:
     random_seed: int = 42
     insert_paired_baseline_every: int = 4
     noise_band_percent: float = 2.0
+    max_candidates: int | None = None
+    affinity_modes: list[str] | None = None
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -146,7 +148,7 @@ def run_search(
         repetitions=repetitions,
     )
 
-    thread_candidates = generate_thread_candidates(base_job, topology)
+    thread_candidates = _apply_candidate_cap(generate_thread_candidates(base_job, topology), candidates_by_id, config)
     for candidate in thread_candidates:
         candidates_by_id[candidate.candidate_id] = candidate
     stage1 = _run_stage(
@@ -165,7 +167,11 @@ def run_search(
     stages.append(_stage_result("thread_count", thread_candidates, current, stage1, config))
 
     supported_flags = _first_supported_flags(repetitions)
-    batch_candidates = generate_batch_candidates(current, base_job, supported_flags=supported_flags)
+    batch_candidates = _apply_candidate_cap(
+        generate_batch_candidates(current, base_job, supported_flags=supported_flags),
+        candidates_by_id,
+        config,
+    )
     for candidate in batch_candidates:
         candidates_by_id[candidate.candidate_id] = candidate
     if batch_candidates:
@@ -194,7 +200,11 @@ def run_search(
             )
         )
 
-    affinity_candidates = generate_affinity_candidates(current, topology)
+    affinity_candidates = _apply_candidate_cap(
+        generate_affinity_candidates(current, topology, allowed_modes=config.affinity_modes),
+        candidates_by_id,
+        config,
+    )
     for candidate in affinity_candidates:
         candidates_by_id[candidate.candidate_id] = candidate
     if affinity_candidates:
@@ -295,6 +305,26 @@ def build_stage_schedule(
             if insert_paired_baseline_every > 0 and nonbaseline_seen % insert_paired_baseline_every == 0:
                 schedule.append(baseline)
     return schedule
+
+
+def _apply_candidate_cap(
+    candidates: list[SearchCandidate],
+    candidates_by_id: dict[str, SearchCandidate],
+    config: SearchConfig,
+) -> list[SearchCandidate]:
+    if config.max_candidates is None:
+        return candidates
+    remaining = max(0, config.max_candidates - len(candidates_by_id))
+    selected: list[SearchCandidate] = []
+    for candidate in candidates:
+        if candidate.candidate_id in candidates_by_id:
+            selected.append(candidate)
+            continue
+        if remaining <= 0:
+            continue
+        selected.append(candidate)
+        remaining -= 1
+    return selected
 
 
 def _run_stage(
