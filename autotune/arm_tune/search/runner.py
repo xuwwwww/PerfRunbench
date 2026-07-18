@@ -167,11 +167,8 @@ def run_search(
     stages.append(_stage_result("thread_count", thread_candidates, current, stage1, config))
 
     supported_flags = _first_supported_flags(repetitions)
-    batch_candidates = _apply_candidate_cap(
-        generate_batch_candidates(current, base_job, supported_flags=supported_flags),
-        candidates_by_id,
-        config,
-    )
+    raw_batch_candidates = generate_batch_candidates(current, base_job, supported_flags=supported_flags)
+    batch_candidates = _apply_candidate_cap(raw_batch_candidates, candidates_by_id, config)
     for candidate in batch_candidates:
         candidates_by_id[candidate.candidate_id] = candidate
     if batch_candidates:
@@ -191,20 +188,23 @@ def run_search(
         current = _select_best_candidate(stage_candidates, repetitions, current)
         stages.append(_stage_result("batch_parameters", stage_candidates, current, stage2, config))
     else:
+        decision = {"status": "skipped", "reason": "no supported optional batch flags were inspected"}
+        if raw_batch_candidates and _candidate_limit_reached(candidates_by_id, config):
+            decision = {
+                "status": "skipped_due_to_candidate_limit",
+                "reason": "candidate limit was reached before batch parameter candidates could be evaluated",
+            }
         stages.append(
             SearchStageResult(
                 stage="batch_parameters",
                 candidate_ids=[],
                 selected_candidate_id=current.candidate_id,
-                decision={"status": "skipped", "reason": "no supported optional batch flags were inspected"},
+                decision=decision,
             )
         )
 
-    affinity_candidates = _apply_candidate_cap(
-        generate_affinity_candidates(current, topology, allowed_modes=config.affinity_modes),
-        candidates_by_id,
-        config,
-    )
+    raw_affinity_candidates = generate_affinity_candidates(current, topology, allowed_modes=config.affinity_modes)
+    affinity_candidates = _apply_candidate_cap(raw_affinity_candidates, candidates_by_id, config)
     for candidate in affinity_candidates:
         candidates_by_id[candidate.candidate_id] = candidate
     if affinity_candidates:
@@ -224,12 +224,18 @@ def run_search(
         current = _select_best_candidate(stage_candidates, repetitions, current)
         stages.append(_stage_result("affinity", stage_candidates, current, stage3, config))
     else:
+        decision = {"status": "skipped", "reason": "no meaningful affinity candidates for visible topology or configured affinity modes"}
+        if raw_affinity_candidates and _candidate_limit_reached(candidates_by_id, config):
+            decision = {
+                "status": "skipped_due_to_candidate_limit",
+                "reason": "candidate limit was reached before affinity candidates could be evaluated",
+            }
         stages.append(
             SearchStageResult(
                 stage="affinity",
                 candidate_ids=[],
                 selected_candidate_id=current.candidate_id,
-                decision={"status": "skipped", "reason": "no meaningful affinity candidates for visible topology"},
+                decision=decision,
             )
         )
 
@@ -260,7 +266,7 @@ def run_search(
         candidate=current_distribution,
         noise_band_percent=config.noise_band_percent,
     )
-    recommendation = _recommendation(current, baseline, decision)
+    recommendation = _recommendation(current, baseline, decision, candidate_count=len(candidates))
     warnings = _collect_warnings(distributions)
     result = ArmTuneSearchResult(
         run_id=run_id,
@@ -325,6 +331,10 @@ def _apply_candidate_cap(
         selected.append(candidate)
         remaining -= 1
     return selected
+
+
+def _candidate_limit_reached(candidates_by_id: dict[str, SearchCandidate], config: SearchConfig) -> bool:
+    return config.max_candidates is not None and len(candidates_by_id) >= config.max_candidates
 
 
 def _run_stage(
@@ -533,25 +543,30 @@ def _recommendation(
     selected: SearchCandidate,
     baseline: SearchCandidate,
     decision: NoiseBandDecision,
+    *,
+    candidate_count: int,
 ) -> SearchRecommendation:
     if selected.candidate_id == baseline.candidate_id:
         return SearchRecommendation(
             status="baseline_retained",
             candidate_id=baseline.candidate_id,
-            message="No non-baseline candidate exceeded the configured noise band.",
+            message=f"No non-baseline candidate among {candidate_count} tested configurations exceeded the configured noise band.",
             noise_band_decision=decision,
         )
     if decision.classification == "improved":
         return SearchRecommendation(
             status="recommended",
             candidate_id=selected.candidate_id,
-            message="Best observed performance candidate under the tested llama-bench configuration.",
+            message=f"Best observed performance candidate among {candidate_count} tested configurations.",
             noise_band_decision=decision,
         )
     return SearchRecommendation(
         status="inconclusive",
         candidate_id=selected.candidate_id,
-        message="Best observed candidate is not recommended as an improvement because it is not outside the configured noise band.",
+        message=(
+            f"Best observed candidate among {candidate_count} tested configurations is not recommended "
+            "as an improvement because it is not outside the configured noise band."
+        ),
         noise_band_decision=decision,
     )
 

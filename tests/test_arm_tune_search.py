@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from autotune.arm_tune.cli import main as arm_main
 from autotune.arm_tune.config import parse_optimize_config
+from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.schemas import (
     ArchitectureInfo,
     ArmCpuIdentity,
@@ -150,6 +151,33 @@ class ArmTuneSearchTest(unittest.TestCase):
         self.assertEqual([candidate.affinity_mode for candidate in compact_only], ["compact"])
         self.assertEqual(disabled, [])
 
+    def test_affinity_candidates_skip_invalid_single_cpu_reserve_mask(self) -> None:
+        base = SearchCandidate(candidate_id="threads-1", stage="thread_count", threads=1)
+
+        candidates = generate_affinity_candidates(base, CpuTopology(logical_cpus=1, online_cpus="0", numa_nodes=1))
+
+        self.assertNotIn("reserve-one-core", {candidate.affinity_mode for candidate in candidates})
+
+    def test_optimize_config_rejects_unknown_affinity_mode_and_deduplicates_modes(self) -> None:
+        _, _, config = parse_optimize_config(
+            _config(
+                "/bin/echo",
+                "/tmp/model.gguf",
+                search={"affinity_modes": ["compact", "compact", "scheduler-default"]},
+            )
+        )
+
+        self.assertEqual(config.affinity_modes, ["compact", "scheduler-default"])
+
+        with self.assertRaisesRegex(ArmTuneConfigError, "search.affinity_modes"):
+            parse_optimize_config(
+                _config(
+                    "/bin/echo",
+                    "/tmp/model.gguf",
+                    search={"affinity_modes": ["compact", "unknown-mode"]},
+                )
+            )
+
     def test_search_config_caps_candidates_and_filters_affinity_modes(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -184,6 +212,87 @@ class ArmTuneSearchTest(unittest.TestCase):
             self.assertEqual(candidate_ids, ["baseline", "threads-2", "affinity-compact-0_1"])
             self.assertLessEqual(len(candidate_ids), 3)
             self.assertEqual(affinity_stage.candidate_ids, ["threads-2", "affinity-compact-0_1"])
+
+    def test_candidate_limit_is_unique_candidates_not_executions(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            executable = _fake_executable(root)
+            model = _model_file(root)
+            _, job, search_config = parse_optimize_config(_config(executable, model))
+            target = _SyntheticLocalTarget(logical_cpus=2)
+            optimize_dir = root / "run" / "armtune" / "optimize"
+            search_config = replace(
+                search_config,
+                warmup_runs=1,
+                search_runs=1,
+                confirmation_runs=2,
+                cooldown_seconds=0,
+                max_candidates=2,
+            )
+
+            with patch.dict(os.environ, {"FAKE_LLAMA_BENCH_HELP_MODE": "full", "FAKE_LLAMA_BENCH_SCALE_BY_THREADS": "1"}):
+                result = run_search(
+                    target=target,
+                    base_job=replace(job, run_id="unique-cap-search", target_run_directory=str(optimize_dir)),
+                    config=search_config,
+                    run_id="unique-cap-search",
+                    optimize_dir=optimize_dir,
+                )
+
+            batch_stage = next(stage for stage in result.stages if stage.stage == "batch_parameters")
+            affinity_stage = next(stage for stage in result.stages if stage.stage == "affinity")
+
+            self.assertEqual([candidate.candidate_id for candidate in result.candidates], ["baseline", "threads-2"])
+            self.assertEqual(batch_stage.decision["status"], "skipped_due_to_candidate_limit")
+            self.assertEqual(affinity_stage.decision["status"], "skipped_due_to_candidate_limit")
+            self.assertGreater(len(result.repetitions), len(result.candidates))
+            self.assertIn("tested configurations", result.recommendation.message)
+
+    def test_capped_candidate_plan_is_deterministic_for_same_inputs(self) -> None:
+        plans: list[tuple[list[str], list[tuple[str, list[str], str]]]] = []
+
+        for _ in range(2):
+            with TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                executable = _fake_executable(root)
+                model = _model_file(root)
+                _, job, search_config = parse_optimize_config(_config(executable, model))
+                target = _SyntheticLocalTarget(logical_cpus=2)
+                search_config = replace(
+                    search_config,
+                    warmup_runs=0,
+                    search_runs=1,
+                    confirmation_runs=1,
+                    cooldown_seconds=0,
+                    random_seed=17,
+                    max_candidates=3,
+                    affinity_modes=["scheduler-default", "compact"],
+                )
+
+                with patch.dict(os.environ, {"FAKE_LLAMA_BENCH_HELP_MODE": "full", "FAKE_LLAMA_BENCH_SCALE_BY_THREADS": "1"}):
+                    result = run_search(
+                        target=target,
+                        base_job=replace(job, run_id="deterministic-cap-search"),
+                        config=search_config,
+                        run_id="deterministic-cap-search",
+                        optimize_dir=root / "run" / "armtune" / "optimize",
+                    )
+
+                plans.append(
+                    (
+                        [candidate.candidate_id for candidate in result.candidates],
+                        [
+                            (
+                                stage.stage,
+                                stage.candidate_ids,
+                                str(stage.decision.get("status", stage.decision.get("classification"))),
+                            )
+                            for stage in result.stages
+                        ],
+                    )
+                )
+
+        self.assertEqual(plans[0], plans[1])
 
     def test_fake_full_search_e2e_records_quality_gate_and_warmup_exclusion(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -285,8 +394,13 @@ class ArmTuneSearchTest(unittest.TestCase):
                             "compact",
                         ]
                     )
+                effective_configs = list((root / ".autotuneai" / "runs").glob("*/armtune/optimize/optimize_config.json"))
+                self.assertEqual(len(effective_configs), 1)
+                effective = json.loads(effective_configs[0].read_text(encoding="utf-8"))
 
         self.assertEqual(exit_code, 0)
+        self.assertEqual(effective["max_candidates"], 2)
+        self.assertEqual(effective["affinity_modes"], ["compact"])
 
 
 class _SyntheticLocalTarget(LocalArmTarget):
