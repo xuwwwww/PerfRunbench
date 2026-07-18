@@ -319,3 +319,42 @@ execution properties: request completed, generated content is nonempty,
 streaming parsed, and no server error occurred. It records
 `quality_gate_status: not_evaluated` and must not call nonempty output a
 quality pass.
+
+## Phase 4 Quality-Aware Server Search Method
+
+Phase 4 reuses the Phase 3B.1 `benchmark.llama_server` worker path for each
+candidate and adds controller-side deterministic quality validation. The
+worker still receives only a versioned job spec path and a run directory, and
+the target still executes only allowlisted worker operations.
+
+The primary Phase 4 performance metric is median client-observed TTFT in
+milliseconds. Lower is better. Median end-to-end latency is recorded as a
+secondary metric, but ArmTune does not combine TTFT and end-to-end latency into
+a composite score.
+
+Candidate eligibility requires:
+
+- `result_origin` is not `unverified`.
+- binary and model validation passed.
+- server startup and readiness passed.
+- measured requests completed.
+- SSE parsing passed.
+- cleanup passed or was forced with port release.
+- downloaded artifact digest validation passed.
+- the quality suite digest, prompt-suite snapshot, and protocol settings are
+preserved.
+- all required deterministic quality cases pass.
+
+A candidate with better TTFT but failed required quality validation is rejected
+with `rejected_quality` and is not eligible for recommendation. A candidate
+with execution, lifecycle, cleanup, provenance, or artifact-validation failure
+is rejected with `rejected_execution`.
+
+The recommendation text must remain bounded to the tested candidate count, for
+example:
+
+> Best observed quality-passing performance candidate among 3 tested
+> configurations.
+
+Phase 4 results are still not final competition benchmark conclusions and do
+not prove KleidiAI or any optimized Arm execution path.

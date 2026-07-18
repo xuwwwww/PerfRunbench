@@ -177,3 +177,32 @@ http://127.0.0.1:<selected-port>
 The controller downloads the completed `server_benchmark` artifact directory
 and validates `artifact_manifest.json` using the same digest trust boundary as
 the `llama-bench` benchmark path.
+
+## Phase 4 Server Optimize Protocol
+
+Phase 4 does not add a new remote worker operation for search. The controller
+performs candidate planning locally and invokes repeated versioned
+`benchmark.llama_server` jobs for each candidate.
+
+The candidate-specific fields are serialized into the server job spec:
+
+- `server.threads`
+- `server.batch_size`
+- `server.ubatch_size`
+- `server.affinity_mode`
+- `server.cpu_affinity`
+
+The remote worker validates every field through the existing server benchmark
+protocol allowlist. It still does not accept arbitrary remote shell strings,
+free-form server flags, public bind addresses, or `shell=True` execution.
+
+For SSH targets, `workload.prompt_suite_path` must be an absolute path on the
+target. The controller writes a local derived `prompt_suite_snapshot.json` for
+auditability, but the operator must upload the same prompt-suite payload to the
+configured target path before a bounded real Phase 4 validation run.
+
+The controller downloads each candidate's completed server benchmark artifact
+directory, validates candidate artifact manifests, writes the quality-aware
+`server_optimize_result.json`, and validates the root `server_optimize`
+artifact manifest. Credentials, identity-file paths, and private host details
+must not be written to public artifacts.

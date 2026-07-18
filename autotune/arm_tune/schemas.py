@@ -329,8 +329,11 @@ class LlamaServerSettings:
     threads: int = 1
     context_size: int = 512
     batch_size: int | None = None
+    ubatch_size: int | None = None
     seed: int = 42
     temperature: float = 0.0
+    cpu_affinity: list[int] | None = None
+    affinity_mode: str = "scheduler-default"
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -430,8 +433,11 @@ class LlamaServerJobSpec:
                 threads=_required_int(server_payload, "threads"),
                 context_size=_required_int(server_payload, "context_size"),
                 batch_size=_optional_int(server_payload.get("batch_size"), "server.batch_size"),
+                ubatch_size=_optional_int(server_payload.get("ubatch_size"), "server.ubatch_size"),
                 seed=_required_int(server_payload, "seed"),
                 temperature=_required_float(server_payload, "temperature"),
+                cpu_affinity=_optional_int_list(server_payload.get("cpu_affinity"), "server.cpu_affinity"),
+                affinity_mode=str(server_payload.get("affinity_mode", "scheduler-default")),
             ),
             workload=LlamaServerWorkloadSpec(
                 prompt_suite_path=_required_str(workload_payload, "prompt_suite_path"),
@@ -626,6 +632,9 @@ class LlamaServerConfiguration:
     command: list[str]
     supported_flags_used: dict[str, str] = field(default_factory=dict)
     unsupported_optional_fields: list[str] = field(default_factory=list)
+    affinity_mode: str = "scheduler-default"
+    cpu_affinity: list[int] | None = None
+    affinity_applied: bool | None = None
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:

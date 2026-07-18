@@ -485,6 +485,12 @@ still executes only allowlisted worker operations, binds `llama-server` to
 loopback, preserves raw SSE and generated outputs, and validates artifact
 digests after download.
 
+The Phase 4 controller does not add an arbitrary remote shell operation. Server
+autotuning is a controller-side orchestration layer over repeated
+`benchmark.llama_server` jobs. Candidate-specific settings are serialized in
+the versioned server job spec, including `threads`, `batch_size`,
+`ubatch_size`, `affinity_mode`, and optional `cpu_affinity`.
+
 Candidate comparison is quality-aware:
 
 - Performance distributions use client-observed TTFT as the primary metric and
@@ -499,6 +505,20 @@ Candidate comparison is quality-aware:
 - A faster candidate that fails a critical quality validator is rejected with
   `rejected_quality`.
 - A candidate inside the configured noise band remains `inconclusive`.
+
+The Phase 4 server optimize artifact root is:
+
+```text
+.autotuneai/runs/<run_id>/armtune/server_optimize/
+```
+
+It contains the sanitized optimize job, effective config, quality suite
+manifest and snapshot, derived prompt-suite snapshot, per-candidate server
+benchmark artifact directories, `server_optimize_result.json`, root
+`artifact_manifest.json`, and `artifact_validation.json`. For local targets,
+the derived prompt-suite snapshot is used directly. For SSH targets, the
+configured workload prompt suite must be an absolute target path that has been
+uploaded separately.
 
 The Phase 4 MVP does not compare build profiles, verify KleidiAI, change the
 llama.cpp source commit, perform quantization search, run concurrency/load

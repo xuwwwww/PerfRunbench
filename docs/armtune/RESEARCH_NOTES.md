@@ -281,3 +281,21 @@ Access date for all entries: 2026-07-13.
   final optimization, stable production performance, KleidiAI evidence,
   quality validation, build-profile comparison, Performix evidence,
   Performance Passport evidence, or a formal competition benchmark result.
+
+## Phase 4-L Local Fake Quality-Aware Server Search
+
+- Source: local fake `llama-server` fixture and public synthetic BootTrace
+  quality suite.
+- Quality suite: `configs/armtune/quality/boottrace_suite.json`
+- CLI shape:
+  `autotuneai arm optimize --config <local-fake-quality-config>`
+- Result origin: `test_fixture`
+- Validated behavior: server optimize config parsing, derived prompt-suite
+  snapshot, repeated `benchmark.llama_server` candidate execution,
+  deterministic quality validation, faster quality-failing candidate rejection,
+  quality-passing candidate eligibility, conservative recommendation state,
+  cleanup evidence, and root artifact digest validation.
+- Claim boundary: fake TTFT, end-to-end latency, generated outputs, and quality
+  responses are fixtures. They prove pipeline behavior only and must not be
+  reported as Arm performance, model quality, or optimized Arm execution
+  evidence.

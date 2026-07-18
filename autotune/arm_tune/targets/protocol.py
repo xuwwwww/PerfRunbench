@@ -68,8 +68,11 @@ SERVER_KEYS = {
     "threads",
     "context_size",
     "batch_size",
+    "ubatch_size",
     "seed",
     "temperature",
+    "cpu_affinity",
+    "affinity_mode",
 }
 SERVER_WORKLOAD_KEYS = {
     "schema_version",
@@ -239,11 +242,17 @@ def _validate_server_benchmark_job(payload: dict[str, Any]) -> None:
         _positive_float(server.get(key), f"server.{key}")
     if server.get("batch_size") is not None:
         _positive_int(server.get("batch_size"), "server.batch_size")
+    if server.get("ubatch_size") is not None:
+        _positive_int(server.get("ubatch_size"), "server.ubatch_size")
     if isinstance(server.get("seed"), bool) or not isinstance(server.get("seed"), int):
         raise ArmTuneProtocolError("server.seed must be an integer")
     temperature = server.get("temperature")
     if isinstance(temperature, bool) or not isinstance(temperature, (int, float)) or float(temperature) < 0:
         raise ArmTuneProtocolError("server.temperature must be a non-negative number")
+    _optional_cpu_affinity(server.get("cpu_affinity"), "server.cpu_affinity")
+    affinity_mode = str(server.get("affinity_mode", "scheduler-default"))
+    if affinity_mode not in {"scheduler-default", "compact", "spread", "reserve-one-core", "numa-local"}:
+        raise ArmTuneProtocolError("server.affinity_mode is unsupported")
     workload = payload["workload"]
     if not _is_absolute_target_path(str(workload.get("prompt_suite_path", ""))):
         raise ArmTuneProtocolError("workload.prompt_suite_path must be absolute on the target")

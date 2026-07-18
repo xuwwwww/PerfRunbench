@@ -1018,10 +1018,11 @@ Phase 3B.2 remains out of scope for the Phase 3B.1 implementation.
 
 ## Phase 4 Plan: Quality-Aware Server Autotuning MVP
 
-Status: planned. Phase 4 combines deterministic BootTrace quality validation
-with bounded `llama-server` candidate search. It remains an MVP focused on a
-small public synthetic quality suite, not on final competition benchmarking or
-optimized Arm execution claims.
+Status: implemented locally; real-target validation pending. Phase 4 combines
+deterministic BootTrace quality validation with bounded `llama-server`
+candidate search. It remains an MVP focused on a small public synthetic
+quality suite, not on final competition benchmarking or optimized Arm execution
+claims.
 
 Allowed scope:
 
@@ -1071,31 +1072,35 @@ Phase 4 artifact layout:
 .autotuneai/runs/<run_id>/armtune/server_optimize/
   optimize_job.json
   effective_config.json
-  search_plan.json
   quality_suite_manifest.json
   quality_suite_snapshot.json
-  target_fingerprint.json
-  executable_manifest.json
-  model_manifest.json
-  search_result.json
-  recommendation.json
+  prompt_suite_snapshot.json
+  server_optimize_result.json
+  artifact_validation.json
   artifact_manifest.json
-  baseline/
-    candidate.json
-    performance_summary.json
-    quality_summary.json
-    requests/...
   candidates/
     <candidate-id>/
-      candidate.json
-      performance_summary.json
-      quality_summary.json
-      eligibility.json
-      requests/...
-  confirmation/
-    baseline/...
-    selected/...
+      search/
+        0001/
+          server_job.json
+          benchmark_result.json
+          artifact_manifest.json
+          raw/...
+          requests/...
+      confirmation/
+        0002/
+          server_job.json
+          benchmark_result.json
+          artifact_manifest.json
+          raw/...
+          requests/...
 ```
+
+The controller creates a derived `prompt_suite_snapshot.json` from the quality
+suite for local fake/full E2E runs. For SSH targets, the workload
+`prompt_suite_path` remains an absolute target path; the operator must upload
+the derived prompt suite to that target path before running the bounded real
+validation.
 
 Phase 4 recommendation wording must be bounded, for example:
 

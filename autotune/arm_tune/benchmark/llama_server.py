@@ -49,6 +49,7 @@ OPTIONAL_SERVER_FLAGS = {
     "threads": ["-t", "--threads"],
     "context_size": ["-c", "--ctx-size"],
     "batch_size": ["--batch-size"],
+    "ubatch_size": ["--ubatch-size"],
     "seed": ["--seed"],
     "temperature": ["--temp", "--temperature"],
 }
@@ -214,6 +215,9 @@ def run_llama_server_worker(job: LlamaServerJobSpec, run_dir: str | Path) -> Lla
         command=command,
         supported_flags_used=used_flags,
         unsupported_optional_fields=unsupported_optional,
+        affinity_mode=job.server.affinity_mode,
+        cpu_affinity=list(job.server.cpu_affinity) if job.server.cpu_affinity is not None else None,
+        affinity_applied=_can_apply_affinity(job.server.cpu_affinity),
     )
     atomic_write_json(server_dir / "server_configuration.json", configuration.to_dict())
 
@@ -221,7 +225,7 @@ def run_llama_server_worker(job: LlamaServerJobSpec, run_dir: str | Path) -> Lla
     lifecycle = ServerLifecycleResult(selected_port=port)
     requests: list[GenerationRequestResult] = []
     try:
-        started = start_server(command, raw_dir, port)
+        started = start_server(command, raw_dir, port, cpu_affinity=job.server.cpu_affinity)
         lifecycle = wait_until_ready(started, job)
         if lifecycle.readiness_status == "ready":
             requests = run_prompt_suite_requests(job, prompts, requests_dir, port)
@@ -345,6 +349,7 @@ def build_server_command(
         ("threads", job.server.threads),
         ("context_size", job.server.context_size),
         ("batch_size", job.server.batch_size),
+        ("ubatch_size", job.server.ubatch_size),
         ("seed", job.server.seed),
         ("temperature", job.server.temperature),
     ]:
@@ -362,7 +367,7 @@ def build_server_command(
     return command, used, unsupported_optional
 
 
-def start_server(command: list[str], raw_dir: Path, port: int) -> _StartedServer:
+def start_server(command: list[str], raw_dir: Path, port: int, *, cpu_affinity: list[int] | None = None) -> _StartedServer:
     stdout_path = raw_dir / "server_stdout.txt"
     stderr_path = raw_dir / "server_stderr.txt"
     stdout_handle = stdout_path.open("w", encoding="utf-8", errors="replace", newline="\n")
@@ -384,7 +389,13 @@ def start_server(command: list[str], raw_dir: Path, port: int) -> _StartedServer
             creationflags=creationflags,
             start_new_session=start_new_session,
         )
+        _apply_process_affinity(process.pid, cpu_affinity)
     except Exception:
+        try:
+            if "process" in locals() and process.poll() is None:
+                process.terminate()
+        except Exception:
+            pass
         stdout_handle.close()
         stderr_handle.close()
         raise
@@ -929,6 +940,20 @@ def _select_port(port: int | str) -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
+
+
+def _can_apply_affinity(cpu_affinity: list[int] | None) -> bool | None:
+    if cpu_affinity is None:
+        return None
+    return os.name != "nt" and hasattr(os, "sched_setaffinity")
+
+
+def _apply_process_affinity(pid: int, cpu_affinity: list[int] | None) -> None:
+    if cpu_affinity is None:
+        return
+    if os.name == "nt" or not hasattr(os, "sched_setaffinity"):
+        return
+    os.sched_setaffinity(pid, set(cpu_affinity))
 
 
 def _write_stream_jsonl(path: Path, events: list[StreamingEventRecord]) -> None:

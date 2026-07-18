@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if "--help" in args:
         mode = os.environ.get("FAKE_LLAMA_SERVER_HELP_MODE", "full")
-        flags = ["--model", "--host", "--port", "--threads", "--ctx-size", "--batch-size", "--seed", "--temp"]
+        flags = ["--model", "--host", "--port", "--threads", "--ctx-size", "--batch-size", "--ubatch-size", "--seed", "--temp"]
         if mode == "missing_port":
             flags.remove("--port")
         print("fake llama-server fixture help")
@@ -31,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--threads", "-t", type=int, default=1)
     parser.add_argument("--ctx-size", "-c", type=int, default=512)
     parser.add_argument("--batch-size", type=int)
+    parser.add_argument("--ubatch-size", type=int)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--temp", "--temperature", dest="temperature", type=float, default=0.0)
     parsed = parser.parse_args(args)
@@ -45,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     if mode == "ignore_sigterm":
         signal.signal(signal.SIGTERM, lambda signum, frame: None)
     ready_at = time.monotonic() + float(os.environ.get("FAKE_LLAMA_SERVER_READY_DELAY", "0"))
+    request_count = {"count": 0}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
@@ -70,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
                 self.end_headers()
                 return
             length = int(self.headers.get("Content-Length", "0"))
-            _ = self.rfile.read(length)
+            body = self.rfile.read(length)
             if mode == "http_error":
                 self.send_response(500)
                 self.end_headers()
@@ -85,23 +89,38 @@ def main(argv: list[str] | None = None) -> int:
                 self._event("data: {not-json}")
                 self._event("data: [DONE]")
                 return
+            quality_mode = os.environ.get("FAKE_LLAMA_SERVER_QUALITY_MODE", "")
+            if quality_mode.startswith("boottrace"):
+                response_text = _quality_response_text(body, parsed, quality_mode)
+                delay_profile = os.environ.get("FAKE_LLAMA_SERVER_DELAY_PROFILE", "")
+                if delay_profile == "quality":
+                    time.sleep(_quality_ttft_delay(parsed))
+                self._event('data: {"choices":[{"delta":{"role":"assistant"}}]}')
+                self._event("data: " + json.dumps({"choices": [{"delta": {"content": response_text}}]}))
+                self._event('data: {"choices":[{"finish_reason":"stop","delta":{}}]}')
+                self._event("data: [DONE]")
+                _maybe_shutdown(server, request_count)
+                return
             self._event('data: {"choices":[{"delta":{"role":"assistant"}}]}')
             self._event('data: {"choices":[{"delta":{"content":""}}]}')
             if mode == "empty_content":
                 self._event('data: {"choices":[{"finish_reason":"stop","delta":{}}]}')
                 self._event("data: [DONE]")
+                _maybe_shutdown(server, request_count)
                 return
             self._event('data: {"choices":[{"delta":{"content":"Hello"}}]}')
             if mode == "mid_stream_disconnect":
+                _maybe_shutdown(server, request_count)
                 return
             self._event('data: {"choices":[{"delta":{"content":" world"}}]}')
             self._event('data: {"choices":[{"finish_reason":"stop","delta":{}}]}')
             self._event("data: [DONE]")
+            _maybe_shutdown(server, request_count)
 
         def _event(self, line: str) -> None:
             self.wfile.write((line + "\n\n").encode("utf-8"))
             self.wfile.flush()
-            time.sleep(0.01)
+            time.sleep(float(os.environ.get("FAKE_LLAMA_SERVER_EVENT_DELAY", "0.01")))
 
     server = ThreadingHTTPServer((parsed.host, parsed.port), Handler)
     print(f"fake llama-server listening on {parsed.host}:{parsed.port}", flush=True)
@@ -110,6 +129,106 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         server.server_close()
     return 0
+
+
+def _quality_response_text(body: bytes, parsed: argparse.Namespace, quality_mode: str) -> str:
+    prompt = _prompt_from_request(body)
+    case_id = _case_id_from_prompt(prompt)
+    if quality_mode == "boottrace_invalid_json":
+        return "{not-json"
+    if quality_mode == "boottrace_fail_all" or (parsed.batch_size is not None and parsed.batch_size >= 256):
+        return json.dumps(
+            {
+                "case_id": case_id,
+                "status": "ok",
+                "event_sequence_valid": False,
+                "latency_ms": 12.5,
+                "summary": "I invented one missing BootTrace line.",
+                "evidence_line_ids": ["L001", "L999"],
+            },
+            sort_keys=True,
+        )
+    return json.dumps(
+        {
+            "case_id": case_id,
+            "status": _status_for_case(case_id),
+            "event_sequence_valid": True,
+            "latency_ms": _latency_for_case(case_id),
+            "summary": _summary_for_case(case_id),
+            "evidence_line_ids": _evidence_for_case(case_id),
+        },
+        sort_keys=True,
+    )
+
+
+def _prompt_from_request(body: bytes) -> str:
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except Exception:
+        return ""
+    messages = payload.get("messages", [])
+    if not isinstance(messages, list):
+        return ""
+    parts: list[str] = []
+    for message in messages:
+        if isinstance(message, dict) and isinstance(message.get("content"), str):
+            parts.append(message["content"])
+    return "\n".join(parts)
+
+
+def _case_id_from_prompt(prompt: str) -> str:
+    match = re.search(r"CASE_ID=([A-Za-z0-9_.-]+)", prompt)
+    return match.group(1) if match else "unknown"
+
+
+def _status_for_case(case_id: str) -> str:
+    if case_id == "boot_retry_recovered":
+        return "warning"
+    return "ok"
+
+
+def _latency_for_case(case_id: str) -> float:
+    return {
+        "boot_success": 83.0,
+        "boot_retry_recovered": 142.0,
+        "boot_config_missing": 36.0,
+    }.get(case_id, 50.0)
+
+
+def _summary_for_case(case_id: str) -> str:
+    if case_id == "boot_retry_recovered":
+        return "Boot completed after one retry using cited BootTrace evidence."
+    if case_id == "boot_config_missing":
+        return "Boot failed because a required configuration line is missing."
+    return "Boot completed successfully using cited BootTrace evidence."
+
+
+def _evidence_for_case(case_id: str) -> list[str]:
+    return {
+        "boot_success": ["L001", "L002", "L003"],
+        "boot_retry_recovered": ["L010", "L011", "L012", "L013"],
+        "boot_config_missing": ["L020", "L021"],
+    }.get(case_id, ["L001"])
+
+
+def _quality_ttft_delay(parsed: argparse.Namespace) -> float:
+    if parsed.batch_size is not None and parsed.batch_size >= 256:
+        return 0.002
+    if parsed.threads == 1:
+        return 0.005
+    return 0.05
+
+
+def _maybe_shutdown(server: ThreadingHTTPServer, request_count: dict[str, int]) -> None:
+    try:
+        limit = int(os.environ.get("FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS", "0"))
+    except ValueError:
+        limit = 0
+    if limit <= 0:
+        return
+    request_count["count"] += 1
+    if request_count["count"] >= limit:
+        threading.Thread(target=server.shutdown, daemon=True).start()
 
 
 if __name__ == "__main__":

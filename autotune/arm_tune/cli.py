@@ -21,6 +21,7 @@ from autotune.arm_tune.schemas import (
     TargetSpec,
 )
 from autotune.arm_tune.search.runner import SearchConfig, run_search
+from autotune.arm_tune.server_search.runner import ArmTuneServerSearchResult, PRIMARY_METRIC as SERVER_PRIMARY_METRIC, SECONDARY_METRIC as SERVER_SECONDARY_METRIC, run_server_search
 from autotune.arm_tune.targets.local import LocalArmTarget
 from autotune.arm_tune.targets.ssh import SshArmTarget
 from autotune.arm_tune.targets.worker import main as worker_main
@@ -59,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--config", required=True)
     benchmark.set_defaults(handler=_cmd_benchmark)
 
-    optimize = subparsers.add_parser("optimize", help="Run repeated ArmTune llama-bench performance search.")
+    optimize = subparsers.add_parser("optimize", help="Run repeated ArmTune performance search.")
     optimize.add_argument("--config", required=True)
     optimize.add_argument("--warmup-runs", type=int)
     optimize.add_argument("--search-runs", type=int)
@@ -187,7 +188,8 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
         ["autotuneai", "arm", "optimize", "--config", args.config],
         ResourceBudget(enforce=False),
     )
-    optimize_dir = run_dir / "armtune" / "optimize"
+    is_server = isinstance(job, LlamaServerJobSpec)
+    optimize_dir = run_dir / "armtune" / ("server_optimize" if is_server else "optimize")
     optimize_dir.mkdir(parents=True, exist_ok=True)
     target = _target_from_spec(spec)
     job = replace(
@@ -198,13 +200,22 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
         target_run_directory=str(optimize_dir),
     )
     try:
-        result = run_search(
-            target=target,
-            base_job=job,
-            config=search_config,
-            run_id=manifest.run_id,
-            optimize_dir=optimize_dir,
-        )
+        if isinstance(job, LlamaServerJobSpec):
+            result = run_server_search(
+                target=target,
+                base_job=job,
+                config=search_config,
+                run_id=manifest.run_id,
+                optimize_dir=optimize_dir,
+            )
+        else:
+            result = run_search(
+                target=target,
+                base_job=job,
+                config=search_config,
+                run_id=manifest.run_id,
+                optimize_dir=optimize_dir,
+            )
     except ArmTuneError:
         finish_run(run_dir, manifest, "failed", 2)
         raise
@@ -212,9 +223,12 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
         finish_run(run_dir, manifest, "failed", 3)
         print(f"ArmTune runtime error: {exc}", file=sys.stderr)
         return 3
-    exit_code = 0 if result.status == "completed" else 1
+    if isinstance(result, ArmTuneServerSearchResult):
+        exit_code = _server_optimize_exit_code(result)
+    else:
+        exit_code = 0 if result.status == "completed" else 1
     finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
-    print(_optimize_summary(result))
+    print(_server_optimize_summary(result) if isinstance(result, ArmTuneServerSearchResult) else _optimize_summary(result))
     return exit_code
 
 
@@ -426,6 +440,81 @@ def _optimize_summary(result) -> str:
         f"artifact_directory: {result.artifact_directory}",
     ]
     return "\n".join(lines)
+
+
+def _server_optimize_exit_code(result: ArmTuneServerSearchResult) -> int:
+    if result.recommendation.status in {"recommended", "inconclusive"}:
+        return 0
+    return 1
+
+
+def _server_optimize_summary(result: ArmTuneServerSearchResult) -> str:
+    baseline = _server_candidate_result(result, result.baseline_candidate_id)
+    selected = _server_candidate_result(result, result.selected_candidate_id)
+    decision = result.recommendation.noise_band_decision
+    improvement = "Not available" if decision is None or decision.delta_percent is None else f"{decision.delta_percent:.3f}%"
+    noise = "Not available" if decision is None else decision.classification
+    selected_quality = selected.quality_result.aggregate if selected else None
+    required_passed, required_total = _required_quality_case_counts(selected) if selected else (0, result.quality_suite_manifest.required_case_count)
+    lines = [
+        f"run_id: {result.run_id}",
+        f"target_architecture: {result.target_architecture}",
+        f"result_origin: {result.result_origin}",
+        f"adapter: {result.runtime_adapter}",
+        f"candidate_count: {result.candidate_count}",
+        f"eligible_candidate_count: {result.eligible_candidate_count}",
+        f"failed_candidate_count: {result.failed_candidate_count}",
+        f"quality_suite_id: {result.quality_suite_manifest.suite_id}",
+        f"required_quality_cases_passed: {required_passed}/{required_total}",
+        f"baseline_median_ttft_ms: {_server_metric(baseline, SERVER_PRIMARY_METRIC)}",
+        f"selected_median_ttft_ms: {_server_metric(selected, SERVER_PRIMARY_METRIC)}",
+        f"observed_improvement_percent: {improvement}",
+        f"selected_median_end_to_end_latency_ms: {_server_metric(selected, SERVER_SECONDARY_METRIC)}",
+        f"noise_band_classification: {noise}",
+        f"recommendation_state: {result.recommendation.status}",
+        f"quality_gate_status: {selected_quality.quality_gate_status if selected_quality else result.quality_gate_status}",
+        f"cleanup_status: {_server_cleanup_status(result)}",
+        f"artifact_directory: {result.artifact_directory}",
+    ]
+    return "\n".join(lines)
+
+
+def _server_candidate_result(result: ArmTuneServerSearchResult, candidate_id: str | None):
+    if candidate_id is None:
+        return None
+    for candidate in result.candidates:
+        if candidate.candidate.candidate_id == candidate_id:
+            return candidate
+    return None
+
+
+def _server_metric(candidate, metric_name: str) -> str:
+    if candidate is None:
+        return "Not available"
+    distribution = candidate.distributions.get(metric_name)
+    if distribution is None or distribution.median is None:
+        return "Not available"
+    return f"{distribution.median:.3f}"
+
+
+def _required_quality_case_counts(candidate) -> tuple[int, int]:
+    by_case: dict[str, list[object]] = {}
+    for case in candidate.quality_result.cases:
+        if case.required:
+            by_case.setdefault(case.case_id, []).append(case)
+    passed = sum(1 for results in by_case.values() if all(getattr(item, "status", "") == "passed" for item in results))
+    return passed, candidate.quality_result.suite_manifest.required_case_count
+
+
+def _server_cleanup_status(result: ArmTuneServerSearchResult) -> str:
+    statuses = {run.cleanup_status for candidate in result.candidates for run in candidate.benchmark_runs}
+    if not statuses:
+        return "Not available"
+    if statuses <= {"passed", "forced"}:
+        return "passed"
+    if "failed" in statuses:
+        return "failed"
+    return ",".join(sorted(statuses))
 
 
 def _summary_metrics(parse_result: LlamaBenchParseResult | None) -> tuple[float | None, float | None]:

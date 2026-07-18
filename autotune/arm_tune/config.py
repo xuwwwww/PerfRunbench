@@ -86,8 +86,11 @@ SERVER_KEYS = {
     "threads",
     "context_size",
     "batch_size",
+    "ubatch_size",
     "seed",
     "temperature",
+    "cpu_affinity",
+    "affinity_mode",
 }
 SERVER_WORKLOAD_KEYS = {
     "mode",
@@ -116,6 +119,7 @@ SEARCH_KEYS = {
     "max_candidates",
     "affinity_modes",
 }
+QUALITY_GATE_KEYS = {"enabled", "suite_path"}
 PYTHON_MODULE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
 
@@ -133,7 +137,7 @@ def load_benchmark_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSp
     return parse_benchmark_config(payload)
 
 
-def load_optimize_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSpec, SearchConfig]:
+def load_optimize_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSpec | LlamaServerJobSpec, SearchConfig]:
     payload = load_config(path)
     if not isinstance(payload, dict):
         raise ArmTuneConfigError("optimize config must be an object")
@@ -281,8 +285,11 @@ def parse_server_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, 
             threads=_positive_int(server.get("threads", 1), "server.threads"),
             context_size=_positive_int(server.get("context_size", 512), "server.context_size"),
             batch_size=_optional_positive_int(server.get("batch_size"), "server.batch_size"),
+            ubatch_size=_optional_positive_int(server.get("ubatch_size"), "server.ubatch_size"),
             seed=_int_field(server.get("seed", 42), "server.seed"),
             temperature=_non_negative_float(server.get("temperature", 0.0), "server.temperature"),
+            cpu_affinity=_optional_cpu_affinity(server.get("cpu_affinity"), "server.cpu_affinity"),
+            affinity_mode=_affinity_mode(server.get("affinity_mode", "scheduler-default")),
         ),
         workload=LlamaServerWorkloadSpec(
             prompt_suite_path=_absolute_path_field(workload.get("prompt_suite_path"), "workload.prompt_suite_path"),
@@ -305,11 +312,21 @@ def parse_server_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, 
     return target, job
 
 
-def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBenchJobSpec, SearchConfig]:
-    unknown = set(payload) - OPTIMIZE_TOP_LEVEL_KEYS
+def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBenchJobSpec | LlamaServerJobSpec, SearchConfig]:
+    runtime_payload = payload.get("runtime")
+    workload_payload = payload.get("workload")
+    server_optimize = (
+        isinstance(runtime_payload, dict)
+        and runtime_payload.get("adapter") == "llama_server"
+    ) or (
+        isinstance(workload_payload, dict)
+        and workload_payload.get("mode") == "server"
+    )
+    allowed_top_level = (SERVER_BENCHMARK_TOP_LEVEL_KEYS | {"search", "quality_gate"}) if server_optimize else OPTIMIZE_TOP_LEVEL_KEYS
+    unknown = set(payload) - allowed_top_level
     if unknown:
         raise ArmTuneConfigError(f"unknown optimize config field(s): {sorted(unknown)}")
-    benchmark_payload = {key: value for key, value in payload.items() if key != "search"}
+    benchmark_payload = {key: value for key, value in payload.items() if key not in {"search", "quality_gate"}}
     target, job = parse_benchmark_config(benchmark_payload)
     search_payload = payload.get("search", {})
     if search_payload is None:
@@ -317,6 +334,16 @@ def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBen
     if not isinstance(search_payload, dict):
         raise ArmTuneConfigError("search must be an object")
     _reject_unknown(search_payload, SEARCH_KEYS, "search")
+    quality_payload = payload.get("quality_gate", {})
+    if quality_payload is None:
+        quality_payload = {}
+    if not isinstance(quality_payload, dict):
+        raise ArmTuneConfigError("quality_gate must be an object")
+    _reject_unknown(quality_payload, QUALITY_GATE_KEYS, "quality_gate")
+    quality_enabled = bool(quality_payload.get("enabled", False))
+    suite_path = _optional_config_path(quality_payload.get("suite_path"), "quality_gate.suite_path")
+    if quality_enabled and not suite_path:
+        raise ArmTuneConfigError("quality_gate.suite_path is required when quality_gate.enabled is true")
     config = SearchConfig(
         warmup_runs=_non_negative_int(search_payload.get("warmup_runs", 2), "search.warmup_runs"),
         search_runs=_positive_int(search_payload.get("search_runs", 5), "search.search_runs"),
@@ -330,6 +357,8 @@ def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBen
         noise_band_percent=_positive_float(search_payload.get("noise_band_percent", 2.0), "search.noise_band_percent"),
         max_candidates=_optional_positive_int(search_payload.get("max_candidates"), "search.max_candidates"),
         affinity_modes=_optional_affinity_modes(search_payload.get("affinity_modes"), "search.affinity_modes"),
+        quality_gate_enabled=quality_enabled,
+        quality_suite_path=suite_path,
     )
     return target, job, config
 
@@ -438,6 +467,17 @@ def _absolute_path_field(value: Any, label: str) -> str:
         raise ArmTuneConfigError(f"{label} is required")
     if not (Path(text).is_absolute() or text.startswith("/")):
         raise ArmTuneConfigError(f"{label} must be absolute on the target")
+    return text
+
+
+def _optional_config_path(value: Any, label: str) -> str | None:
+    if value in {None, ""}:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if any(char in text for char in "\x00\r\n"):
+        raise ArmTuneConfigError(f"{label} must not contain control characters")
     return text
 
 

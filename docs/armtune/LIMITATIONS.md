@@ -174,3 +174,22 @@ should be labeled unverified.
   `llama-server` candidate search, performance recommendation, build-profile
   comparison, KleidiAI verification, Performix, or Performance Passport
   generation.
+
+## Phase 4 Limitations
+
+- Phase 4 implements a deterministic public synthetic BootTrace quality suite
+  and quality-aware `llama-server` candidate search.
+- Local fake E2E evidence validates controller orchestration, server lifecycle,
+  stream parsing, quality rejection, conservative recommendation state, and
+  artifact digest validation without Arm hardware, SSH, network, model weights,
+  root privilege, or cloud credentials.
+- Fake-server quality and timing values are fixtures and must not be reported
+  as Arm performance.
+- Until a bounded real-target Phase 4 run is completed and documented, Phase 4
+  does not prove measured quality-aware tuning on real Arm hardware.
+- Phase 4 uses a public synthetic BootTrace suite. It does not validate private
+  firmware logs, production customer logs, or NDA-protected data.
+- Phase 4 does not compare build profiles, verify KleidiAI, modify llama.cpp,
+  search quantization, run concurrency/load tests, integrate Performix,
+  generate a complete Performance Passport, or establish final competition
+  benchmark conclusions.
