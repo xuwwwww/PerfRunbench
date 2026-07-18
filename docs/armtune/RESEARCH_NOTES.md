@@ -194,3 +194,38 @@ Access date for all entries: 2026-07-13.
 - Unresolved uncertainty: optimized-path evidence, semantic quality,
   build-profile comparisons, Performix, Performance Passport generation, and
   stable production performance remain unvalidated.
+
+## Phase 3A.2 Search Guardrail Smoke Validation
+
+- Source: user-provisioned AWS Graviton2 Linux Arm64 development target.
+- Run ID: `20260718_154049_739709`
+- PerfRunbench commit:
+  `77ed7fb23a4ff8660f57fac857341b705a585050`
+- Command shape:
+  `autotuneai arm optimize --config <private-config> --warmup-runs 1 --search-runs 1 --confirmation-runs 2 --cooldown-seconds 0 --max-candidates 3 --affinity-modes scheduler-default,compact`
+- Search protocol override: `warmup_runs=1`, `search_runs=1`,
+  `confirmation_runs=2`, `cooldown_seconds=0.0`, `random_seed=42`,
+  `insert_paired_baseline_every=2`, `noise_band_percent=5.0`,
+  `max_candidates=3`, `affinity_modes=[scheduler-default, compact]`.
+- Candidate plan: `baseline`, `threads-1`, `affinity-compact-0_1`.
+- Unique candidate count: `3`.
+- Process execution count: `9`; this confirms `max_candidates` limited unique
+  candidate configurations, not warm-up, paired-baseline, confirmation, or
+  total process executions.
+- Effective config artifact: `optimize_config.json` preserved the CLI override
+  values for `max_candidates` and `affinity_modes`.
+- Search status: `completed`
+- Result origin: `measured`
+- Quality gate status: `not_evaluated`
+- Recommendation status: `inconclusive`
+- Artifact validation: `passed`; 9 repetition manifests and 117 artifact
+  records checked after download.
+- Relevant conclusion: the Windows controller config merge, SSH protocol,
+  remote worker execution, bounded search plan, effective-config artifact, and
+  downloaded artifact digest validation all worked for the Phase 3A.2 guardrail
+  smoke profile.
+- Claim boundary: this is a functional validation of candidate-count and
+  affinity-mode guardrails on a real Linux Arm64 target. It is not a new
+  optimization result, not stable production performance, not KleidiAI
+  evidence, not `llama-server` evidence, not TTFT or end-to-end latency
+  evidence, and not deterministic quality-gate evidence.
