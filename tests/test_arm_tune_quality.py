@@ -39,7 +39,7 @@ class ArmTuneQualityTest(unittest.TestCase):
         _, cases, _, _ = load_quality_suite(QUALITY_SUITE)
         cases_by_id = {case.case_id: case for case in cases}
 
-        for case_id in ["boot_success", "boot_device_timeout", "boot_firmware_component_failure"]:
+        for case_id in ["boot_success", "boot_config_missing", "boot_device_timeout", "boot_firmware_component_failure"]:
             with self.subTest(case_id=case_id):
                 response = (FIXTURES / f"{case_id}_response.json").read_text(encoding="utf-8")
                 result = validate_quality_case(cases_by_id[case_id], response)

@@ -6,7 +6,7 @@
     {
       "case_id": "boot_success",
       "category": "boottrace_success",
-      "prompt": "CASE_ID=boot_success\nYou are validating this synthetic BootTrace excerpt.\nL001 Boot ROM entered BL1\nL002 BL2 loaded kernel image\nL003 Kernel handed off to userspace\nReturn compact JSON with case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "prompt": "CASE_ID=boot_success\nYou are validating this synthetic BootTrace excerpt.\nL001 Boot ROM entered BL1\nL002 BL2 loaded kernel image\nL003 Kernel handed off to userspace\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
       "response_format": "json",
       "required": true,
       "maximum_predicted_tokens": 96,
@@ -16,7 +16,7 @@
       },
       "expected": {
         "case_id": "boot_success",
-        "status": "ok",
+        "status": "success",
         "required_evidence_line_ids": ["L001", "L002", "L003"],
         "allowed_evidence_line_ids": ["L001", "L002", "L003"]
       },
@@ -38,7 +38,7 @@
           }
         },
         {"type": "exact_field", "field": "case_id", "expected": "boot_success"},
-        {"type": "allowed_values", "field": "status", "expected": ["ok"]},
+        {"type": "allowed_values", "field": "status", "expected": ["success"]},
         {"type": "exact_field", "field": "event_sequence_valid", "expected": true},
         {"type": "numeric_range", "field": "latency_ms", "expected": {"min": 0, "max": 120}},
         {"type": "required_substrings", "field": "summary", "expected": ["Boot completed"]},
@@ -57,7 +57,7 @@
     {
       "case_id": "boot_retry_recovered",
       "category": "boottrace_retry",
-      "prompt": "CASE_ID=boot_retry_recovered\nYou are validating this synthetic BootTrace excerpt.\nL010 NIC firmware init failed once\nL011 Retry scheduled after 50 ms\nL012 NIC firmware init succeeded\nL013 Network target mounted\nReturn compact JSON with case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "prompt": "CASE_ID=boot_retry_recovered\nYou are validating this synthetic BootTrace excerpt.\nL010 NIC firmware init failed once\nL011 Retry scheduled after 50 ms\nL012 NIC firmware init succeeded\nL013 Network target mounted\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
       "response_format": "json",
       "required": true,
       "maximum_predicted_tokens": 96,
@@ -108,7 +108,7 @@
     {
       "case_id": "boot_config_missing",
       "category": "boottrace_failure",
-      "prompt": "CASE_ID=boot_config_missing\nYou are validating this synthetic BootTrace excerpt.\nL020 Kernel requested storage UUID 1111-2222\nL021 Required storage UUID is absent from discovered devices\nReturn compact JSON with case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "prompt": "CASE_ID=boot_config_missing\nYou are validating this synthetic BootTrace excerpt.\nL020 Kernel requested storage UUID 1111-2222\nL021 Required storage UUID is absent from discovered devices\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
       "response_format": "json",
       "required": true,
       "maximum_predicted_tokens": 96,
@@ -118,7 +118,7 @@
       },
       "expected": {
         "case_id": "boot_config_missing",
-        "status": "ok",
+        "status": "failure",
         "required_evidence_line_ids": ["L020", "L021"],
         "allowed_evidence_line_ids": ["L020", "L021"]
       },
@@ -140,7 +140,7 @@
           }
         },
         {"type": "exact_field", "field": "case_id", "expected": "boot_config_missing"},
-        {"type": "allowed_values", "field": "status", "expected": ["ok"]},
+        {"type": "allowed_values", "field": "status", "expected": ["failure"]},
         {"type": "exact_field", "field": "event_sequence_valid", "expected": true},
         {"type": "numeric_range", "field": "latency_ms", "expected": {"min": 0, "max": 80}},
         {"type": "required_substrings", "field": "summary", "expected": ["required configuration line is missing"]},
@@ -159,7 +159,7 @@
     {
       "case_id": "boot_device_timeout",
       "category": "boottrace_failure",
-      "prompt": "CASE_ID=boot_device_timeout\nYou are validating this synthetic BootTrace excerpt.\nL030 PCIe device scan started\nL031 NVMe controller did not become ready before timeout\nL032 Boot manager entered recovery shell\nReturn compact JSON with case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "prompt": "CASE_ID=boot_device_timeout\nYou are validating this synthetic BootTrace excerpt.\nL030 PCIe device scan started\nL031 NVMe controller did not become ready before timeout\nL032 Boot manager entered recovery shell\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
       "response_format": "json",
       "required": true,
       "maximum_predicted_tokens": 96,
@@ -210,7 +210,7 @@
     {
       "case_id": "boot_firmware_component_failure",
       "category": "boottrace_failure",
-      "prompt": "CASE_ID=boot_firmware_component_failure\nYou are validating this synthetic BootTrace excerpt.\nL040 BL2 verified firmware volume\nL041 BMC mailbox returned firmware component checksum failure\nL042 Firmware update rollback completed\nL043 Boot blocked pending service action\nReturn compact JSON with case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "prompt": "CASE_ID=boot_firmware_component_failure\nYou are validating this synthetic BootTrace excerpt.\nL040 BL2 verified firmware volume\nL041 BMC mailbox returned firmware component checksum failure\nL042 Firmware update rollback completed\nL043 Boot blocked pending service action\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
       "response_format": "json",
       "required": true,
       "maximum_predicted_tokens": 96,

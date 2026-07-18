@@ -184,9 +184,9 @@ def _case_id_from_prompt(prompt: str) -> str:
 def _status_for_case(case_id: str) -> str:
     if case_id == "boot_retry_recovered":
         return "warning"
-    if case_id in {"boot_device_timeout", "boot_firmware_component_failure"}:
+    if case_id in {"boot_config_missing", "boot_device_timeout", "boot_firmware_component_failure"}:
         return "failure"
-    return "ok"
+    return "success"
 
 
 def _latency_for_case(case_id: str) -> float:
