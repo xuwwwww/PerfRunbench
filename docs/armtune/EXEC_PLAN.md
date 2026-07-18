@@ -723,10 +723,9 @@ stdout/stderr artifact paths, execution status, parse status, parsed metrics,
 host fingerprint, allowed CPU mask, target load when available, and failure
 reason.
 
-Phase 3A recommendations must use wording such as:
+Phase 3A recommendations must use bounded wording such as:
 
-> Best observed performance candidate under the tested llama-bench
-> configuration.
+> Best observed performance candidate among N tested configurations.
 
 They must not recommend candidates that failed required trials, missed required
 metrics, are statistically indistinguishable within the configured noise band
@@ -771,22 +770,43 @@ final optimization, stable production performance, KleidiAI usage,
 quality-gate validation, build-profile comparison, Performix, Performance
 Passport generation, or formal competition benchmark results.
 
-## Phase 3B Plan: Search-Space Control Hardening
+## Phase 3A.2 Plan: Search Candidate Controls and Cost Guardrails
 
-Status: implemented. Phase 3B adds explicit controls for small, bounded
+Status: implemented. Phase 3A.2 adds explicit controls for small, bounded
 real-target smoke profiles without changing the Phase 3A performance-only
 claim boundary.
 
+Phase labels are reserved as follows:
+
+```text
+Phase 3A.1
+Real bounded search validation
+
+Phase 3A.2
+Candidate-count and affinity guardrails
+
+Phase 3B
+Server inference and deterministic quality validation
+```
+
 Allowed scope:
 
-- Add `search.max_candidates` to cap the total planned search candidate count,
-  including the baseline.
+- Add `search.max_candidates` to cap unique tested candidate configurations.
 - Keep the baseline candidate even when the cap is one.
 - Apply the cap in deterministic stage order: baseline, thread candidates,
   supported batch candidate, affinity candidates.
+- Do not count warm-up runs, paired-baseline insertions, confirmation runs, or
+  process execution count toward `search.max_candidates`.
+- Mark stages that still had raw candidates but could not be evaluated due to
+  the cap as `skipped_due_to_candidate_limit`.
 - Add `search.affinity_modes` to allowlist generated affinity candidates.
+- Reject unknown affinity modes as configuration errors and deduplicate
+  repeated modes.
+- Avoid invalid affinity masks, including `reserve-one-core` on a single
+  visible CPU and `numa-local` on single-node topology.
 - Keep default behavior backward compatible when these fields are omitted.
 - Expose matching CLI overrides for `autotuneai arm optimize`.
+- Persist the final effective config after CLI overrides are applied.
 - Add fake-executable tests for config parsing, affinity filtering, and capped
   candidate plans.
 
@@ -818,3 +838,29 @@ This hardening addresses the Phase 3A.1 limitation where the real-target smoke
 run requested a very small candidate set but the implementation still planned
 five candidates on a 2-vCPU target. It does not retroactively change the
 recorded Phase 3A.1 evidence.
+
+## Phase 3B Plan: Server Inference and Deterministic Quality Validation
+
+Status: planned. Phase 3B moves ArmTune beyond synthetic throughput benchmark
+search by validating a real AI workload's latency and deterministic output
+quality on the Arm target.
+
+Allowed scope:
+
+- `llama-server` lifecycle management on the target.
+- Local-on-target HTTP client for benchmark traffic.
+- Streaming time-to-first-token measurement.
+- End-to-end latency measurement.
+- Structured BootTrace output for startup and request phases.
+- Deterministic quality validation for fixed prompts and expected structured
+  output.
+- Combined performance and quality eligibility result.
+
+Out of scope:
+
+- Thread-search expansion beyond the Phase 3A controls.
+- Build-profile comparison.
+- KleidiAI claims without verified execution evidence.
+- Arm Performix.
+- Performance Passport generation.
+- Formal competition benchmark conclusions.

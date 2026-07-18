@@ -121,14 +121,27 @@ should be labeled unverified.
 - Phase 3A.1 used a user-provisioned burstable AWS Graviton2 development
   instance. The results are pipeline-validation measurements, not stable
   production performance or formal competition benchmark results.
-- The Phase 3A.1 validation run predates Phase 3B candidate controls. On the
+- The Phase 3A.1 validation run predates Phase 3A.2 candidate controls. On the
   2-vCPU validation target, that historical run planned five candidates rather
   than the desired three-or-fewer smoke profile.
-- Phase 3B adds `search.max_candidates` and `search.affinity_modes` for future
+- Phase 3A.2 adds `search.max_candidates` and `search.affinity_modes` for
   bounded smoke profiles, but no new real-target benchmark evidence has been
   collected with those controls yet.
+- Phase 3A.2 `max_candidates` limits unique tested candidate configurations,
+  not warm-up runs, paired-baseline insertions, confirmation runs, or process
+  execution count.
 - Phase 3A does not implement `llama-server`, HTTP, streaming, TTFT, BootTrace,
   build-profile comparison, KleidiAI claims, Performix, Performance Passport
   generation, cloud provisioning, or automatic instance control.
 - Phase 3A defaults are intended to make the search protocol testable and
   auditable, not to establish final stable production performance.
+
+## Phase 3B Planned Limitations
+
+- Phase 3B is reserved for `llama-server` lifecycle management,
+  local-on-target HTTP measurement, streaming TTFT, end-to-end latency,
+  structured BootTrace output, and deterministic quality validation.
+- Phase 3B will be required before ArmTune can reject a faster candidate because
+  real generation output is invalid, malformed, or semantically unacceptable.
+- Phase 3A.2 candidate-count and affinity guardrails must not be described as
+  Phase 3B server-inference or quality-gate validation.

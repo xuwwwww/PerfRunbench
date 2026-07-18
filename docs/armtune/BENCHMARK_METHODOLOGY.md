@@ -212,17 +212,28 @@ generated from visible and allowed CPUs, deduplicated, and validated. Optional
 proves support for those flags. Unsupported flags fail validation rather than
 being used silently.
 
-Phase 3B adds optional search-space controls for bounded validation profiles:
+Phase 3A.2 adds optional search-space controls for bounded validation
+profiles:
 
-- `search.max_candidates` caps the total candidate plan, including the
-  baseline.
+- `search.max_candidates` caps unique tested candidate configurations,
+  including the retained baseline.
 - `search.affinity_modes` allowlists generated affinity candidates.
 - Defaults preserve the Phase 3A candidate generation behavior when these
   fields are omitted.
 
-The cap is applied in deterministic stage order. This keeps smoke runs small
-without changing the benchmark operation, parser, artifact preservation,
-statistics, or recommendation semantics.
+The cap is applied in deterministic stage order and does not count warm-up
+runs, paired-baseline insertions, confirmation runs, or total process execution
+count. Stages that still had raw candidates but could not be evaluated because
+the cap was exhausted are recorded as
+`skipped_due_to_candidate_limit`.
+
+Unknown affinity modes are configuration errors. Repeated affinity modes are
+deduplicated. `numa-local` is generated only when topology makes it meaningful,
+and `reserve-one-core` is not generated when only one visible CPU exists. CLI
+overrides take precedence over config-file values, and the final effective
+config is preserved with the run artifacts. This keeps smoke runs small without
+changing the benchmark operation, parser, artifact preservation, statistics, or
+quality-gate boundary.
 
 The search is staged:
 
@@ -233,11 +244,17 @@ The search is staged:
 
 Phase 3A recommendations are performance-only and include
 `quality_gate_status: not_evaluated`. ArmTune must not call a candidate
-generally optimal. The allowed wording is:
+generally optimal. The allowed wording is bounded by the actual tested
+configuration count, for example:
 
-> Best observed performance candidate under the tested llama-bench
-> configuration.
+> Best observed performance candidate among 4 tested configurations.
 
 Candidates that failed required trials, missed required metrics, are within the
 configured noise band, or differ in model, binary, target, token counts, or
 protocol are not recommended as improvements.
+
+Phase 3B is reserved for `llama-server` lifecycle validation, local-on-target
+HTTP measurement, streaming time-to-first-token, end-to-end latency, structured
+BootTrace output, deterministic quality validation, and combined performance
+plus quality eligibility. Phase 3A.2 candidate controls are not Phase 3B
+quality evidence.
