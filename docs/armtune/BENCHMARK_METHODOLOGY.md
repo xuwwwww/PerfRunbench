@@ -258,3 +258,64 @@ HTTP measurement, streaming time-to-first-token, end-to-end latency, structured
 BootTrace output, deterministic quality validation, and combined performance
 plus quality eligibility. Phase 3A.2 candidate controls are not Phase 3B
 quality evidence.
+
+## Phase 3B.1 llama-server Method
+
+Phase 3B.1 uses `llama-server` to validate server lifecycle, target-local HTTP
+request timing, streaming parsing, generated-output preservation, and cleanup.
+It does not run candidate search or deterministic quality scoring.
+
+The server is inspected before startup. ArmTune preserves raw `--version` and
+`--help` stdout/stderr, records binary SHA-256 and size, extracts supported
+flags from help output, and records unknown or unverified runtime/build fields
+as `unknown` rather than guessing.
+
+The server binds only to loopback. Public bind addresses are configuration
+errors in Phase 3B.1. The HTTP client runs on the target and connects only to:
+
+```text
+http://127.0.0.1:<selected-port>
+```
+
+TTFT is defined as:
+
+```text
+first valid generated content timestamp - request start timestamp
+```
+
+The following do not count as first generated content:
+
+- HTTP response headers
+- empty SSE events
+- role-only deltas
+- metadata-only events
+- keepalive events
+- malformed events
+
+End-to-end latency is defined as:
+
+```text
+response completion timestamp - request start timestamp
+```
+
+Runtime timing fields, when present, are preserved separately from
+client-observed timings. ArmTune does not estimate unavailable token counts
+from character count.
+
+The default Phase 3B.1 request protocol is sequential:
+
+```text
+warmup_requests: 1 per prompt
+measured repetitions: 3 per prompt
+concurrency: unsupported
+```
+
+Warm-up request artifacts are preserved but excluded from measured latency
+distributions. Failed requests remain failed request records; they are not
+converted into zero latency.
+
+The prompt suite is public and synthetic. Phase 3B.1 validates only basic
+execution properties: request completed, generated content is nonempty,
+streaming parsed, and no server error occurred. It records
+`quality_gate_status: not_evaluated` and must not call nonempty output a
+quality pass.

@@ -9,7 +9,17 @@ from typing import Any
 from autotune.arm_tune import SCHEMA_VERSION
 from autotune.arm_tune.config import AFFINITY_MODE_CHOICES, default_local_target, load_benchmark_config, load_optimize_config, load_target_spec
 from autotune.arm_tune.errors import ArmTuneError
-from autotune.arm_tune.schemas import ArmBenchmarkResult, DoctorStatuses, LlamaBenchParseResult, ProductionValidation, StatusCheck, TargetSpec
+from autotune.arm_tune.schemas import (
+    ArmBenchmarkResult,
+    DoctorStatuses,
+    GenerationMetricDistribution,
+    LlamaBenchParseResult,
+    LlamaServerBenchmarkResult,
+    LlamaServerJobSpec,
+    ProductionValidation,
+    StatusCheck,
+    TargetSpec,
+)
 from autotune.arm_tune.search.runner import SearchConfig, run_search
 from autotune.arm_tune.targets.local import LocalArmTarget
 from autotune.arm_tune.targets.ssh import SshArmTarget
@@ -45,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_host.add_argument("--target-config")
     inspect_host.set_defaults(handler=_cmd_inspect_host)
 
-    benchmark = subparsers.add_parser("benchmark", help="Run a fixed ArmTune llama-bench benchmark job.")
+    benchmark = subparsers.add_parser("benchmark", help="Run a fixed ArmTune benchmark job.")
     benchmark.add_argument("--config", required=True)
     benchmark.set_defaults(handler=_cmd_benchmark)
 
@@ -141,7 +151,8 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
         ["autotuneai", "arm", "benchmark", "--config", args.config],
         ResourceBudget(enforce=False),
     )
-    benchmark_dir = run_dir / "armtune" / "benchmark"
+    is_server = isinstance(job, LlamaServerJobSpec)
+    benchmark_dir = run_dir / "armtune" / ("server_benchmark" if is_server else "benchmark")
     benchmark_dir.mkdir(parents=True, exist_ok=True)
     target = _target_from_spec(spec)
     job = replace(
@@ -152,7 +163,10 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
         target_run_directory=str(benchmark_dir),
     )
     try:
-        result = target.run_benchmark(job, benchmark_dir)
+        if isinstance(job, LlamaServerJobSpec):
+            result = target.run_server_benchmark(job, benchmark_dir)
+        else:
+            result = target.run_benchmark(job, benchmark_dir)
     except ArmTuneError:
         finish_run(run_dir, manifest, "failed", 2)
         raise
@@ -160,9 +174,9 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
         finish_run(run_dir, manifest, "failed", 3)
         print(f"ArmTune runtime error: {exc}", file=sys.stderr)
         return 3
-    exit_code = _benchmark_exit_code(result)
+    exit_code = _server_benchmark_exit_code(result) if isinstance(result, LlamaServerBenchmarkResult) else _benchmark_exit_code(result)
     finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
-    print(_benchmark_summary(result))
+    print(_server_benchmark_summary(result) if isinstance(result, LlamaServerBenchmarkResult) else _benchmark_summary(result))
     return exit_code
 
 
@@ -329,6 +343,22 @@ def _benchmark_exit_code(result: ArmBenchmarkResult) -> int:
     return 1
 
 
+def _server_benchmark_exit_code(result: LlamaServerBenchmarkResult) -> int:
+    if result.cleanup_status == "failed":
+        return 4
+    if result.validation_status != "passed" or result.inspection_status == "failed":
+        return 2
+    if (
+        result.startup_status == "ready"
+        and result.readiness_status == "ready"
+        and result.request_status == "completed"
+        and result.stream_parse_status == "parsed"
+        and result.benchmark_status == "passed"
+    ):
+        return 0
+    return 1
+
+
 def _benchmark_summary(result: ArmBenchmarkResult) -> str:
     prefill, decode = _summary_metrics(result.trial.parse_result if result.trial else None)
     binary_hash = result.executable.sha256[:12] if result.executable and result.executable.sha256 else "Not available"
@@ -347,6 +377,34 @@ def _benchmark_summary(result: ArmBenchmarkResult) -> str:
         f"parse_status: {result.parse_status}",
         f"prefill_tokens_per_second: {_format_metric(prefill)}",
         f"decode_tokens_per_second: {_format_metric(decode)}",
+        f"artifact_directory: {result.artifact_directory}",
+    ]
+    return "\n".join(lines)
+
+
+def _server_benchmark_summary(result: LlamaServerBenchmarkResult) -> str:
+    architecture = result.host.architecture.normalized_machine
+    measured = [request for request in result.requests if request.phase == "measured"]
+    failed = [
+        request
+        for request in measured
+        if request.request_status != "completed" or request.stream_parse_status != "parsed"
+    ]
+    ttft = result.distributions.get("ttft_ms")
+    e2e = result.distributions.get("end_to_end_latency_ms")
+    lines = [
+        f"run_id: {result.run_id}",
+        f"target_type: {result.target_type}",
+        f"target_architecture: {architecture}",
+        f"result_origin: {result.result_origin}",
+        f"server_startup_status: {result.startup_status}",
+        f"server_readiness_status: {result.readiness_status}",
+        f"measured_request_count: {len(measured)}",
+        f"failed_request_count: {len(failed)}",
+        f"median_ttft_ms: {_format_distribution(ttft)}",
+        f"median_end_to_end_latency_ms: {_format_distribution(e2e)}",
+        f"cleanup_status: {result.cleanup_status}",
+        f"quality_gate_status: {result.quality_gate_status}",
         f"artifact_directory: {result.artifact_directory}",
     ]
     return "\n".join(lines)
@@ -385,3 +443,9 @@ def _summary_metrics(parse_result: LlamaBenchParseResult | None) -> tuple[float 
 
 def _format_metric(value: float | None) -> str:
     return "Not available" if value is None else f"{value:.3f}"
+
+
+def _format_distribution(distribution: GenerationMetricDistribution | None) -> str:
+    if distribution is None or distribution.median is None:
+        return "Not available"
+    return f"{distribution.median:.3f}"

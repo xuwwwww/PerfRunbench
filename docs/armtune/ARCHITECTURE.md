@@ -132,6 +132,20 @@ ci/
 report/
 ```
 
+Phase 3B.1 introduces a narrow runtime adapter boundary:
+
+```text
+autotune/arm_tune/adapters/
+  base.py
+  llama_bench.py
+  llama_server.py
+```
+
+The adapter boundary is intentionally thin in Phase 3B.1. Existing
+`llama-bench` execution and search code remains backward compatible, while the
+new `llama-server` vertical slice uses a separate worker operation and artifact
+layout.
+
 ## PerfRunbench Reuse
 
 Reuse existing PerfRunbench infrastructure where sound:
@@ -389,3 +403,50 @@ Recommendation semantics are conservative:
 - inconclusive candidates remain inconclusive within the configured noise band
 - incompatible model, binary, target, token count, or protocol evidence prevents
   recommendation
+
+## Phase 3B.1 llama-server Benchmark Foundation
+
+Phase 3B.1 extends `autotuneai arm benchmark --config <path>` with a validated
+runtime mode:
+
+```json
+{
+  "runtime": {
+    "adapter": "llama_server"
+  },
+  "workload": {
+    "mode": "server"
+  }
+}
+```
+
+The worker operation is allowlisted as:
+
+```text
+benchmark.llama_server
+```
+
+The target owns server execution and request timing. The controller does not
+send measured HTTP traffic from Windows or another non-target host. The worker
+binds `llama-server` only to loopback, selects a free local port when
+configured with `port: auto`, waits for readiness before measured requests,
+preserves raw server stdout/stderr, records request stream artifacts, and
+cleans up the process before returning.
+
+Phase 3B.1 records:
+
+- binary and model manifests
+- raw `--version` and `--help` inspection output
+- supported server flags detected from help output
+- server configuration and selected loopback port
+- lifecycle states for startup, readiness, cleanup, and port release
+- warm-up and measured request artifacts
+- streaming event logs
+- generated output text
+- TTFT and end-to-end latency from target-local client timestamps
+- `quality_gate_status: not_evaluated`
+
+Phase 3B.1 does not modify the Phase 3A search engine to use `llama-server`.
+It does not perform deterministic quality scoring, BootTrace validation,
+KleidiAI verification, build-profile comparison, Performix integration,
+Performance Passport generation, cloud provisioning, or real AWS execution.

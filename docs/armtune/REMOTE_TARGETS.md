@@ -139,3 +139,41 @@ preserving the downloaded files for debugging.
 The native Arm64 GitHub workflow does not exercise an external SSH server.
 Remote-target production validation with a real SSH host remains a later
 phase.
+
+## Phase 3B.1 Server Benchmark Protocol
+
+Phase 3B.1 adds the allowlisted worker operation:
+
+```text
+benchmark.llama_server
+```
+
+The controller uploads a versioned `server_job.json` and invokes the same fixed
+worker entry point:
+
+```text
+python3 -m autotune.cli arm worker --job-spec <remote-json-path> --run-dir <remote-run-dir>
+```
+
+The job spec must describe executable, model, server, workload, and artifact
+settings. It must not contain arbitrary remote shell strings or user-controlled
+extra server flags.
+
+The remote worker must bind `llama-server` only to loopback:
+
+```text
+127.0.0.1
+```
+
+Phase 3B.1 rejects public bind addresses such as `0.0.0.0`; it does not open
+EC2 security-group ports and does not expose the server to external networks.
+
+The HTTP benchmark client runs on the target and connects only to:
+
+```text
+http://127.0.0.1:<selected-port>
+```
+
+The controller downloads the completed `server_benchmark` artifact directory
+and validates `artifact_manifest.json` using the same digest trust boundary as
+the `llama-bench` benchmark path.

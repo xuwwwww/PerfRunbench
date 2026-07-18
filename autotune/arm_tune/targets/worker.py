@@ -7,8 +7,9 @@ from pathlib import Path
 
 from autotune.arm_tune.errors import ArmTuneError, ArmTuneProtocolError
 from autotune.arm_tune.benchmark.llama_bench import BENCHMARK_OPERATION, run_llama_bench_worker
+from autotune.arm_tune.benchmark.llama_server import SERVER_BENCHMARK_OPERATION, run_llama_server_worker
 from autotune.arm_tune.platform.environment import collect_host_inspection
-from autotune.arm_tune.schemas import LlamaBenchJobSpec, RemotePrerequisiteResult, WorkerResult
+from autotune.arm_tune.schemas import LlamaBenchJobSpec, LlamaServerJobSpec, RemotePrerequisiteResult, WorkerResult
 from autotune.arm_tune.targets.protocol import atomic_write_json, read_json, validate_worker_job
 
 
@@ -58,6 +59,10 @@ def run_worker(job_spec_path: str | Path, run_dir: str | Path) -> WorkerResult:
     if operation == BENCHMARK_OPERATION:
         benchmark_job = LlamaBenchJobSpec.from_dict(job)
         result = run_llama_bench_worker(benchmark_job, target_dir)
+        return WorkerResult(operation=operation, status="ok", result=result.to_dict())
+    if operation == SERVER_BENCHMARK_OPERATION:
+        server_job = LlamaServerJobSpec.from_dict(job)
+        result = run_llama_server_worker(server_job, target_dir)
         return WorkerResult(operation=operation, status="ok", result=result.to_dict())
     raise ArmTuneProtocolError(f"unsupported worker operation: {operation}")
 

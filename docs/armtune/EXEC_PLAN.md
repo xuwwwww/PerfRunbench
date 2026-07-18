@@ -841,9 +841,9 @@ recorded Phase 3A.1 evidence.
 
 ## Phase 3B.1 Plan: llama-server Lifecycle and Generation Metrics
 
-Status: planned. Phase 3B.1 introduces a `llama-server` benchmark foundation
-without changing the Phase 3A `llama-bench` search engine and without adding
-quality scoring.
+Status: implemented as a fake-tested foundation. Phase 3B.1 introduces a
+`llama-server` benchmark foundation without changing the Phase 3A
+`llama-bench` search engine and without adding quality scoring.
 
 Allowed scope:
 
@@ -892,6 +892,10 @@ Out of scope:
 - Arm Performix.
 - Performance Passport generation.
 - Formal competition benchmark conclusions.
+
+Implementation validation is local/fake only in this checkpoint. No real AWS,
+external SSH, real model, or real `llama-server` performance benchmark was
+executed for Phase 3B.1.
 
 Phase 3B.1 artifact layout:
 

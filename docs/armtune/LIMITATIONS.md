@@ -145,3 +145,18 @@ should be labeled unverified.
   real generation output is invalid, malformed, or semantically unacceptable.
 - Phase 3A.2 candidate-count and affinity guardrails must not be described as
   Phase 3B server-inference or quality-gate validation.
+
+## Phase 3B.1 Limitations
+
+- Phase 3B.1 implements a fake-tested `llama-server` benchmark foundation only.
+- Phase 3B.1 does not provide real AWS or external SSH server evidence.
+- Phase 3B.1 does not download models, open public server ports, provision
+  cloud resources, or change EC2 security groups.
+- Phase 3B.1 request timing is target-local, but fake-server timings are
+  fixture data and must not be reported as Arm performance.
+- Phase 3B.1 records `quality_gate_status: not_evaluated`; successful nonempty
+  generated output is not a semantic quality pass.
+- Phase 3B.1 does not add BootTrace validation, deterministic semantic scoring,
+  `llama-server` candidate search, performance recommendation, build-profile
+  comparison, KleidiAI verification, Performix, or Performance Passport
+  generation.

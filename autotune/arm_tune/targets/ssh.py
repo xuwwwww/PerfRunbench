@@ -8,12 +8,15 @@ from pathlib import Path
 
 from autotune.arm_tune.benchmark.artifact_validation import apply_artifact_validation, validate_artifact_manifest
 from autotune.arm_tune.benchmark.llama_bench import ensure_benchmark_operation
+from autotune.arm_tune.benchmark.llama_server import apply_server_artifact_validation, ensure_server_benchmark_operation, finalize_server_result_artifacts
 from autotune.arm_tune.errors import TargetExecutionError
 from autotune.arm_tune.schemas import (
     ArmBenchmarkResult,
     CommandResult,
     HostInspectionResult,
     LlamaBenchJobSpec,
+    LlamaServerBenchmarkResult,
+    LlamaServerJobSpec,
     ProductionValidation,
     RemotePrerequisiteResult,
     TargetSpec,
@@ -104,6 +107,42 @@ class SshArmTarget(ArmTuneTarget):
         validated = apply_artifact_validation(benchmark_result, validation, local_dir)
         atomic_write_json(local_dir / "benchmark_result.json", validated.to_dict())
         return validated
+
+    def run_server_benchmark(self, job: LlamaServerJobSpec, local_artifact_dir: str | Path) -> LlamaServerBenchmarkResult:
+        local_dir = Path(local_artifact_dir)
+        local_dir.mkdir(parents=True, exist_ok=True)
+        remote_run_dir = safe_remote_path(f"{self.spec.remote_workdir.rstrip('/')}/{job.run_id}/armtune/server_benchmark")
+        remote_job = safe_remote_path(f"{remote_run_dir}/server_job.json")
+        remote_job_spec = replace(
+            job,
+            target_type="ssh",
+            target_run_directory=remote_run_dir,
+            remote_module=self.spec.remote_module,
+        )
+        ensure_server_benchmark_operation(remote_job_spec)
+        with tempfile.TemporaryDirectory(prefix="armtune-ssh-server-benchmark-") as temp_dir:
+            local_job = Path(temp_dir) / "server_job.json"
+            atomic_write_json(local_job, remote_job_spec.to_dict())
+            self._run_checked(self.build_ssh_command(["mkdir", "-p", remote_run_dir]), timeout_seconds=self.spec.connect_timeout_seconds)
+            self._run_checked(self.build_scp_upload_command(local_job, remote_job), timeout_seconds=self.spec.connect_timeout_seconds)
+            result = self._run_checked(
+                self.build_worker_command(remote_job, remote_run_dir),
+                timeout_seconds=self.spec.command_timeout_seconds,
+            )
+            self._run_checked(
+                self.build_scp_download_command(f"{remote_run_dir}/.", local_dir),
+                timeout_seconds=self.spec.command_timeout_seconds,
+            )
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise TargetExecutionError("remote server benchmark worker did not return valid JSON") from exc
+        if payload.get("status") != "ok":
+            raise TargetExecutionError(f"remote server benchmark worker failed: {payload.get('error')}")
+        benchmark_result = LlamaServerBenchmarkResult.from_dict(payload["result"])
+        validation = validate_artifact_manifest(local_dir)
+        validated = apply_server_artifact_validation(benchmark_result, validation, local_dir)
+        return finalize_server_result_artifacts(local_dir, validated)
 
     def check_prerequisites(self) -> RemotePrerequisiteResult:
         self._run_checked(self.build_python_version_command(), timeout_seconds=self.spec.connect_timeout_seconds)

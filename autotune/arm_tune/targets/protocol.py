@@ -11,8 +11,8 @@ from autotune.arm_tune import SCHEMA_VERSION
 from autotune.arm_tune.errors import ArmTuneProtocolError
 
 
-ALLOWED_WORKER_OPERATIONS = {"benchmark.llama_bench", "check_prerequisites", "inspect_host"}
-WORKER_JOB_KEYS = {
+ALLOWED_WORKER_OPERATIONS = {"benchmark.llama_bench", "benchmark.llama_server", "check_prerequisites", "inspect_host"}
+LLAMA_BENCH_WORKER_JOB_KEYS = {
     "schema_version",
     "protocol_version",
     "operation",
@@ -21,6 +21,22 @@ WORKER_JOB_KEYS = {
     "executable",
     "model",
     "benchmark",
+    "artifacts",
+    "target_type",
+    "remote_module",
+    "result_origin",
+    "created_at_utc",
+}
+LLAMA_SERVER_WORKER_JOB_KEYS = {
+    "schema_version",
+    "protocol_version",
+    "operation",
+    "run_id",
+    "target_run_directory",
+    "executable",
+    "model",
+    "server",
+    "workload",
     "artifacts",
     "target_type",
     "remote_module",
@@ -42,6 +58,35 @@ BENCHMARK_KEYS = {
     "affinity_mode",
 }
 ARTIFACT_KEYS = {"schema_version", "preserve_raw_stdout", "preserve_raw_stderr"}
+SERVER_KEYS = {
+    "schema_version",
+    "host",
+    "port",
+    "startup_timeout_seconds",
+    "request_timeout_seconds",
+    "shutdown_timeout_seconds",
+    "threads",
+    "context_size",
+    "batch_size",
+    "seed",
+    "temperature",
+}
+SERVER_WORKLOAD_KEYS = {
+    "schema_version",
+    "prompt_suite_path",
+    "predict_tokens",
+    "repetitions",
+    "warmup_requests",
+    "streaming",
+    "cooldown_seconds",
+}
+SERVER_ARTIFACT_KEYS = {
+    "schema_version",
+    "preserve_server_stdout",
+    "preserve_server_stderr",
+    "preserve_request_stream",
+    "preserve_generated_output",
+}
 ADDITIONAL_SUPPORTED_OPTION_KEYS = {"threads_batch", "batch_size", "ubatch_size"}
 REMOTE_PATH_PATTERN = re.compile(r"^[A-Za-z0-9._~/:@+-]+$")
 PYTHON_MODULE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
@@ -50,11 +95,16 @@ PYTHON_MODULE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0
 def validate_worker_job(payload: dict[str, Any]) -> None:
     if payload.get("schema_version") != SCHEMA_VERSION:
         raise ArmTuneProtocolError(f"unsupported schema_version: {payload.get('schema_version')!r}")
-    allowed_keys = WORKER_JOB_KEYS if payload.get("operation") == "benchmark.llama_bench" else SIMPLE_WORKER_JOB_KEYS
+    operation = payload.get("operation")
+    if operation == "benchmark.llama_bench":
+        allowed_keys = LLAMA_BENCH_WORKER_JOB_KEYS
+    elif operation == "benchmark.llama_server":
+        allowed_keys = LLAMA_SERVER_WORKER_JOB_KEYS
+    else:
+        allowed_keys = SIMPLE_WORKER_JOB_KEYS
     unknown = set(payload) - allowed_keys
     if unknown:
         raise ArmTuneProtocolError(f"unsupported worker job field(s): {sorted(unknown)}")
-    operation = payload.get("operation")
     if operation not in ALLOWED_WORKER_OPERATIONS:
         raise ArmTuneProtocolError(f"unsupported worker operation: {operation!r}")
     target_type = payload.get("target_type")
@@ -65,6 +115,8 @@ def validate_worker_job(payload: dict[str, Any]) -> None:
         raise ArmTuneProtocolError("remote_module must be a Python module path")
     if operation == "benchmark.llama_bench":
         _validate_benchmark_job(payload)
+    if operation == "benchmark.llama_server":
+        _validate_server_benchmark_job(payload)
 
 
 def atomic_write_json(path: str | Path, payload: dict[str, Any]) -> Path:
@@ -155,6 +207,54 @@ def _validate_benchmark_job(payload: dict[str, Any]) -> None:
         raise ArmTuneProtocolError("benchmark.affinity_mode is unsupported")
 
 
+def _validate_server_benchmark_job(payload: dict[str, Any]) -> None:
+    if payload.get("protocol_version") != "1.0":
+        raise ArmTuneProtocolError(f"unsupported protocol_version: {payload.get('protocol_version')!r}")
+    for key in ["run_id", "target_run_directory", "executable", "model", "server", "workload", "artifacts"]:
+        if key not in payload:
+            raise ArmTuneProtocolError(f"server benchmark job missing required field: {key}")
+    if payload.get("result_origin", "unverified") not in {"measured", "test_fixture", "unverified"}:
+        raise ArmTuneProtocolError("result_origin must be 'measured', 'test_fixture', or 'unverified'")
+    _validate_object(payload["executable"], EXECUTABLE_KEYS, "executable")
+    _validate_object(payload["model"], MODEL_KEYS, "model")
+    _validate_object(payload["server"], SERVER_KEYS, "server")
+    _validate_object(payload["workload"], SERVER_WORKLOAD_KEYS, "workload")
+    _validate_object(payload["artifacts"], SERVER_ARTIFACT_KEYS, "artifacts")
+    if not _is_absolute_target_path(str(payload["executable"].get("path", ""))):
+        raise ArmTuneProtocolError("executable.path must be absolute on the target")
+    if not _is_absolute_target_path(str(payload["model"].get("path", ""))):
+        raise ArmTuneProtocolError("model.path must be absolute on the target")
+    server = payload["server"]
+    host = str(server.get("host", "127.0.0.1"))
+    if host not in {"127.0.0.1", "localhost"}:
+        raise ArmTuneProtocolError("server.host must be loopback-only")
+    port = server.get("port", "auto")
+    if port != "auto":
+        _positive_int(port, "server.port")
+        if int(port) > 65535:
+            raise ArmTuneProtocolError("server.port must be between 1 and 65535")
+    for key in ["threads", "context_size"]:
+        _positive_int(server.get(key), f"server.{key}")
+    for key in ["startup_timeout_seconds", "request_timeout_seconds", "shutdown_timeout_seconds"]:
+        _positive_float(server.get(key), f"server.{key}")
+    if server.get("batch_size") is not None:
+        _positive_int(server.get("batch_size"), "server.batch_size")
+    if isinstance(server.get("seed"), bool) or not isinstance(server.get("seed"), int):
+        raise ArmTuneProtocolError("server.seed must be an integer")
+    temperature = server.get("temperature")
+    if isinstance(temperature, bool) or not isinstance(temperature, (int, float)) or float(temperature) < 0:
+        raise ArmTuneProtocolError("server.temperature must be a non-negative number")
+    workload = payload["workload"]
+    if not _is_absolute_target_path(str(workload.get("prompt_suite_path", ""))):
+        raise ArmTuneProtocolError("workload.prompt_suite_path must be absolute on the target")
+    for key in ["predict_tokens", "repetitions"]:
+        _positive_int(workload.get(key), f"workload.{key}")
+    _non_negative_int(workload.get("warmup_requests"), "workload.warmup_requests")
+    _non_negative_float(workload.get("cooldown_seconds"), "workload.cooldown_seconds")
+    if workload.get("streaming") is not True:
+        raise ArmTuneProtocolError("workload.streaming must be true")
+
+
 def _validate_object(value: Any, allowed: set[str], label: str) -> None:
     if not isinstance(value, dict):
         raise ArmTuneProtocolError(f"{label} must be an object")
@@ -176,6 +276,15 @@ def _positive_int(value: Any, label: str) -> None:
         raise ArmTuneProtocolError(f"{label} must be >= 1")
 
 
+def _non_negative_int(value: Any, label: str) -> None:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ArmTuneProtocolError(f"{label} must be an integer") from exc
+    if parsed < 0:
+        raise ArmTuneProtocolError(f"{label} must be >= 0")
+
+
 def _positive_float(value: Any, label: str) -> None:
     try:
         parsed = float(value)
@@ -183,6 +292,15 @@ def _positive_float(value: Any, label: str) -> None:
         raise ArmTuneProtocolError(f"{label} must be a number") from exc
     if parsed <= 0:
         raise ArmTuneProtocolError(f"{label} must be > 0")
+
+
+def _non_negative_float(value: Any, label: str) -> None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ArmTuneProtocolError(f"{label} must be a number") from exc
+    if parsed < 0:
+        raise ArmTuneProtocolError(f"{label} must be >= 0")
 
 
 def _optional_cpu_affinity(value: Any, label: str) -> None:

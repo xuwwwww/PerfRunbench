@@ -320,6 +320,141 @@ class LlamaBenchJobSpec:
 
 
 @dataclass(frozen=True)
+class LlamaServerSettings:
+    host: str = "127.0.0.1"
+    port: int | str = "auto"
+    startup_timeout_seconds: float = 30.0
+    request_timeout_seconds: float = 30.0
+    shutdown_timeout_seconds: float = 5.0
+    threads: int = 1
+    context_size: int = 512
+    batch_size: int | None = None
+    seed: int = 42
+    temperature: float = 0.0
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaServerWorkloadSpec:
+    prompt_suite_path: str
+    predict_tokens: int
+    repetitions: int
+    warmup_requests: int = 1
+    streaming: bool = True
+    cooldown_seconds: float = 0.0
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaServerArtifactsSpec:
+    preserve_server_stdout: bool = True
+    preserve_server_stderr: bool = True
+    preserve_request_stream: bool = True
+    preserve_generated_output: bool = True
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class PromptSuiteEntry:
+    prompt_id: str
+    prompt: str
+    expected_response_mode: str
+    max_predict_tokens: int | None = None
+    deterministic_settings: dict[str, Any] = field(default_factory=dict)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaServerJobSpec:
+    protocol_version: str
+    operation: str
+    run_id: str
+    target_run_directory: str
+    executable: BenchmarkExecutableSpec
+    model: BenchmarkModelSpec
+    server: LlamaServerSettings
+    workload: LlamaServerWorkloadSpec
+    artifacts: LlamaServerArtifactsSpec = field(default_factory=LlamaServerArtifactsSpec)
+    target_type: str = "local"
+    remote_module: str = "autotune.cli"
+    result_origin: str = "measured"
+    created_at_utc: str = field(default_factory=utc_now)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "LlamaServerJobSpec":
+        require_schema_version(payload)
+        executable_payload = _required_object(payload, "executable")
+        model_payload = _required_object(payload, "model")
+        server_payload = _required_object(payload, "server")
+        workload_payload = _required_object(payload, "workload")
+        artifacts_payload = payload.get("artifacts", {})
+        if not isinstance(artifacts_payload, dict):
+            raise ValueError("artifacts must be an object")
+        result_origin = _optional_str(payload.get("result_origin", "unverified"), "result_origin")
+        _ensure_enum(result_origin, RESULT_ORIGINS, "result_origin")
+        return cls(
+            protocol_version=_required_str(payload, "protocol_version"),
+            operation=_required_str(payload, "operation"),
+            run_id=_required_str(payload, "run_id"),
+            target_run_directory=_required_str(payload, "target_run_directory"),
+            executable=BenchmarkExecutableSpec(
+                path=_required_str(executable_payload, "path"),
+                expected_sha256=_optional_text(executable_payload.get("expected_sha256"), "expected_sha256"),
+            ),
+            model=BenchmarkModelSpec(
+                path=_required_str(model_payload, "path"),
+                expected_sha256=_optional_text(model_payload.get("expected_sha256"), "expected_sha256"),
+            ),
+            server=LlamaServerSettings(
+                host=_optional_str(server_payload.get("host", "127.0.0.1"), "server.host"),
+                port=_server_port(server_payload.get("port", "auto")),
+                startup_timeout_seconds=_required_float(server_payload, "startup_timeout_seconds"),
+                request_timeout_seconds=_required_float(server_payload, "request_timeout_seconds"),
+                shutdown_timeout_seconds=_required_float(server_payload, "shutdown_timeout_seconds"),
+                threads=_required_int(server_payload, "threads"),
+                context_size=_required_int(server_payload, "context_size"),
+                batch_size=_optional_int(server_payload.get("batch_size"), "server.batch_size"),
+                seed=_required_int(server_payload, "seed"),
+                temperature=_required_float(server_payload, "temperature"),
+            ),
+            workload=LlamaServerWorkloadSpec(
+                prompt_suite_path=_required_str(workload_payload, "prompt_suite_path"),
+                predict_tokens=_required_int(workload_payload, "predict_tokens"),
+                repetitions=_required_int(workload_payload, "repetitions"),
+                warmup_requests=_required_int(workload_payload, "warmup_requests"),
+                streaming=_optional_bool(workload_payload.get("streaming", True), "streaming"),
+                cooldown_seconds=_required_float(workload_payload, "cooldown_seconds"),
+            ),
+            artifacts=LlamaServerArtifactsSpec(
+                preserve_server_stdout=_optional_bool(artifacts_payload.get("preserve_server_stdout", True), "preserve_server_stdout"),
+                preserve_server_stderr=_optional_bool(artifacts_payload.get("preserve_server_stderr", True), "preserve_server_stderr"),
+                preserve_request_stream=_optional_bool(artifacts_payload.get("preserve_request_stream", True), "preserve_request_stream"),
+                preserve_generated_output=_optional_bool(artifacts_payload.get("preserve_generated_output", True), "preserve_generated_output"),
+            ),
+            target_type=_optional_str(payload.get("target_type", "local"), "target_type"),
+            remote_module=_optional_str(payload.get("remote_module", "autotune.cli"), "remote_module"),
+            result_origin=result_origin,
+            created_at_utc=_optional_str(payload.get("created_at_utc", utc_now()), "created_at_utc"),
+        )
+
+
+@dataclass(frozen=True)
 class BenchmarkFileManifest:
     path: str
     basename: str
@@ -460,6 +595,196 @@ class ArtifactValidationResult:
 
     def to_dict(self) -> dict[str, Any]:
         return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaServerInspection:
+    version_command: list[str]
+    help_command: list[str]
+    version_exit_code: int
+    help_exit_code: int
+    version_status: str
+    help_status: str
+    raw_version_stdout_path: str
+    raw_version_stderr_path: str
+    raw_help_stdout_path: str
+    raw_help_stderr_path: str
+    supported_flags: list[str] = field(default_factory=list)
+    source_commit: str = UNKNOWN
+    runtime_build: str = UNKNOWN
+    fixture_marker_detected: bool = False
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaServerConfiguration:
+    host: str
+    port: int
+    command: list[str]
+    supported_flags_used: dict[str, str] = field(default_factory=dict)
+    unsupported_optional_fields: list[str] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class ServerLifecycleResult:
+    process_started: bool = False
+    startup_status: str = "not_started"
+    readiness_status: str = "not_checked"
+    cleanup_status: str = "not_started"
+    cleanup_mode: str = "none"
+    port_released: bool = False
+    pid: int | None = None
+    selected_port: int | None = None
+    startup_duration_seconds: float | None = None
+    readiness_message: str = ""
+    cleanup_message: str = ""
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class StreamingEventRecord:
+    event_index: int
+    raw_line: str
+    event_type: str
+    content_delta: str = ""
+    finish_reason: str | None = None
+    valid_generated_content: bool = False
+    received_offset_ms: float | None = None
+    parse_status: str = "parsed"
+    message: str = ""
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class GenerationRequestResult:
+    prompt_id: str
+    phase: str
+    repetition_index: int
+    request_status: str
+    stream_parse_status: str
+    http_status: int | None
+    ttft_ms: float | None
+    end_to_end_latency_ms: float | None
+    generated_token_count: int | None
+    generated_text: str
+    finish_reason: str | None = None
+    response_headers: dict[str, str] = field(default_factory=dict)
+    error: str = ""
+    runtime_timings: dict[str, Any] = field(default_factory=dict)
+    request_artifact_dir: str = ""
+    stream_event_count: int = 0
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class GenerationMetricDistribution:
+    metric_name: str
+    valid_count: int
+    failed_count: int
+    median: float | None = None
+    p95: float | None = None
+    min: float | None = None
+    max: float | None = None
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class LlamaServerBenchmarkResult:
+    run_id: str
+    operation: str
+    target_type: str
+    result_origin: str
+    validation_status: str
+    inspection_status: str
+    startup_status: str
+    readiness_status: str
+    request_status: str
+    stream_parse_status: str
+    cleanup_status: str
+    benchmark_status: str
+    quality_gate_status: str
+    host: HostInfo
+    executable: BenchmarkFileManifest | None = None
+    model: BenchmarkFileManifest | None = None
+    inspection: LlamaServerInspection | None = None
+    server_configuration: LlamaServerConfiguration | None = None
+    lifecycle: ServerLifecycleResult | None = None
+    requests: list[GenerationRequestResult] = field(default_factory=list)
+    distributions: dict[str, GenerationMetricDistribution] = field(default_factory=dict)
+    artifacts: BenchmarkArtifactManifest = field(default_factory=BenchmarkArtifactManifest)
+    provenance: BenchmarkProvenance | None = None
+    artifact_validation: ArtifactValidationResult = field(default_factory=ArtifactValidationResult)
+    artifact_directory: str = ""
+    message: str = ""
+    created_at_utc: str = field(default_factory=utc_now)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "LlamaServerBenchmarkResult":
+        require_schema_version(payload)
+        host_payload = payload["host"]
+        host = HostInfo(
+            architecture=ArchitectureInfo(**_without_schema(host_payload["architecture"])),
+            cpu_identity=ArmCpuIdentity(**_without_schema(host_payload["cpu_identity"])),
+            host_capabilities=ArmHostCapabilities(**_without_schema(host_payload["host_capabilities"])),
+            topology=CpuTopology(**_without_schema(host_payload["topology"])),
+            os_release=host_payload.get("os_release", UNKNOWN),
+            cgroup_limits=host_payload.get("cgroup_limits", {}),
+        )
+        return cls(
+            run_id=_required_str(payload, "run_id"),
+            operation=_required_str(payload, "operation"),
+            target_type=_required_str(payload, "target_type"),
+            result_origin=_required_str(payload, "result_origin"),
+            validation_status=_required_str(payload, "validation_status"),
+            inspection_status=_required_str(payload, "inspection_status"),
+            startup_status=_required_str(payload, "startup_status"),
+            readiness_status=_required_str(payload, "readiness_status"),
+            request_status=_required_str(payload, "request_status"),
+            stream_parse_status=_required_str(payload, "stream_parse_status"),
+            cleanup_status=_required_str(payload, "cleanup_status"),
+            benchmark_status=_required_str(payload, "benchmark_status"),
+            quality_gate_status=_required_str(payload, "quality_gate_status"),
+            host=host,
+            executable=_file_manifest_from_payload(payload.get("executable")),
+            model=_file_manifest_from_payload(payload.get("model")),
+            inspection=_server_inspection_from_payload(payload.get("inspection")),
+            server_configuration=_server_configuration_from_payload(payload.get("server_configuration")),
+            lifecycle=_server_lifecycle_from_payload(payload.get("lifecycle")),
+            requests=[_generation_request_from_payload(item) for item in payload.get("requests", [])],
+            distributions={
+                str(key): GenerationMetricDistribution(**_without_schema(value))
+                for key, value in payload.get("distributions", {}).items()
+            },
+            artifacts=BenchmarkArtifactManifest(artifacts=payload.get("artifacts", {}).get("artifacts", {})),
+            provenance=_provenance_from_payload(payload.get("provenance")),
+            artifact_validation=_artifact_validation_from_payload(payload.get("artifact_validation")),
+            artifact_directory=str(payload.get("artifact_directory", "")),
+            message=str(payload.get("message", "")),
+            created_at_utc=str(payload.get("created_at_utc", utc_now())),
+        )
 
 
 @dataclass(frozen=True)
@@ -677,6 +1002,24 @@ def _required_int(payload: dict[str, Any], key: str) -> int:
     return value
 
 
+def _optional_int(value: Any, label: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{label} must be an integer when provided")
+    return value
+
+
+def _server_port(value: Any) -> int | str:
+    if value == "auto":
+        return "auto"
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("server.port must be 'auto' or an integer")
+    if value < 1 or value > 65535:
+        raise ValueError("server.port must be between 1 and 65535")
+    return value
+
+
 def _optional_int_list(value: Any, label: str) -> list[int] | None:
     if value is None:
         return None
@@ -767,3 +1110,25 @@ def _artifact_validation_from_payload(payload: dict[str, Any] | None) -> Artifac
         checked_artifacts=int(payload.get("checked_artifacts", 0)),
         issues=[ArtifactValidationIssue(**_without_schema(issue)) for issue in payload.get("issues", [])],
     )
+
+
+def _server_inspection_from_payload(payload: dict[str, Any] | None) -> LlamaServerInspection | None:
+    if payload is None:
+        return None
+    return LlamaServerInspection(**_without_schema(payload))
+
+
+def _server_configuration_from_payload(payload: dict[str, Any] | None) -> LlamaServerConfiguration | None:
+    if payload is None:
+        return None
+    return LlamaServerConfiguration(**_without_schema(payload))
+
+
+def _server_lifecycle_from_payload(payload: dict[str, Any] | None) -> ServerLifecycleResult | None:
+    if payload is None:
+        return None
+    return ServerLifecycleResult(**_without_schema(payload))
+
+
+def _generation_request_from_payload(payload: dict[str, Any]) -> GenerationRequestResult:
+    return GenerationRequestResult(**_without_schema(payload))

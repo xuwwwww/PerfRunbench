@@ -6,6 +6,7 @@ from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
 from autotune.arm_tune.benchmark.llama_bench import BENCHMARK_OPERATION, PROTOCOL_VERSION
+from autotune.arm_tune.benchmark.llama_server import SERVER_BENCHMARK_OPERATION
 from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.schemas import (
     BenchmarkArtifactsSpec,
@@ -13,6 +14,10 @@ from autotune.arm_tune.schemas import (
     BenchmarkModelSpec,
     LlamaBenchJobSpec,
     LlamaBenchSettings,
+    LlamaServerArtifactsSpec,
+    LlamaServerJobSpec,
+    LlamaServerSettings,
+    LlamaServerWorkloadSpec,
     TargetSpec,
 )
 from autotune.arm_tune.search.runner import SearchConfig
@@ -28,6 +33,17 @@ BENCHMARK_TOP_LEVEL_KEYS = {
     "executable",
     "model",
     "benchmark",
+    "artifacts",
+}
+SERVER_BENCHMARK_TOP_LEVEL_KEYS = {
+    "schema_version",
+    "target",
+    "result_origin",
+    "runtime",
+    "executable",
+    "model",
+    "server",
+    "workload",
     "artifacts",
 }
 OPTIMIZE_TOP_LEVEL_KEYS = BENCHMARK_TOP_LEVEL_KEYS | {"search"}
@@ -60,6 +76,34 @@ BENCHMARK_KEYS = {
     "affinity_mode",
 }
 ARTIFACT_KEYS = {"preserve_raw_stdout", "preserve_raw_stderr"}
+RUNTIME_KEYS = {"adapter"}
+SERVER_KEYS = {
+    "host",
+    "port",
+    "startup_timeout_seconds",
+    "request_timeout_seconds",
+    "shutdown_timeout_seconds",
+    "threads",
+    "context_size",
+    "batch_size",
+    "seed",
+    "temperature",
+}
+SERVER_WORKLOAD_KEYS = {
+    "mode",
+    "prompt_suite_path",
+    "predict_tokens",
+    "repetitions",
+    "warmup_requests",
+    "streaming",
+    "cooldown_seconds",
+}
+SERVER_ARTIFACT_KEYS = {
+    "preserve_server_stdout",
+    "preserve_server_stderr",
+    "preserve_request_stream",
+    "preserve_generated_output",
+}
 ADDITIONAL_SUPPORTED_OPTION_KEYS = {"threads_batch", "batch_size", "ubatch_size"}
 SEARCH_KEYS = {
     "warmup_runs",
@@ -82,7 +126,7 @@ def load_target_spec(path: str | Path) -> TargetSpec:
     return parse_target_spec(payload)
 
 
-def load_benchmark_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSpec]:
+def load_benchmark_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSpec | LlamaServerJobSpec]:
     payload = load_config(path)
     if not isinstance(payload, dict):
         raise ArmTuneConfigError("benchmark config must be an object")
@@ -96,7 +140,13 @@ def load_optimize_config(path: str | Path) -> tuple[TargetSpec, LlamaBenchJobSpe
     return parse_optimize_config(payload)
 
 
-def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBenchJobSpec]:
+def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBenchJobSpec | LlamaServerJobSpec]:
+    runtime_payload = payload.get("runtime")
+    workload_payload = payload.get("workload")
+    if isinstance(runtime_payload, dict) and runtime_payload.get("adapter") == "llama_server":
+        return parse_server_benchmark_config(payload)
+    if isinstance(workload_payload, dict) and workload_payload.get("mode") == "server":
+        return parse_server_benchmark_config(payload)
     unknown = set(payload) - BENCHMARK_TOP_LEVEL_KEYS
     if unknown:
         raise ArmTuneConfigError(f"unknown benchmark config field(s): {sorted(unknown)}")
@@ -159,6 +209,94 @@ def parse_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBe
         artifacts=BenchmarkArtifactsSpec(
             preserve_raw_stdout=bool(artifacts.get("preserve_raw_stdout", True)),
             preserve_raw_stderr=bool(artifacts.get("preserve_raw_stderr", True)),
+        ),
+        target_type=target.type,
+        remote_module=target.remote_module,
+        result_origin=result_origin,
+    )
+    return target, job
+
+
+def parse_server_benchmark_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaServerJobSpec]:
+    unknown = set(payload) - SERVER_BENCHMARK_TOP_LEVEL_KEYS
+    if unknown:
+        raise ArmTuneConfigError(f"unknown server benchmark config field(s): {sorted(unknown)}")
+    schema_version = str(payload.get("schema_version", SCHEMA_VERSION))
+    if schema_version != SCHEMA_VERSION:
+        raise ArmTuneConfigError(f"unsupported schema_version: {schema_version!r}")
+    raw_target = payload.get("target")
+    if not isinstance(raw_target, dict):
+        raise ArmTuneConfigError("target must be an object")
+    target = parse_target_spec({"schema_version": schema_version, "target": raw_target})
+    runtime = _object_field(payload, "runtime")
+    executable = _object_field(payload, "executable")
+    model = _object_field(payload, "model")
+    server = _object_field(payload, "server")
+    workload = _object_field(payload, "workload")
+    artifacts = payload.get("artifacts", {})
+    if artifacts is None:
+        artifacts = {}
+    if not isinstance(artifacts, dict):
+        raise ArmTuneConfigError("artifacts must be an object")
+    _reject_unknown(runtime, RUNTIME_KEYS, "runtime")
+    _reject_unknown(executable, EXECUTABLE_KEYS, "executable")
+    _reject_unknown(model, MODEL_KEYS, "model")
+    _reject_unknown(server, SERVER_KEYS, "server")
+    _reject_unknown(workload, SERVER_WORKLOAD_KEYS, "workload")
+    _reject_unknown(artifacts, SERVER_ARTIFACT_KEYS, "artifacts")
+    adapter = str(runtime.get("adapter", "")).strip()
+    if adapter != "llama_server":
+        raise ArmTuneConfigError("runtime.adapter must be 'llama_server' for server benchmark configs")
+    mode = str(workload.get("mode", "server")).strip()
+    if mode != "server":
+        raise ArmTuneConfigError("workload.mode must be 'server'")
+    host = str(server.get("host", "127.0.0.1")).strip()
+    if host not in {"127.0.0.1", "localhost"}:
+        raise ArmTuneConfigError("server.host must be loopback-only in Phase 3B.1")
+    streaming = bool(workload.get("streaming", True))
+    if not streaming:
+        raise ArmTuneConfigError("workload.streaming must be true in Phase 3B.1")
+    result_origin = str(payload.get("result_origin", "unverified"))
+    if result_origin not in {"measured", "test_fixture", "unverified"}:
+        raise ArmTuneConfigError("result_origin must be 'measured', 'test_fixture', or 'unverified'")
+    job = LlamaServerJobSpec(
+        protocol_version=PROTOCOL_VERSION,
+        operation=SERVER_BENCHMARK_OPERATION,
+        run_id="pending",
+        target_run_directory="pending",
+        executable=BenchmarkExecutableSpec(
+            path=_absolute_path_field(executable.get("path"), "executable.path"),
+            expected_sha256=_optional_sha256(executable.get("expected_sha256"), "executable.expected_sha256"),
+        ),
+        model=BenchmarkModelSpec(
+            path=_absolute_path_field(model.get("path"), "model.path"),
+            expected_sha256=_optional_sha256(model.get("expected_sha256"), "model.expected_sha256"),
+        ),
+        server=LlamaServerSettings(
+            host=host,
+            port=_server_port_field(server.get("port", "auto"), "server.port"),
+            startup_timeout_seconds=_positive_float(server.get("startup_timeout_seconds", 30.0), "server.startup_timeout_seconds"),
+            request_timeout_seconds=_positive_float(server.get("request_timeout_seconds", 30.0), "server.request_timeout_seconds"),
+            shutdown_timeout_seconds=_positive_float(server.get("shutdown_timeout_seconds", 5.0), "server.shutdown_timeout_seconds"),
+            threads=_positive_int(server.get("threads", 1), "server.threads"),
+            context_size=_positive_int(server.get("context_size", 512), "server.context_size"),
+            batch_size=_optional_positive_int(server.get("batch_size"), "server.batch_size"),
+            seed=_int_field(server.get("seed", 42), "server.seed"),
+            temperature=_non_negative_float(server.get("temperature", 0.0), "server.temperature"),
+        ),
+        workload=LlamaServerWorkloadSpec(
+            prompt_suite_path=_absolute_path_field(workload.get("prompt_suite_path"), "workload.prompt_suite_path"),
+            predict_tokens=_positive_int(workload.get("predict_tokens"), "workload.predict_tokens"),
+            repetitions=_positive_int(workload.get("repetitions", 3), "workload.repetitions"),
+            warmup_requests=_non_negative_int(workload.get("warmup_requests", 1), "workload.warmup_requests"),
+            streaming=streaming,
+            cooldown_seconds=_non_negative_float(workload.get("cooldown_seconds", 0.0), "workload.cooldown_seconds"),
+        ),
+        artifacts=LlamaServerArtifactsSpec(
+            preserve_server_stdout=bool(artifacts.get("preserve_server_stdout", True)),
+            preserve_server_stderr=bool(artifacts.get("preserve_server_stderr", True)),
+            preserve_request_stream=bool(artifacts.get("preserve_request_stream", True)),
+            preserve_generated_output=bool(artifacts.get("preserve_generated_output", True)),
         ),
         target_type=target.type,
         remote_module=target.remote_module,
@@ -327,6 +465,15 @@ def _optional_positive_int(value: Any, label: str) -> int | None:
     if value is None:
         return None
     parsed = _positive_int(value, label)
+    return parsed
+
+
+def _server_port_field(value: Any, label: str) -> int | str:
+    if value == "auto":
+        return "auto"
+    parsed = _int_field(value, label)
+    if parsed <= 0 or parsed > 65535:
+        raise ArmTuneConfigError(f"{label} must be 'auto' or between 1 and 65535")
     return parsed
 
 
