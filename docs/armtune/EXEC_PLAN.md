@@ -1015,3 +1015,93 @@ Planned scope:
   fail.
 
 Phase 3B.2 remains out of scope for the Phase 3B.1 implementation.
+
+## Phase 4 Plan: Quality-Aware Server Autotuning MVP
+
+Status: planned. Phase 4 combines deterministic BootTrace quality validation
+with bounded `llama-server` candidate search. It remains an MVP focused on a
+small public synthetic quality suite, not on final competition benchmarking or
+optimized Arm execution claims.
+
+Allowed scope:
+
+- Deterministic local BootTrace quality suite using public synthetic traces.
+- Versioned quality-suite, validator-result, aggregate-result, candidate
+  quality, and quality-gate schemas.
+- Deterministic validators for valid JSON, required fields, exact fields,
+  allowed values, required substrings, forbidden substrings, regular
+  expressions, numeric ranges, evidence line IDs, required evidence citations,
+  invented line ID rejection, and nonempty output.
+- `autotuneai arm optimize --config <path>` support for
+  `runtime.adapter: llama_server`, `workload.mode: server`, and
+  `quality_gate.enabled: true`.
+- Reuse of the Phase 3B.1 `benchmark.llama_server` worker path for every
+  server candidate, preserving lifecycle, request, raw SSE, generated output,
+  and artifact-manifest behavior.
+- Reuse of Phase 3A search controls where practical: deterministic candidate
+  order, seed, warm-up exclusion, measured repetitions, confirmation runs,
+  failure preservation, noise-band classification, `max_candidates`, and
+  `affinity_modes`.
+- Initial server candidates limited to safe dimensions proven by inspected
+  help output: thread count, batch size, ubatch size, and process affinity.
+- Candidate quality eligibility and conservative recommendation states:
+  `recommended`, `inconclusive`, `rejected_quality`,
+  `rejected_execution`, `insufficient_evidence`, and
+  `no_eligible_candidate`.
+- Fake full E2E that demonstrates one faster quality-passing candidate and one
+  faster quality-failing candidate that is rejected.
+- Bounded real Arm64 validation only after the implementation commit, using an
+  existing manually started target and sanitized evidence documentation.
+
+Out of scope:
+
+- Build-profile comparison.
+- KleidiAI implementation, verification, or claims.
+- llama.cpp source modification.
+- Model quantization search.
+- Concurrency or load testing.
+- Distributed inference.
+- Arm Performix.
+- Complete Performance Passport generation.
+- Final competition benchmark conclusions.
+
+Phase 4 artifact layout:
+
+```text
+.autotuneai/runs/<run_id>/armtune/server_optimize/
+  optimize_job.json
+  effective_config.json
+  search_plan.json
+  quality_suite_manifest.json
+  quality_suite_snapshot.json
+  target_fingerprint.json
+  executable_manifest.json
+  model_manifest.json
+  search_result.json
+  recommendation.json
+  artifact_manifest.json
+  baseline/
+    candidate.json
+    performance_summary.json
+    quality_summary.json
+    requests/...
+  candidates/
+    <candidate-id>/
+      candidate.json
+      performance_summary.json
+      quality_summary.json
+      eligibility.json
+      requests/...
+  confirmation/
+    baseline/...
+    selected/...
+```
+
+Phase 4 recommendation wording must be bounded, for example:
+
+> Best observed eligible candidate under the tested server benchmark and
+> deterministic quality protocol.
+
+Phase 4 must not describe any result as the best Arm configuration, globally
+optimal, production optimal, stable production performance, KleidiAI evidence,
+or a formal competition benchmark result.

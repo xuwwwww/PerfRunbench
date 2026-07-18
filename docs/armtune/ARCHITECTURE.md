@@ -450,3 +450,57 @@ Phase 3B.1 does not modify the Phase 3A search engine to use `llama-server`.
 It does not perform deterministic quality scoring, BootTrace validation,
 KleidiAI verification, build-profile comparison, Performix integration,
 Performance Passport generation, cloud provisioning, or real AWS execution.
+
+## Phase 4 Quality-Aware Server Tuning
+
+Phase 4 adds a deterministic local quality layer and a bounded
+`llama-server` search path. The quality layer is not an external model judge:
+it validates public synthetic BootTrace cases against explicit expected
+answers and validator rules stored in a versioned quality suite.
+
+The quality package owns deterministic validation:
+
+```text
+autotune/arm_tune/quality/
+  __init__.py
+  schemas.py
+  suite.py
+  validators.py
+  boottrace.py
+  aggregation.py
+```
+
+Quality suites are serialized with `schema_version` and stable digests. A
+quality case contains a prompt, expected response format, expected canonical
+fields, validator specifications, required/optional status, maximum predicted
+tokens, and deterministic generation settings. Validator results retain
+`validator_type`, `status`, `expected`, `observed`, and an actionable message;
+ArmTune must not collapse quality evidence into a single boolean.
+
+`autotuneai arm optimize` remains the public entry point. When a config uses
+`runtime.adapter: llama_server`, `workload.mode: server`, and
+`quality_gate.enabled: true`, the controller runs a bounded server search by
+creating normal Phase 3B.1 server benchmark jobs for each candidate. The target
+still executes only allowlisted worker operations, binds `llama-server` to
+loopback, preserves raw SSE and generated outputs, and validates artifact
+digests after download.
+
+Candidate comparison is quality-aware:
+
+- Performance distributions use client-observed TTFT as the primary metric and
+  end-to-end latency as a secondary metric.
+- Warm-up requests are preserved but excluded from distributions.
+- Request failures and stream parse failures remain explicit failures, not
+  zero-valued metrics.
+- A candidate is eligible only when lifecycle, cleanup, provenance, binary and
+  model digests, target fingerprint, prompt-suite digest, quality-suite digest,
+  protocol settings, required request execution, required stream parsing, and
+  required quality cases all pass.
+- A faster candidate that fails a critical quality validator is rejected with
+  `rejected_quality`.
+- A candidate inside the configured noise band remains `inconclusive`.
+
+The Phase 4 MVP does not compare build profiles, verify KleidiAI, change the
+llama.cpp source commit, perform quantization search, run concurrency/load
+tests, integrate Performix, generate a complete Performance Passport, or
+produce final competition benchmark claims.
