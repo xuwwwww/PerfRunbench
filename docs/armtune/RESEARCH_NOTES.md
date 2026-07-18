@@ -229,3 +229,55 @@ Access date for all entries: 2026-07-13.
   optimization result, not stable production performance, not KleidiAI
   evidence, not `llama-server` evidence, not TTFT or end-to-end latency
   evidence, and not deterministic quality-gate evidence.
+
+## Phase 3B.1-R Real llama-server Validation
+
+- Source: user-provisioned AWS T4g / Graviton2 Linux Arm64 development target.
+- Evidence file:
+  `docs/armtune/results/PHASE_3B1_REAL_SERVER_VALIDATION.md`
+- Run ID: `20260719_004451_487119`
+- Target type: `ssh`
+- Target architecture: `aarch64`
+- Target OS: `Ubuntu 24.04.4 LTS`
+- Kernel: `6.17.0-1019-aws`
+- CPU model: `Neoverse-N1`
+- Logical CPUs: `2`
+- PerfRunbench commit:
+  `1b70660812cee0da2ddf40eb1a0bc1af4a51d4c9`
+- llama.cpp commit:
+  `b15ca938ad00aa6b3ee6c2edda7363fd02826b18`
+- llama-server SHA-256:
+  `6faba7459f6d4ed13564bc5ec876e0bde0c0aa538fb371865dd89e03b11b254e`
+- Model SHA-256:
+  `041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55`
+- Protocol: loopback-only `llama-server`, target-local HTTP client,
+  OpenAI-compatible SSE, 3 synthetic prompts, 3 warm-up requests, and 6
+  measured requests.
+- Result origin: `measured`
+- Inspection status: `passed`
+- Startup status: `ready`
+- Readiness status: `ready`
+- Request status: `completed`
+- Stream parse status: `parsed`
+- Benchmark status: `passed`
+- Cleanup status: `passed`
+- Failed requests: `0`
+- Quality gate status: `not_evaluated`
+- Artifact validation: `passed`; 48 artifact records checked.
+- TTFT distribution: valid `6`, failed `0`, median `41.105 ms`, p95
+  `45.24175 ms`.
+- End-to-end latency distribution: valid `6`, failed `0`, median
+  `762.659 ms`, p95 `908.2335 ms`.
+- Real SSE compatibility: role-only metadata deltas were ignored for TTFT,
+  generated content arrived through `choices[0].delta.content`, runtime
+  timing metadata was preserved separately, and the stream ended with
+  `data: [DONE]`.
+- Relevant conclusion: ArmTune's `llama-server` lifecycle, target-local
+  loopback HTTP client, streaming TTFT and end-to-end latency measurement,
+  generated-output preservation, cleanup, SSH worker, provenance, and
+  artifact-validation pipeline worked against a real `llama-server` workload
+  on Linux Arm64.
+- Claim boundary: this is a bounded server-pipeline validation run. It is not
+  final optimization, stable production performance, KleidiAI evidence,
+  quality validation, build-profile comparison, Performix evidence,
+  Performance Passport evidence, or a formal competition benchmark result.

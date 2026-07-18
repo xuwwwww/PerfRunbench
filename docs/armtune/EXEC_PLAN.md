@@ -946,6 +946,61 @@ Phase 3B.1 exit codes:
 4 = cleanup failure that may have left a process running
 ```
 
+## Phase 3B.1-R Validation: Bounded Real Arm64 llama-server Run
+
+Status: completed. A user-provisioned AWS T4g / Graviton2 instance was used
+only as an existing Linux Arm64 target; ArmTune did not provision, resize,
+start, stop, or otherwise control cloud resources.
+
+Phase 3B.1-R validated the real-target server path:
+
+```text
+Windows controller
+  -> system OpenSSH
+  -> Linux Arm64 target
+  -> real llama-server binary
+  -> real GGUF model
+  -> loopback-only target-local HTTP client
+  -> OpenAI-compatible SSE parser
+  -> generated-output preservation
+  -> cleanup and port-release verification
+  -> downloaded artifact digest validation
+```
+
+Validation evidence:
+
+```text
+Evidence file: docs/armtune/results/PHASE_3B1_REAL_SERVER_VALIDATION.md
+Run ID: 20260719_004451_487119
+Target type: ssh
+Target architecture: aarch64
+Target OS: Ubuntu 24.04.4 LTS
+Kernel: 6.17.0-1019-aws
+CPU model: Neoverse-N1
+PerfRunbench commit: 1b70660812cee0da2ddf40eb1a0bc1af4a51d4c9
+llama.cpp commit: b15ca938ad00aa6b3ee6c2edda7363fd02826b18
+llama-server SHA-256: 6faba7459f6d4ed13564bc5ec876e0bde0c0aa538fb371865dd89e03b11b254e
+Model SHA-256: 041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55
+Result origin: measured
+Inspection status: passed
+Startup status: ready
+Readiness status: ready
+Request status: completed
+Stream parse status: parsed
+Benchmark status: passed
+Cleanup status: passed
+Quality gate status: not_evaluated
+Measured requests: 6
+Failed requests: 0
+Artifact validation: passed
+Checked artifacts: 48
+```
+
+This evidence validates the server execution pipeline only. It is not evidence
+of optimization, KleidiAI execution, quality preservation, stable production
+performance, build-profile improvement, Performix support, Performance
+Passport generation, or a formal competition benchmark result.
+
 ## Phase 3B.2 Plan: Deterministic BootTrace Quality Gate
 
 Status: planned. Phase 3B.2 will add deterministic quality validation on top of

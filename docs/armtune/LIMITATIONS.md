@@ -148,8 +148,22 @@ should be labeled unverified.
 
 ## Phase 3B.1 Limitations
 
-- Phase 3B.1 implements a fake-tested `llama-server` benchmark foundation only.
-- Phase 3B.1 does not provide real AWS or external SSH server evidence.
+- Phase 3B.1 implements a `llama-server` benchmark foundation.
+- Phase 3B.1-R adds one bounded real-target server validation run on a
+  user-provisioned AWS T4g / Graviton2 Linux Arm64 development instance.
+- The Phase 3B.1-R evidence is recorded in
+  `docs/armtune/results/PHASE_3B1_REAL_SERVER_VALIDATION.md`.
+- The run `20260719_004451_487119` validated server lifecycle, target-local
+  loopback HTTP measurement, OpenAI-compatible SSE parsing, generated-output
+  preservation, cleanup, and artifact digest validation against a real
+  `llama-server` binary and a real GGUF model on Linux `aarch64`, with
+  `result_origin: measured`.
+- The run completed 6 measured requests with 0 failed requests and passed
+  artifact digest validation for 48 artifact records.
+- The observed median TTFT was `41.105 ms`, and the observed median
+  end-to-end latency was `762.659 ms`. These are bounded pipeline-validation
+  measurements from a burstable development instance, not final competition
+  benchmark results.
 - Phase 3B.1 does not download models, open public server ports, provision
   cloud resources, or change EC2 security groups.
 - Phase 3B.1 request timing is target-local, but fake-server timings are
