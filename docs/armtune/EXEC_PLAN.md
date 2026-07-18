@@ -839,28 +839,120 @@ run requested a very small candidate set but the implementation still planned
 five candidates on a 2-vCPU target. It does not retroactively change the
 recorded Phase 3A.1 evidence.
 
-## Phase 3B Plan: Server Inference and Deterministic Quality Validation
+## Phase 3B.1 Plan: llama-server Lifecycle and Generation Metrics
 
-Status: planned. Phase 3B moves ArmTune beyond synthetic throughput benchmark
-search by validating a real AI workload's latency and deterministic output
-quality on the Arm target.
+Status: planned. Phase 3B.1 introduces a `llama-server` benchmark foundation
+without changing the Phase 3A `llama-bench` search engine and without adding
+quality scoring.
 
 Allowed scope:
 
-- `llama-server` lifecycle management on the target.
-- Local-on-target HTTP client for benchmark traffic.
-- Streaming time-to-first-token measurement.
-- End-to-end latency measurement.
-- Structured BootTrace output for startup and request phases.
-- Deterministic quality validation for fixed prompts and expected structured
-  output.
-- Combined performance and quality eligibility result.
+- Runtime adapter foundation that keeps existing `llama-bench` behavior
+  backward compatible.
+- `llama-server` binary inspection with raw `--version` and `--help`
+  artifacts, supported flag detection, binary SHA-256, and unknown/unverified
+  fields when evidence is absent.
+- Versioned worker operation `benchmark.llama_server`.
+- Versioned server job specification with executable, model, server,
+  workload, and artifact controls.
+- Loopback-only server binding; Phase 3B.1 rejects public bind addresses and
+  does not open external ports.
+- Server process lifecycle: free loopback port selection, argument-list
+  subprocess launch, bounded readiness, bounded shutdown, process cleanup, and
+  port-release verification.
+- Target-local HTTP client that connects only to
+  `http://127.0.0.1:<selected-port>`.
+- OpenAI-compatible streaming request support using standard-library HTTP
+  functionality unless a dependency blocker is documented.
+- TTFT measured from request start to the first valid generated content delta.
+- End-to-end latency measured from request start to response completion.
+- Raw HTTP status, selected response headers, complete streaming event log,
+  generated output preservation, and request-level result artifacts.
+- A small public synthetic prompt suite covering short deterministic
+  completion, structured JSON generation request, and longer summarization.
+- Sequential protocol with configurable warm-up requests, measured repetitions,
+  request timeout, cooldown, seed, temperature, and predicted tokens.
+- Warm-up request artifacts preserved but excluded from measured
+  distributions.
+- Versioned schemas for inspection, configuration, lifecycle, streaming
+  events, request results, metric distributions, and final benchmark results.
+- Public CLI fake-server E2E and fake SSH worker protocol tests.
+- `quality_gate_status: not_evaluated` for all Phase 3B.1 results.
 
 Out of scope:
 
-- Thread-search expansion beyond the Phase 3A controls.
+- BootTrace semantic or deterministic quality scoring.
+- Candidate search through `llama-server`.
+- Performance recommendation.
+- Real AWS or external SSH execution.
+- Cloud provisioning, instance start/stop, or security-group changes.
+- Model download.
 - Build-profile comparison.
 - KleidiAI claims without verified execution evidence.
 - Arm Performix.
 - Performance Passport generation.
 - Formal competition benchmark conclusions.
+
+Phase 3B.1 artifact layout:
+
+```text
+.autotuneai/runs/<run_id>/armtune/server_benchmark/
+  server_job.json
+  executable_manifest.json
+  model_manifest.json
+  inspection.json
+  server_configuration.json
+  lifecycle.json
+  benchmark_result.json
+  artifact_manifest.json
+  raw/
+    inspection_version_stdout.txt
+    inspection_version_stderr.txt
+    inspection_help_stdout.txt
+    inspection_help_stderr.txt
+    server_stdout.txt
+    server_stderr.txt
+  requests/
+    <prompt-id>/
+      warmup/
+        0001/
+          request.json
+          stream.jsonl
+          output.txt
+          result.json
+      measured/
+        0001/
+        0002/
+        0003/
+```
+
+Phase 3B.1 CLI summary should report run ID, target type, target
+architecture, result origin, server startup/readiness status, request counts,
+failed request counts, median TTFT when available, median end-to-end latency
+when available, cleanup status, `quality_gate_status: not_evaluated`, and the
+artifact directory. Missing metrics must print `Not available`, not zero.
+
+Phase 3B.1 exit codes:
+
+```text
+0 = server and required measured requests completed and parsed
+1 = server executed but benchmark or required requests failed
+2 = invalid configuration, unsupported target, validation failure, or protocol mismatch
+3 = internal/runtime error
+4 = cleanup failure that may have left a process running
+```
+
+## Phase 3B.2 Plan: Deterministic BootTrace Quality Gate
+
+Status: planned. Phase 3B.2 will add deterministic quality validation on top of
+the Phase 3B.1 server benchmark foundation.
+
+Planned scope:
+
+- Structured BootTrace prompt suite and expected-output rules.
+- Deterministic semantic validation that does not require external services.
+- Quality eligibility status separate from performance metrics.
+- Candidate rejection when performance improves but required quality checks
+  fail.
+
+Phase 3B.2 remains out of scope for the Phase 3B.1 implementation.
