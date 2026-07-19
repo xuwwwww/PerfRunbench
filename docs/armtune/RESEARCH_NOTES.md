@@ -352,3 +352,58 @@ Access date for all entries: 2026-07-13.
   recommendation, final optimization, stable production performance, KleidiAI,
   build-profile improvement, Performix, Performance Passport output, or formal
   competition benchmark results.
+
+## Phase 6B-R Qwen2.5-7B Qualification Rejection
+
+- Source: user-provisioned AWS C7g / Graviton3 Linux Arm64 development target.
+- Evidence file:
+  `docs/armtune/results/PHASE_6_QWEN25_PROFILE_COMPARISON.md`
+- Run ID: `20260719_152540_406176`
+- Target type: `ssh`
+- Target architecture: `aarch64`
+- Target OS: `Ubuntu 24.04.4 LTS`
+- Kernel: `6.17.0-1019-aws`
+- CPU model: `Neoverse-V1`
+- Logical CPUs: `8`
+- PerfRunbench remote worker commit:
+  `ff6a31531db48f423915ae37875afa90c949a0c4`
+- llama.cpp source commit:
+  `b15ca938ad00aa6b3ee6c2edda7363fd02826b18`
+- llama-server SHA-256:
+  `6faba7459f6d4ed13564bc5ec876e0bde0c0aa538fb371865dd89e03b11b254e`
+- Model repository: `Qwen/Qwen2.5-7B-Instruct-GGUF`
+- Model repository revision:
+  `bb5d59e06d9551d752d08b292a50eb208b07ab1f`
+- Merged model SHA-256:
+  `1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49`
+- Quality suite ID: `synthetic_boottrace_quality_v1`
+- Quality suite digest:
+  `42a784ba1da5c624f14dfb9d2d89917768650c8e60ad0918f98c2e4da96d1169`
+- Prompt contract SHA-256:
+  `8c4af720b8e5da01d506c4aeba0dde3b588d21693e04eae59c2230ab0a80e01b`
+- Protocol: loopback-only `llama-server`, target-local HTTP client, five
+  synthetic BootTrace quality cases, `threads=8`, `context_size=4096`,
+  `temperature=0.0`, `seed=42`, strict normalization disabled, and one
+  measured request per case.
+- Result origin: `measured`
+- Request success count: `5/5`
+- Raw JSON valid count: `5/5`
+- Required quality cases passed: `0/5`
+- Critical validator failures: `22`
+- Failure categories: `missing_required_evidence`,
+  `model_capability_failure`, `response_format_violation`,
+  `wrong_root_cause`, and `wrong_status`.
+- Artifact validation: `passed`; 40 quality-calibration artifact records and
+  32 nested benchmark artifact records checked.
+- CLI exit code: `1`
+- Cleanup evidence: benchmark reported `cleanup_status: passed`; a post-run
+  process check found no residual `llama-server` or ArmTune worker processes.
+- Qualification outcome: `model_profile_suitability: unsuitable`.
+- Phase 6C outcome: build-profile comparison and Performance Passport
+  generation were not executed because the qualification gate did not pass.
+- Claim boundary: this validates real Arm execution, Qwen2.5 split GGUF
+  acquisition and merge, deterministic quality rejection, cleanup, and
+  artifact validation. It does not validate a suitable model/profile,
+  quality-preserving recommendation, final optimization, stable production
+  performance, KleidiAI, build-profile improvement, Performix, Performance
+  Passport output, or formal competition benchmark results.

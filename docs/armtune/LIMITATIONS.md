@@ -245,8 +245,14 @@ should be labeled unverified.
 - Qwen3-4B was unsuitable under the tested Phase 6A contracts, including a
   private `/no_think` prompt-contract variant. Validators and canonical
   expected answers must not be weakened in response.
-- Qwen2.5-7B qualification must pass before build-profile comparison,
-  performance recommendation, or measured Performance Passport generation.
+- Qwen2.5-7B Q4_K_M was unsuitable under the tested strict public BootTrace
+  quality contract even though every request completed and every output was
+  raw-valid JSON. Semantic failures such as wrong root cause, wrong status,
+  missing required evidence, and invalid numeric values were not normalized
+  away.
+- A future model/profile qualification must pass before build-profile
+  comparison, performance recommendation, or measured Performance Passport
+  generation.
 - C7g and T4g measurements are not comparable. Any C7g result needs its own
   baseline and must not be compared to earlier T4g evidence.
 - Phase 6 does not automatically provision, resize, start, stop, or alter

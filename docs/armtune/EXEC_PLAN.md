@@ -1308,11 +1308,11 @@ measured Performance Passport generation were intentionally not executed.
 
 ## Phase 6 Plan: Qualified Model And Arm Profile Comparison
 
-Status: planned. Phase 6 uses the Phase 5 evidence pipeline without adding
-framework functionality. The first objective is to qualify a stronger model
-under the public synthetic BootTrace suite. Arm build-profile comparison,
-paired measurement, and Performance Passport generation are conditional on
-model/profile suitability.
+Status: partially executed. Phase 6 uses the Phase 5 evidence pipeline without
+adding framework functionality. Qwen2.5-7B qualification was executed and did
+not pass the public synthetic BootTrace quality gate, so Arm build-profile
+comparison, paired measurement, and Performance Passport generation remain
+blocked pending a suitable model/profile.
 
 Phase 6A result boundary:
 
@@ -1372,6 +1372,26 @@ Phase 6B quality gate:
   success, 5/5 required cases passed, zero critical validator failures, zero
   invented evidence IDs, passed cleanup, passed artifact validation, and
   `model_profile_suitability: suitable`.
+
+Phase 6B Qwen2.5-7B result boundary:
+
+- Qwen2.5-7B Q4_K_M was downloaded as split GGUF files from
+  `Qwen/Qwen2.5-7B-Instruct-GGUF`, merged with `llama-gguf-split --merge`,
+  and validated by SHA-256.
+- The run used an existing C7g / Graviton3 Linux `aarch64` target with
+  `production_benchmark_ready: true`.
+- Strict calibration produced `result_origin: measured`, 5/5 completed
+  requests, and 5/5 raw-valid JSON outputs.
+- The required BootTrace quality gate still failed with
+  `required_quality_cases_passed: 0/5` and
+  `model_profile_suitability: unsuitable`.
+- Failure categories included `wrong_root_cause`, `wrong_status`,
+  `missing_required_evidence`, `response_format_violation`, and
+  `model_capability_failure`; this was not a Markdown-fence-only failure.
+- Artifact digest validation passed for both nested benchmark artifacts and
+  outer quality-calibration artifacts.
+- Phase 6C profile comparison and measured Performance Passport generation
+  were intentionally not executed.
 
 Conditional Phase 6C profile comparison:
 
