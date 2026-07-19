@@ -565,6 +565,72 @@ profile comparison, Performance Passport generation, and passport tamper
 detection. These tests validate the evidence pipeline and claim gates; they do
 not provide measured Arm performance.
 
+## Phase 9 Deterministic Tuning Workload
+
+Phase 9 stops using the difficult held-out BootTrace suite as a prerequisite
+for performance tuning. The existing held-out suite is reclassified as a
+`BootTrace Capability Benchmark`: it is still valid evidence of model
+limitations, but it is not the tuning quality gate.
+
+The tuning quality gate is a new deterministic public synthetic suite:
+
+```text
+configs/armtune/quality/boottrace_tuning_suite.json
+```
+
+Its cases are intentionally direct. Trace lines use explicit key-value facts
+such as `STAGE=...`, `EVENT=...`, `ROOT_CAUSE=...`, and `BOOT_RESULT=...`.
+The required JSON fields are:
+
+```text
+case_id
+status
+failure_stage
+root_cause_category
+evidence_line_ids
+```
+
+The valid enum sets are fixed by the suite. Every required evidence ID must be
+present in the prompt, and invented evidence IDs are critical failures. The
+suite may include an informational `recommended_action`, but free-form action
+text is not a critical validator.
+
+The tuning gate passes only when:
+
+- all required cases pass
+- request execution succeeds for all cases
+- stream parsing passes
+- cleanup passes
+- artifact validation passes
+- critical validator failures are zero
+- invented evidence IDs are zero
+
+The tuning gate may use the existing versioned single-fence normalization
+policy for exact Markdown JSON fence extraction. Normalization cannot alter
+semantic values, add missing fields, change enum values, or infer evidence.
+
+Real Phase 9 tuning fixes the model and runtime inputs before comparison:
+
+- Qwen2.5-7B-Instruct-GGUF Q4_K_M
+- pinned model SHA-256
+- pinned llama.cpp source commit
+- pinned llama-server binary digest for each build profile
+- temperature `0`
+- deterministic seed
+- prompt-contract digest
+- tuning-suite digest
+- schema digest
+- normalization-policy version
+- context size
+- predict-token limit
+
+Performance comparison uses only candidates that pass the tuning quality gate.
+Faster candidates with corrupted output are `rejected_quality`. Recommendation
+claims must use bounded wording:
+
+> Best observed eligible configuration under the tested Arm target, model,
+> server workload, and deterministic tuning quality protocol.
+
 ## Phase 6 Qualified Profile Comparison
 
 Phase 6 treats model suitability as a hard precondition for measured profile

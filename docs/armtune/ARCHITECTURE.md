@@ -658,6 +658,44 @@ The held-out case audit in
 unique expected classification, taxonomy clarity, required evidence-line
 necessity, ambiguity, and unknown-policy applicability for every evaluation
 case. Canonical answers may change only with written rationale that the fixture
+requires correction, not merely because a model failed.
+
+## Phase 9 Quality Split
+
+Phase 9 separates ArmTune quality evidence into two distinct roles.
+
+`BootTrace Capability Benchmark` is the existing difficult held-out suite:
+
+```text
+configs/armtune/quality/boottrace_suite.json
+```
+
+It remains public, synthetic, audited, and unchanged. It evaluates whether a
+model can handle less direct BootTrace reasoning. It may report unsuitable
+models, and those results remain useful capability evidence, but the suite is
+not required for performance-tuning eligibility.
+
+`Deterministic Tuning Quality Gate` is a separate suite:
+
+```text
+configs/armtune/quality/boottrace_tuning_suite.json
+```
+
+It is designed for repeatable CPU inference tuning. Cases use explicit
+key-value trace lines, fixed enum outputs, and directly evidenced line IDs.
+Critical validation is limited to deterministic structural and semantic checks:
+nonempty output, valid JSON after configured normalization, required fields,
+allowed enum values, exact `status`, exact `failure_stage`, exact
+`root_cause_category`, required evidence IDs, and no invented evidence IDs.
+
+The tuning gate may permit the existing versioned single-fence extraction
+policy, but normalization must not edit JSON values, infer missing fields, or
+repair semantic answers. Raw output, normalized output, normalization steps,
+raw SHA-256, and normalized SHA-256 remain artifact evidence.
+
+Candidate recommendation in Phase 9 is gated by the tuning suite, not by the
+capability benchmark. The capability benchmark limitation must still be
+carried into the Performance Passport and public claims.
 or answer is demonstrably incorrect or ambiguous.
 
 Phase 5 must preserve the Phase 4 result boundary: a real run with no eligible

@@ -39,6 +39,8 @@ another developer can reproduce the same experiment.
 - Repeated baseline and candidate measurements.
 - Deterministic quality validation using a public synthetic BootTrace
   reference workload.
+- Separation between a difficult BootTrace Capability Benchmark and a
+  deterministic tuning quality gate used for performance eligibility.
 - Quality calibration with strict raw-output mode and optional audited
   fenced-JSON normalization.
 - Declarative build-profile evidence for `portable-baseline`, `arm-native`,
@@ -64,6 +66,12 @@ results and do not prove KleidiAI usage or an optimized profile.
 
 Phase 5 fixture passports are pipeline-validation artifacts only. They must not
 be presented as measured Arm performance.
+
+The difficult BootTrace held-out suite is a capability benchmark and has not
+been passed by the tested real models. Phase 9 uses a separate deterministic
+tuning quality gate to verify that build-profile and runtime optimizations do
+not corrupt directly evidenced behavior. Passing the tuning gate must not be
+presented as passing the harder capability benchmark.
 
 ## Setup
 

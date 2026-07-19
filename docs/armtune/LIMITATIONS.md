@@ -321,3 +321,22 @@ should be labeled unverified.
   failed the current held-out semantic gate, ArmTune should stop the current
   model ladder and keep the five held-out cases as a capability benchmark while
   defining a separate deterministic CPU-inference tuning workload.
+
+## Phase 9 Planned Limitations
+
+- Phase 9 does not weaken or rewrite the existing held-out BootTrace capability
+  benchmark. Existing Qwen2.5 and Gemma results remain failed or unsuitable as
+  originally recorded.
+- The new deterministic tuning quality gate is not a claim that the model
+  passed the harder capability benchmark.
+- Phase 9 does not download, replace, or ladder additional models. The fixed
+  workload remains Qwen2.5-7B-Instruct-GGUF Q4_K_M.
+- Phase 9 does not update the llama.cpp source commit.
+- Phase 9 does not use an external LLM judge.
+- Phase 9 does not automatically start, stop, provision, resize, or modify AWS
+  resources or security groups.
+- Phase 9 does not claim KleidiAI unless build and runtime evidence both
+  support the claim.
+- Build-profile comparison, runtime tuning, and Performance Passport
+  generation remain invalid unless every recommended candidate passes the new
+  deterministic tuning quality gate and artifact validation.

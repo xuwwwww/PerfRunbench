@@ -1701,3 +1701,92 @@ Phase 8-R decision:
   capability benchmark and define a separate deterministic workload better
   matched to CPU inference tuning, or qualify a different model/profile under a
   separately justified protocol.
+
+## Phase 9 Plan: Deterministic Tuning Workload And First Real Arm Autotuning
+
+Status: planning and local implementation. Do not start, stop, provision,
+resize, or otherwise manage AWS resources from this phase. Real target work
+may continue only after the operator confirms that the existing C7g target is
+already running.
+
+Phase 9 stops model-ladder work and separates two quality purposes:
+
+1. BootTrace Capability Benchmark
+2. Deterministic Tuning Quality Gate
+
+BootTrace Capability Benchmark:
+
+- The existing held-out suite remains
+  `configs/armtune/quality/boottrace_suite.json`.
+- Existing canonical answers, validators, audit notes, and historical results
+  are preserved.
+- Existing outcomes remain recorded:
+  Qwen2.5-7B `unsuitable`, Qwen2.5-14B `unsuitable`, and Gemma 3 12B strict
+  raw-JSON qualification `failed`.
+- Capability-benchmark results may expose model limitations, but they no
+  longer block inference performance tuning.
+- Capability results must not be rewritten, weakened, or represented as passed.
+
+Deterministic Tuning Quality Gate:
+
+- Add a separate suite:
+  `configs/armtune/quality/boottrace_tuning_suite.json`.
+- The suite contains 6 to 8 new public synthetic cases disjoint from the
+  capability suite.
+- Each case uses explicit key-value trace lines with one directly extractable
+  answer and one valid evidence-line set.
+- Critical validators are limited to nonempty output, valid JSON after the
+  configured versioned normalization policy, required fields, allowed enum
+  values, exact `status`, exact `failure_stage`, exact
+  `root_cause_category`, required evidence IDs, and no invented evidence IDs.
+- Free-form `recommended_action` is not a critical validator.
+- Normalization may extract exactly one Markdown JSON fence with the existing
+  versioned policy, but it must not modify JSON values, add fields, or repair
+  semantic answers.
+
+Fixed workload boundary:
+
+- Reuse Qwen2.5-7B-Instruct-GGUF Q4_K_M as the fixed inference workload.
+- Do not download or switch models.
+- Do not update the llama.cpp source commit.
+- Preserve model digest, runtime binary digest, prompt-contract digest,
+  tuning-suite digest, schema digest, normalization-policy version,
+  generation seed, temperature, context size, and predict-token limit in real
+  evidence artifacts.
+
+Local validation boundary:
+
+- First complete local schema/unit/fake integration tests without AWS.
+- Required local checks include tuning-suite schema validation, disjointness
+  from the capability suite, evidence-ID consistency, canonical-answer pass,
+  wrong status failure, wrong root-cause failure, invented evidence failure,
+  missing evidence failure, single-fence normalization evidence, unchanged
+  capability-suite digest, fake Qwen-like server pass, corrupt fast candidate
+  rejection, and quality-preserving candidate eligibility.
+- After local validation passes, report:
+  `ready_for_real_arm_tuning: true`.
+- Stop before real Phase 9 target execution until the existing C7g target is
+  confirmed running by the operator.
+
+Real Phase 9 target sequence after explicit operator confirmation:
+
+1. Run only the new tuning quality gate on Qwen2.5-7B Q4_K_M.
+2. If it fails, preserve artifacts and fix only integration or
+   prompt-rendering bugs; do not change expected answers to match the model.
+3. If it passes, continue to build profiles without stopping:
+   `portable-baseline`, `arm-native`, and `arm-optimized` only when evidence
+   can support it.
+4. Re-run the tuning quality gate for each build profile.
+5. Compare only quality-passing profiles.
+6. Run bounded runtime autotuning with approximately 8 to 12 unique
+   candidates, sequential requests, paired baseline insertion, deterministic
+   ordering, and TTFT as the primary metric.
+7. Mark faster quality-failing candidates as `rejected_quality`.
+8. Generate and verify the Performance Passport only from eligible evidence.
+
+Recommendation wording remains bounded:
+
+> Best observed eligible configuration under the tested Arm target, model,
+> server workload, and deterministic tuning quality protocol.
+
+Do not call the selected configuration a global optimum.

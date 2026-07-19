@@ -35,7 +35,7 @@ autotuneai arm inspect-host --target-config configs/armtune/targets/demo.json
 Highlight CPU identity, topology, host capabilities, and the label that host
 capability is not the same as workload execution evidence.
 
-### 1:00-1:30 - Quality Calibration
+### 1:00-1:30 - Quality Purposes
 
 Show:
 
@@ -43,9 +43,12 @@ Show:
 autotuneai arm quality-calibrate --config configs/armtune/quality_calibration.example.json
 ```
 
-Highlight strict raw-output validation, optional audited normalization,
-failure-category histogram, prompt-contract digest, and model/profile
-suitability.
+Highlight the difference between the BootTrace Capability Benchmark and the
+Deterministic Tuning Quality Gate. The capability benchmark can remain failed
+while the tuning gate is used to prove that optimization candidates preserve
+directly evidenced behavior. Also highlight strict raw-output validation,
+optional audited normalization, failure-category histogram, prompt-contract
+digest, and model/profile suitability.
 
 ### 1:30-2:10 - Build Profiles and Comparison
 
@@ -97,3 +100,4 @@ Explain pass, regression, invalid/incomparable, and runtime-error exit codes.
   explicit evidence.
 - Do not hide failed candidates.
 - Do not compare incompatible model, prompt, runtime, or target configurations.
+- Do not present a tuning-gate pass as a capability-benchmark pass.
