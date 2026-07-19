@@ -134,18 +134,16 @@ This evidence does not show:
 - KleidiAI execution
 - final competition results
 
-## Next Real-Target Step
+## Real-Target Follow-Up
 
-After explicit target availability and cost approval, re-run the existing
-Qwen2.5-7B Q4_K_M model against:
+The real-target follow-up is recorded in:
 
 ```text
-current-zero-shot
-taxonomy-and-decision-rules
-taxonomy-rules-and-disjoint-few-shot
+docs/armtune/results/PHASE_7_REAL_CONTRACT_SELECTION_AND_MODEL_LADDER.md
 ```
 
-Keep model digest, held-out suite digest, validators, generation seed,
-temperature, context size, output token bound, and normalization policy fixed
-across the three variants. Profile comparison remains blocked unless one
-variant reaches `model_profile_suitability: suitable`.
+That run selected `taxonomy-rules-and-disjoint-few-shot` using only the
+development calibration suite, froze the selected contract before held-out
+evaluation, and then rejected Qwen2.5-7B and Qwen2.5-14B on the held-out suite.
+Profile comparison remains blocked because no tested model/profile reached
+`model_profile_suitability: suitable`.

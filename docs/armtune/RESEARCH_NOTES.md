@@ -432,3 +432,62 @@ Access date for all entries: 2026-07-13.
   recording. It does not validate Qwen2.5 suitability, a stronger model,
   profile comparison, Performance Passport output, Arm performance
   improvement, KleidiAI, Performix, or formal competition benchmark results.
+
+## Phase 7-R Real Contract Selection And Model Ladder
+
+- Source: user-provisioned AWS C7g / Graviton3 Linux Arm64 development target.
+- Evidence file:
+  `docs/armtune/results/PHASE_7_REAL_CONTRACT_SELECTION_AND_MODEL_LADDER.md`
+- Target architecture: `aarch64`
+- Target OS: `Ubuntu 24.04.4 LTS`
+- Kernel: `6.17.0-1019-aws`
+- CPU model: `Neoverse-V1`
+- Logical CPUs: `8`
+- PerfRunbench remote worker commit:
+  `a2908b9bf57dde3cba81a1e846beccd9b8257d26`
+- llama.cpp source checkout verified by target-side git:
+  `b15ca938ad00aa6b3ee6c2edda7363fd02826b18`
+- llama-server SHA-256:
+  `6faba7459f6d4ed13564bc5ec876e0bde0c0aa538fb371865dd89e03b11b254e`
+- Development calibration suite digest:
+  `86e4bfc54e36de6a5e05257f621b9404104ce7c42bf9e90fce0019a7a9ea10db`
+- Held-out evaluation suite digest:
+  `42a784ba1da5c624f14dfb9d2d89917768650c8e60ad0918f98c2e4da96d1169`
+- Selected prompt contract:
+  `taxonomy-rules-and-disjoint-few-shot`
+- Selection flag:
+  `selected_before_held_out_evaluation: true`
+- Qwen2.5-7B development selection:
+  `current-zero-shot` 0/3 required with 8 critical failures,
+  `taxonomy-and-decision-rules` 0/3 required with 3 critical failures, and
+  `taxonomy-rules-and-disjoint-few-shot` 3/3 required with 0 critical
+  failures.
+- Qwen2.5-7B held-out result:
+  5/5 requests completed, 5/5 raw-valid JSON, 2/5 required cases passed,
+  6 critical failures, artifact validation passed, cleanup passed,
+  `suitability: unsuitable`.
+- Qwen2.5-14B model ladder:
+  `Qwen/Qwen2.5-14B-Instruct-GGUF` revision
+  `b466e1f8c07172155743e8e1307507d8a4f91fbd`, Q4_K_M split files downloaded
+  and hashed.
+- Qwen2.5-14B held-out result:
+  5/5 requests completed, 5/5 raw-valid JSON, 2/5 required cases passed,
+  5 critical failures, artifact validation passed, cleanup passed,
+  `suitability: unsuitable`.
+- Gemma 3 12B QAT Q4_0 access check:
+  repository metadata was visible at revision
+  `7929e34ac7c459bbfd1f38d7358e6839f204578b`, but GGUF file metadata access
+  returned `GatedRepoError 401`; no download or qualification run was
+  attempted.
+- Artifact validation: six quality-calibration roots and six nested benchmark
+  manifests were independently revalidated after download, all passed.
+- Cleanup evidence: post-run process checks found no residual `llama-server`
+  or ArmTune worker processes; loopback ports were released.
+- Relevant conclusion: ArmTune correctly separated development-suite prompt
+  selection from held-out evaluation, froze the selected contract before
+  held-out qualification, and rejected stronger real Arm model/profile
+  attempts when semantic quality failed.
+- Claim boundary: this is model qualification and quality-rejection evidence,
+  not quality-preserving performance improvement, build-profile comparison,
+  Performance Passport eligibility, KleidiAI execution, Performix evidence, or
+  final competition benchmark evidence.

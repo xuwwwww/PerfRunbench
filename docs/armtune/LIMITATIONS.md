@@ -273,10 +273,15 @@ should be labeled unverified.
 - SSH quality calibration uploads only the rendered prompt suite into the
   versioned remote run directory. It does not upload model weights,
   credentials, private logs, or arbitrary workload files.
-- Qwen2.5-7B must be re-run against the three Phase 7 contract variants before
-  deciding whether to move up the model ladder. That real-target rerun requires
-  target availability and explicit cost approval if a paid cloud instance must
-  be started.
+- Qwen2.5-7B was re-run against the three Phase 7 contract variants on an
+  explicitly approved C7g target. The winning development-suite contract did
+  not qualify on the held-out suite; Qwen2.5-7B remained `unsuitable`.
+- Qwen2.5-14B Q4_K_M passed the development sanity suite under the same frozen
+  contract, but it also remained `unsuitable` on the held-out suite with only
+  2/5 required cases passed.
+- Gemma 3 12B QAT Q4_0 was not evaluated because GGUF file access was gated
+  for the available target environment. This is an access limitation, not a
+  quality result.
 - Build-profile comparison, Performance Passport generation, Performix
   evidence, KleidiAI claims, and final competition conclusions remain blocked
   until a model/profile is `suitable`.

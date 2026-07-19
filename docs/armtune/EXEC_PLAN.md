@@ -1436,9 +1436,12 @@ Phase 6 result document:
 
 ## Phase 7 Plan: BootTrace Contract Calibration And Conditional Model Ladder
 
-Status: foundation implemented; real model reruns are pending explicit target
-availability and cost approval. Phase 7 does not weaken held-out validators or
-change canonical answers merely because Qwen3-4B and Qwen2.5-7B failed.
+Status: real contract selection and bounded model-ladder qualification executed
+on an explicitly approved C7g target. Qwen2.5-7B and Qwen2.5-14B both remained
+unsuitable under the frozen Phase 7 prompt contract. Gemma 3 12B file access
+was gated, so no Gemma model file was downloaded or evaluated. Phase 7 does not
+weaken held-out validators or change canonical answers merely because Qwen3-4B,
+Qwen2.5-7B, or Qwen2.5-14B failed.
 
 Phase 7 separates four concerns:
 
@@ -1534,3 +1537,42 @@ Stop conditions before model comparison:
 - model/profile suitability other than `suitable`
 
 Profile comparison remains blocked for unsuitable models.
+
+Phase 7 real-target result boundary:
+
+- Evidence file:
+  `docs/armtune/results/PHASE_7_REAL_CONTRACT_SELECTION_AND_MODEL_LADDER.md`.
+- The existing C7g / Graviton3 Linux Arm64 target was verified as
+  `aarch64`, Ubuntu 24.04.4 LTS, kernel `6.17.0-1019-aws`, Neoverse-V1,
+  8 logical CPUs, and approximately 14 GiB available memory before the run.
+- Local commits were pushed first; the remote PerfRunbench checkout was
+  fast-forwarded to
+  `a2908b9bf57dde3cba81a1e846beccd9b8257d26`.
+- Qwen2.5-7B contract selection used only
+  `configs/armtune/quality/boottrace_calibration_suite.json`.
+- Selection results were:
+  `current-zero-shot` 0/3 required with 8 critical failures,
+  `taxonomy-and-decision-rules` 0/3 required with 3 critical failures, and
+  `taxonomy-rules-and-disjoint-few-shot` 3/3 required with 0 critical
+  failures.
+- The selected contract was frozen before held-out evaluation with
+  `selected_before_held_out_evaluation: true`.
+- Qwen2.5-7B held-out qualification completed 5/5 measured requests and 5/5
+  raw-valid JSON outputs, but passed only 2/5 required held-out cases with
+  6 critical failures, so it remained `unsuitable`.
+- Qwen2.5-14B Q4_K_M was downloaded as three split GGUF files from
+  `Qwen/Qwen2.5-14B-Instruct-GGUF` revision
+  `b466e1f8c07172155743e8e1307507d8a4f91fbd`; split-file SHA-256 digests are
+  recorded in the evidence file.
+- Qwen2.5-14B passed the development sanity run with 3/3 required cases and
+  0 critical failures, but held-out qualification again passed only 2/5
+  required cases with 5 critical failures, so it remained `unsuitable`.
+- Gemma 3 12B QAT Q4_0 repository metadata was visible, but GGUF file metadata
+  access returned `GatedRepoError 401`. No Gemma file was downloaded and no
+  Gemma qualification run was attempted.
+- Independent post-download artifact validation passed for all six
+  quality-calibration runs and their nested benchmark manifests.
+- Post-run cleanup checks found no residual `llama-server` or ArmTune worker
+  processes, and loopback ports were released.
+- Build-profile comparison and Performance Passport generation remain blocked
+  because no model/profile is `suitable`.
