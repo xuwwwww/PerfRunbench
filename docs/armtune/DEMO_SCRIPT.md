@@ -1,7 +1,7 @@
 # ArmTune Demo Script
 
-This is a planned three-minute demo outline. It contains no measured Arm
-result.
+This is a three-minute demo outline. Existing measured Arm runs are bounded
+pipeline-validation evidence, not final competition performance results.
 
 ## Pre-Demo Requirements
 
@@ -35,42 +35,50 @@ autotuneai arm inspect-host --target-config configs/armtune/targets/demo.json
 Highlight CPU identity, topology, host capabilities, and the label that host
 capability is not the same as workload execution evidence.
 
-### 1:00-1:30 - Baseline
+### 1:00-1:30 - Quality Calibration
 
 Show:
 
 ```text
-autotuneai arm benchmark --config configs/armtune/llama_cpp_boottrace.json
+autotuneai arm quality-calibrate --config configs/armtune/quality_calibration.example.json
 ```
 
-Highlight raw artifacts, repeated measurements, and quality validation.
+Highlight strict raw-output validation, optional audited normalization,
+failure-category histogram, prompt-contract digest, and model/profile
+suitability.
 
-### 1:30-2:10 - Optimization
+### 1:30-2:10 - Build Profiles and Comparison
 
 Show:
 
 ```text
-autotuneai arm optimize --config configs/armtune/llama_cpp_boottrace.json
+autotuneai arm build-plan --config configs/armtune/build_profiles.example.json
+autotuneai arm build-profile --config configs/armtune/build_profiles.example.json
+autotuneai arm profile-compare --config configs/armtune/profile_comparison.example.json
 ```
 
-Highlight candidate search, paired baseline controls, failed trial visibility,
-and recommendation rationale.
+Highlight that `build-plan` does not execute a build, `build-profile` records
+existing build evidence, `arm-optimized` stays `requested_but_unverified`
+without real KleidiAI evidence, and profile comparison rejects incomplete or
+quality-failing profiles.
 
 ### 2:10-2:40 - Passport and Report
 
 Show:
 
 ```text
-autotuneai arm passport --run-id <run_id>
+autotuneai arm passport --comparison-result .autotuneai/runs/<run_id>/armtune/profile_comparison/profile_comparison_result.json
+autotuneai arm verify-passport --passport .autotuneai/runs/<run_id>/armtune/passport/performance_passport.json
 ```
 
 Open:
 
 ```text
-.autotuneai/runs/<run_id>/armtune/report.html
+.autotuneai/runs/<run_id>/armtune/passport/performance_passport.md
 ```
 
-Highlight reproducibility command, limitations, and raw artifact digests.
+Highlight claim eligibility, limitations, result origin, comparison-result
+digest, and artifact-manifest digest.
 
 ### 2:40-3:00 - CI Gate
 

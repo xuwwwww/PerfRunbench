@@ -72,14 +72,16 @@ Build profiles should be comparable only when the model, prompt suite, token
 counts, runtime source commit, binary provenance, CPU allocation, and quality
 thresholds are controlled.
 
-Planned profiles:
+Phase 5 profile IDs:
 
-- portable Arm64
-- native Arm64
-- verified Arm-optimized
+- `portable-baseline`
+- `arm-native`
+- `arm-optimized`
 
-KleidiAI or another optimized path must not be labeled enabled without explicit
-build or runtime evidence.
+KleidiAI or another optimized path must not be labeled enabled without
+explicit compile, link, runtime, or binary evidence. Host feature support and
+requested CMake settings are necessary context but not workload execution
+evidence.
 
 ## Claims Requiring A Real Arm Host
 
@@ -91,3 +93,7 @@ These claims require Phase 6 or another real Linux Arm64 target run:
 - Neoverse-specific performance conclusions.
 - Performix-derived bottleneck conclusions.
 - Regression gate thresholds backed by Arm measurements.
+
+Phase 5 fixture passports are useful for validating the evidence pipeline, but
+they are not Arm-specific performance claims unless backed by a real Linux
+Arm64 target run with `result_origin: measured`.

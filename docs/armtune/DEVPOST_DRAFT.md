@@ -31,26 +31,47 @@ CPU and features were present, what runtime path was actually used, whether a
 speedup is larger than noise, whether output quality was preserved, and whether
 another developer can reproduce the same experiment.
 
-## Planned Functionality
+## Implemented Evidence Pipeline
 
 - Controller/target workflow for local or SSH Linux Arm64 targets.
 - Arm host identity, feature, and topology inspection.
 - llama.cpp build and runtime evidence.
 - Repeated baseline and candidate measurements.
-- Quality validation using a deterministic reference workload.
-- Arm Performance Passport JSON plus HTML and Markdown reports.
-- Passport comparison and CI regression gate.
+- Deterministic quality validation using a public synthetic BootTrace
+  reference workload.
+- Quality calibration with strict raw-output mode and optional audited
+  fenced-JSON normalization.
+- Declarative build-profile evidence for `portable-baseline`, `arm-native`,
+  and `arm-optimized`.
+- Quality-aware profile comparison and Performance Passport JSON/Markdown
+  generation with digest verification.
+
+## Planned Functionality
+
+- Real quality-preserving build-profile comparison on an existing Linux Arm64
+  target.
 - Optional Arm Performix profiling evidence.
+- Passport comparison and CI regression gate.
 
-## Result Claims
+## Result Claims and Boundaries
 
-No measured Arm result is available yet. This section must be filled only after
-Phase 6 real Arm validation.
+ArmTune has bounded real Arm pipeline evidence for `llama-bench`,
+`llama-server`, streaming request timing, quality-aware rejection, cleanup, and
+artifact digest validation. These runs are not final competition benchmark
+results and do not prove KleidiAI usage or an optimized profile.
+
+Phase 5 fixture passports are pipeline-validation artifacts only. They must not
+be presented as measured Arm performance.
 
 ## Setup
 
-To be completed after Phase 1 and Phase 2 implementation.
+Use private target and workload configuration outside the repository for real
+Arm runs. Public examples are available under `configs/armtune/` and are
+templates only.
 
 ## Demo
 
-To be completed after the reference BootTrace workflow is implemented.
+The current demo flow shows `arm doctor`, `arm inspect-host`,
+`arm quality-calibrate`, `arm build-plan`, `arm build-profile`,
+`arm profile-compare`, `arm passport`, and `arm verify-passport`. Fixture
+passport output is explicitly labeled `fixture_only`.

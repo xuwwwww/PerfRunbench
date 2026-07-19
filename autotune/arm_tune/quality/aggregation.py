@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from autotune.arm_tune.quality.diagnostics import failure_category_histogram
 from autotune.arm_tune.quality.schemas import QualityAggregateResult, QualityCaseResult
 
 
@@ -63,6 +64,7 @@ def aggregate_quality_results(results: list[QualityCaseResult]) -> QualityAggreg
         evidence_citation_correctness=_rate(evidence_valid, evidence_total),
         quality_gate_status=status,
         failure_reasons=sorted(set(reason for reason in failure_reasons if reason)),
+        failure_category_histogram=failure_category_histogram(results),
     )
 
 

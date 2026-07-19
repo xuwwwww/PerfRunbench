@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "unverified",
+  "source_repo": "/opt/llama.cpp",
+  "build_root": "/opt/llama.cpp/build-armtune",
+  "target_architecture": "aarch64",
+  "toolchain": {
+    "compiler_id": "gcc",
+    "compiler_version": "unknown",
+    "cmake_version": "unknown",
+    "generator": "Ninja",
+    "build_type": "Release"
+  },
+  "profiles": [
+    "portable-baseline",
+    "arm-native",
+    {
+      "profile_id": "arm-optimized",
+      "effective_cmake_cache": {
+        "LLAMA_KLEIDIAI": "ON"
+      },
+      "compile_command_evidence": []
+    }
+  ],
+  "binaries": {
+    "portable-baseline": {
+      "path": "/opt/llama.cpp/build-portable/bin/llama-server"
+    },
+    "arm-native": {
+      "path": "/opt/llama.cpp/build-native/bin/llama-server"
+    },
+    "arm-optimized": {
+      "path": "/opt/llama.cpp/build-optimized/bin/llama-server"
+    }
+  },
+  "build": {
+    "effective_cmake_cache": {
+      "CMAKE_BUILD_TYPE": "Release"
+    }
+  },
+  "linked_libraries": []
+}

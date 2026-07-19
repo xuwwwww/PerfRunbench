@@ -586,12 +586,25 @@ Each profile records source repository identity, source commit, dirty-state
 status, compiler and CMake evidence, requested CMake definitions, effective
 CMake cache entries, compile-command evidence when available, target
 architecture, binary paths, binary digests, binary sizes, linked-library
-evidence, build stdout/stderr, build status, and evidence completeness.
+evidence, build-output evidence when available, build status, and evidence
+completeness.
 
 `arm-optimized` can report KleidiAI only when evidence supports it. A requested
-flag alone is `requested_but_unverified`; stronger states require additional
-evidence such as CMake cache or compile definitions, linked symbols or
+flag or CMake cache entry alone is `requested_but_unverified`; stronger states
+require additional evidence such as compile-command records, linked symbols or
 libraries, runtime logs, or build output.
+
+Phase 5 exposes these public commands:
+
+```text
+autotuneai arm quality-calibrate --config <path>
+autotuneai arm build-plan --config <path>
+autotuneai arm build-profile --config <path>
+autotuneai arm inspect-build --config <path>
+autotuneai arm profile-compare --config <path>
+autotuneai arm passport --comparison-result <path>
+autotuneai arm verify-passport --passport <path>
+```
 
 Profile comparison reuses the server benchmark and quality layers. It compares
 only profiles with compatible model, prompt suite, normalization policy,

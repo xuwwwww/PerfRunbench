@@ -148,7 +148,7 @@ def _quality_response_text(body: bytes, parsed: argparse.Namespace, quality_mode
             },
             sort_keys=True,
         )
-    return json.dumps(
+    response = json.dumps(
         {
             "case_id": case_id,
             "status": _status_for_case(case_id),
@@ -159,6 +159,11 @@ def _quality_response_text(body: bytes, parsed: argparse.Namespace, quality_mode
         },
         sort_keys=True,
     )
+    if quality_mode == "boottrace_fenced":
+        return "```json\n" + response + "\n```"
+    if quality_mode == "boottrace_fenced_with_prose":
+        return "Here is the result:\n```json\n" + response + "\n```"
+    return response
 
 
 def _prompt_from_request(body: bytes) -> str:

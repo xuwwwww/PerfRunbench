@@ -4,11 +4,17 @@ import argparse
 import json
 import sys
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
+from autotune.arm_tune.build_profiles.builder import inspect_build, run_build_profile, write_build_plan
+from autotune.arm_tune.build_profiles.comparison import run_profile_comparison
 from autotune.arm_tune.config import AFFINITY_MODE_CHOICES, default_local_target, load_benchmark_config, load_optimize_config, load_target_spec
 from autotune.arm_tune.errors import ArmTuneError
+from autotune.arm_tune.passport.generator import generate_passport
+from autotune.arm_tune.passport.verification import verify_passport
+from autotune.arm_tune.quality.calibration import QualityCalibrationResult, load_quality_calibration_config, run_quality_calibration
 from autotune.arm_tune.schemas import (
     ArmBenchmarkResult,
     DoctorStatuses,
@@ -45,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="autotuneai arm", description="ArmTune target inspection and validation.")
-    subparsers = parser.add_subparsers(dest="arm_command", metavar="{doctor,inspect-host,benchmark,optimize}")
+    subparsers = parser.add_subparsers(dest="arm_command")
 
     doctor = subparsers.add_parser("doctor", help="Validate ArmTune controller and target configuration.")
     doctor.add_argument("--target-config")
@@ -72,6 +78,34 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--max-candidates", type=int)
     optimize.add_argument("--affinity-modes", help="Comma-separated affinity modes to include in search.")
     optimize.set_defaults(handler=_cmd_optimize)
+
+    quality_calibrate = subparsers.add_parser("quality-calibrate", help="Calibrate deterministic quality suitability for a fixed llama-server profile.")
+    quality_calibrate.add_argument("--config", required=True)
+    quality_calibrate.set_defaults(handler=_cmd_quality_calibrate)
+
+    build_plan = subparsers.add_parser("build-plan", help="Create a versioned ArmTune build-profile plan without executing a build.")
+    build_plan.add_argument("--config", required=True)
+    build_plan.set_defaults(handler=_cmd_build_plan)
+
+    build_profile = subparsers.add_parser("build-profile", help="Inspect existing build-profile artifacts and write build evidence.")
+    build_profile.add_argument("--config", required=True)
+    build_profile.set_defaults(handler=_cmd_build_profile)
+
+    inspect_build_cmd = subparsers.add_parser("inspect-build", help="Inspect existing build artifacts for ArmTune build evidence.")
+    inspect_build_cmd.add_argument("--config", required=True)
+    inspect_build_cmd.set_defaults(handler=_cmd_inspect_build)
+
+    profile_compare = subparsers.add_parser("profile-compare", help="Compare quality-passing build profiles using artifact-backed measurements.")
+    profile_compare.add_argument("--config", required=True)
+    profile_compare.set_defaults(handler=_cmd_profile_compare)
+
+    passport = subparsers.add_parser("passport", help="Generate an ArmTune Performance Passport from a profile comparison result.")
+    passport.add_argument("--comparison-result", required=True)
+    passport.set_defaults(handler=_cmd_passport)
+
+    verify_passport_cmd = subparsers.add_parser("verify-passport", help="Verify an ArmTune Performance Passport.")
+    verify_passport_cmd.add_argument("--passport", required=True)
+    verify_passport_cmd.set_defaults(handler=_cmd_verify_passport)
 
     worker = subparsers.add_parser("worker", help=argparse.SUPPRESS)
     worker.add_argument("--job-spec", required=True)
@@ -230,6 +264,167 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
     finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
     print(_server_optimize_summary(result) if isinstance(result, ArmTuneServerSearchResult) else _optimize_summary(result))
     return exit_code
+
+
+def _cmd_quality_calibrate(args: argparse.Namespace) -> int:
+    config = load_quality_calibration_config(args.config)
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "quality-calibrate", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    calibration_dir = run_dir / "armtune" / "quality_calibration"
+    target = _target_from_spec(config.target)
+    try:
+        result = run_quality_calibration(
+            target=target,
+            config=config,
+            run_id=manifest.run_id,
+            calibration_dir=calibration_dir,
+        )
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = _quality_calibration_exit_code(result)
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_quality_calibration_summary(result))
+    return exit_code
+
+
+def _cmd_build_plan(args: argparse.Namespace) -> int:
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "build-plan", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    output_dir = run_dir / "armtune" / "build_profile"
+    try:
+        plan = write_build_plan(config_path=args.config, run_id=manifest.run_id, output_dir=output_dir)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    finish_run(run_dir, manifest, "completed", 0)
+    print("\n".join([
+        f"run_id: {plan.run_id}",
+        f"operation: {plan.operation}",
+        f"result_origin: {plan.result_origin}",
+        f"profile_count: {len(plan.profiles)}",
+        f"execute_build: {str(plan.execute_build).lower()}",
+        f"artifact_directory: {output_dir}",
+    ]))
+    return 0
+
+
+def _cmd_build_profile(args: argparse.Namespace) -> int:
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "build-profile", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    output_dir = run_dir / "armtune" / "build_profile"
+    try:
+        result = run_build_profile(config_path=args.config, run_id=manifest.run_id, output_dir=output_dir)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = 0 if all(profile.build_status == "completed" for profile in result.profiles) else 1
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_build_profile_summary(result))
+    return exit_code
+
+
+def _cmd_inspect_build(args: argparse.Namespace) -> int:
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "inspect-build", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    output_dir = run_dir / "armtune" / "build_profile"
+    try:
+        result = inspect_build(config_path=args.config, run_id=manifest.run_id, output_dir=output_dir)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = 0 if all(profile.binary and profile.binary.validation_status == "passed" for profile in result.profiles) else 1
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_build_profile_summary(result))
+    return exit_code
+
+
+def _cmd_profile_compare(args: argparse.Namespace) -> int:
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "profile-compare", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    output_dir = run_dir / "armtune" / "profile_comparison"
+    try:
+        result = run_profile_comparison(config_path=args.config, run_id=manifest.run_id, output_dir=output_dir)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = 0 if result.recommendation.status in {"recommended", "inconclusive"} else 1
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_profile_comparison_summary(result))
+    return exit_code
+
+
+def _cmd_passport(args: argparse.Namespace) -> int:
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "passport", "--comparison-result", args.comparison_result],
+        ResourceBudget(enforce=False),
+    )
+    output_dir = run_dir / "armtune" / "passport"
+    try:
+        passport, json_path, markdown_path = generate_passport(
+            comparison_result_path=args.comparison_result,
+            run_id=manifest.run_id,
+            output_dir=output_dir,
+        )
+        verification = verify_passport(json_path)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = 0 if verification.verification_status == "passed" else 1
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print("\n".join([
+        f"run_id: {passport.run_id}",
+        f"claim_eligibility_state: {passport.claim_eligibility_state}",
+        f"result_origin: {passport.result_origin}",
+        f"verification_status: {verification.verification_status}",
+        f"json_path: {json_path}",
+        f"markdown_path: {markdown_path}",
+    ]))
+    return exit_code
+
+
+def _cmd_verify_passport(args: argparse.Namespace) -> int:
+    try:
+        verification = verify_passport(args.passport)
+    except Exception as exc:
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    print(json.dumps(verification.to_dict(), indent=2, sort_keys=True))
+    return 0 if verification.verification_status == "passed" else 1
 
 
 def _cmd_worker(args: argparse.Namespace) -> int:
@@ -477,6 +672,68 @@ def _server_optimize_summary(result: ArmTuneServerSearchResult) -> str:
         f"artifact_directory: {result.artifact_directory}",
     ]
     return "\n".join(lines)
+
+
+def _quality_calibration_exit_code(result: QualityCalibrationResult) -> int:
+    if result.benchmark_result.cleanup_status == "failed":
+        return 4
+    if result.suitability_state == "suitable":
+        return 0
+    if result.suitability_state in {"unsuitable", "inconclusive", "execution_failed"}:
+        return 1
+    return 3
+
+
+def _quality_calibration_summary(result: QualityCalibrationResult) -> str:
+    return "\n".join(
+        [
+            f"run_id: {result.run_id}",
+            f"target_type: {result.target_type}",
+            f"result_origin: {result.result_origin}",
+            f"suite_case_count: {result.suite_case_count}",
+            f"request_success_count: {result.request_success_count}",
+            f"raw_json_valid_count: {result.raw_json_valid_count}",
+            f"normalized_json_valid_count: {result.normalized_json_valid_count}",
+            f"required_quality_cases_passed: {result.required_quality_cases_passed}/{result.required_quality_cases_total}",
+            f"critical_failure_count: {result.critical_failure_count}",
+            f"failure_category_histogram: {json.dumps(result.failure_category_histogram, sort_keys=True)}",
+            f"quality_gate_status: {result.quality_gate_status}",
+            f"model_profile_suitability: {result.suitability_state}",
+            f"artifact_directory: {result.artifact_directory}",
+        ]
+    )
+
+
+def _build_profile_summary(result) -> str:
+    completed = sum(1 for profile in result.profiles if profile.build_status == "completed")
+    kleidiai = {profile.profile_id: profile.kleidiai_status for profile in result.profiles}
+    return "\n".join(
+        [
+            f"run_id: {result.run_id}",
+            f"operation: {result.operation}",
+            f"result_origin: {result.result_origin}",
+            f"profile_count: {len(result.profiles)}",
+            f"completed_profile_count: {completed}",
+            f"kleidiai_status: {json.dumps(kleidiai, sort_keys=True)}",
+            f"artifact_directory: {result.artifact_directory}",
+        ]
+    )
+
+
+def _profile_comparison_summary(result) -> str:
+    return "\n".join(
+        [
+            f"run_id: {result.run_id}",
+            f"operation: {result.operation}",
+            f"result_origin: {result.result_origin}",
+            f"baseline_profile_id: {result.baseline_profile_id}",
+            f"profile_count: {len(result.profiles)}",
+            f"eligible_profile_count: {sum(1 for profile in result.profiles if profile.eligible)}",
+            f"recommendation_state: {result.recommendation.status}",
+            f"recommended_profile_id: {result.recommendation.profile_id or 'Not available'}",
+            f"artifact_directory: {result.artifact_directory}",
+        ]
+    )
 
 
 def _server_candidate_result(result: ArmTuneServerSearchResult, candidate_id: str | None):

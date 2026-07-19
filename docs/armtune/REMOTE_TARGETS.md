@@ -206,3 +206,28 @@ directory, validates candidate artifact manifests, writes the quality-aware
 `server_optimize_result.json`, and validates the root `server_optimize`
 artifact manifest. Credentials, identity-file paths, and private host details
 must not be written to public artifacts.
+
+## Phase 5 Evidence Commands on SSH Targets
+
+Phase 5 does not loosen the remote execution boundary.
+
+`autotuneai arm quality-calibrate --config <path>` still invokes the existing
+allowlisted `benchmark.llama_server` worker operation for workload execution.
+The controller adds local evidence artifacts around that run: quality-suite
+manifest, quality-suite snapshot, normalization policy, prompt contract,
+structured capability summary, quality calibration result, artifact manifest,
+and artifact validation.
+
+For SSH targets, `workload.prompt_suite_path` remains an absolute path on the
+target. The controller writes a local `prompt_suite_snapshot.json` for
+auditability, but it does not silently upload or substitute model, prompt, or
+private workload files outside the versioned worker protocol.
+
+`autotuneai arm build-plan` does not execute remote work. `build-profile` and
+`inspect-build` record configured source and binary evidence and must not
+accept arbitrary remote shell strings. A profile may be compared only after
+quality calibration and artifact digest validation pass.
+
+`autotuneai arm passport` and `verify-passport` are controller-side evidence
+operations. They do not connect to the target and do not modify cloud
+resources.

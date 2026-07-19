@@ -202,3 +202,29 @@ should be labeled unverified.
   search quantization, run concurrency/load tests, integrate Performix,
   generate a complete Performance Passport, or establish final competition
   benchmark conclusions.
+
+## Phase 5 Limitations
+
+- Phase 5 implements the local competition-evidence MVP: quality diagnostics,
+  optional fenced-JSON normalization, structured capability reporting,
+  BootTrace prompt-contract digests, quality calibration, declarative build
+  profiles, profile comparison, and Performance Passport generation and
+  verification.
+- Phase 5 local fake E2E evidence remains `result_origin: test_fixture`; its
+  fixture timings and fixture build artifacts must not be reported as Arm
+  performance or as llama.cpp optimization results.
+- Phase 5 does not automatically build llama.cpp from source on the target.
+  `build-plan` is non-executing, and `build-profile` currently records and
+  inspects existing build artifacts rather than running arbitrary build
+  commands.
+- `arm-optimized` remains `requested_but_unverified` unless compile, link,
+  runtime, or binary evidence supports an optimized path. A requested
+  `LLAMA_KLEIDIAI=ON` setting alone is not evidence that KleidiAI executed.
+- No Phase 5 bounded real Arm validation has been recorded yet. Until that
+  evidence exists, there is no measured quality-preserving profile
+  recommendation and no eligible preliminary Performance Passport for a real
+  Arm target.
+- Phase 5 does not add Performix profiling, concurrency/load testing, model
+  download or substitution, cloud provisioning, automatic EC2 control,
+  quality-suite expansion beyond the public synthetic BootTrace suite, or final
+  competition benchmark conclusions.

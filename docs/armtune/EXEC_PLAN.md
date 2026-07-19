@@ -1151,11 +1151,12 @@ quality gate.
 
 ## Phase 5 Plan: Competition Evidence MVP
 
-Status: planned. Phase 5 turns the Phase 4 quality-rejection result into a
-competition-evidence pipeline. It must recover the real-model quality contract
-without weakening canonical BootTrace expected answers, add reproducible Arm
-build-profile evidence, compare only quality-preserving profiles, and generate
-a verifiable Performance Passport.
+Status: local MVP implemented; bounded real validation is pending. Phase 5
+turns the Phase 4 quality-rejection result into a competition-evidence
+pipeline. It recovers the model/profile quality contract through auditable
+diagnostics and optional normalization without weakening canonical BootTrace
+expected answers, adds reproducible Arm build-profile evidence, compares only
+quality-preserving profiles, and generates a verifiable Performance Passport.
 
 Allowed scope:
 
@@ -1258,3 +1259,42 @@ Phase 5 real-validation boundary:
   eligible profiles, generate and verify a passport, revalidate artifact
   manifests, and verify cleanup.
 - Do not automatically download or substitute a model.
+
+Phase 5 implemented artifact roots:
+
+```text
+.autotuneai/runs/<run_id>/armtune/quality_calibration/
+  quality_calibration_job.json
+  effective_config.json
+  quality_suite_manifest.json
+  quality_suite_snapshot.json
+  normalization_policy.json
+  prompt_contract.json
+  prompt_suite_snapshot.json
+  benchmark/
+  quality_calibration_result.json
+  artifact_manifest.json
+  artifact_validation.json
+
+.autotuneai/runs/<run_id>/armtune/build_profile/
+  build_plan.json
+  build_profile_result.json
+  artifact_manifest.json
+  artifact_validation.json
+
+.autotuneai/runs/<run_id>/armtune/profile_comparison/
+  profile_comparison_job.json
+  profile_comparison_result.json
+  artifact_manifest.json
+  artifact_validation.json
+
+.autotuneai/runs/<run_id>/armtune/passport/
+  performance_passport.json
+  performance_passport.md
+  performance_passport_verification.json
+```
+
+Phase 5 fake E2E coverage validates command wiring, fixture build evidence,
+quality-preserving profile comparison, quality rejection, Performance Passport
+generation, and digest tamper detection. Fixture measurements remain
+`result_origin: test_fixture` and must not be used as Arm performance results.

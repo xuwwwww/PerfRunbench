@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "unverified",
+  "baseline_profile_id": "portable-baseline",
+  "noise_band_percent": 2.0,
+  "profiles": [
+    {
+      "profile_id": "portable-baseline",
+      "build_result_path": ".autotuneai/runs/<run_id>/armtune/build_profile/build_profile_result.json",
+      "quality_calibration_result_path": ".autotuneai/runs/<run_id>/armtune/quality_calibration/quality_calibration_result.json",
+      "measurements": [
+        {
+          "ttft_ms": 100.0,
+          "end_to_end_latency_ms": 180.0
+        }
+      ]
+    },
+    {
+      "profile_id": "arm-native",
+      "build_result_path": ".autotuneai/runs/<run_id>/armtune/build_profile/build_profile_result.json",
+      "quality_calibration_result_path": ".autotuneai/runs/<run_id>/armtune/quality_calibration/quality_calibration_result.json",
+      "measurements": [
+        {
+          "ttft_ms": 92.0,
+          "end_to_end_latency_ms": 170.0
+        }
+      ]
+    }
+  ]
+}

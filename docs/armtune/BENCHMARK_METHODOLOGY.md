@@ -461,11 +461,12 @@ are:
 
 Each profile records source commit, dirty-state status, compiler and CMake
 versions, requested and effective CMake definitions, target architecture,
-binary digests, binary size, linked-library evidence, build logs, build status,
-and evidence completeness.
+binary digests, binary size, linked-library evidence, build-output evidence
+when available, build status, and evidence completeness.
 
 `arm-optimized` may report KleidiAI only with build and runtime evidence.
-Requested build flags without runtime or binary evidence remain
+Requested build flags or CMake cache entries without compile, link, runtime,
+or binary evidence remain
 `requested_but_unverified`.
 
 ### Profile Comparison
@@ -529,3 +530,9 @@ Passport verification checks schema, internal digest references, artifact
 manifest binding, and claim consistency. It must never upgrade fixture,
 quality-failing, provenance-incomplete, statistics-incomplete, or cleanup-
 incomplete evidence into a public performance claim.
+
+Phase 5 local tests cover strict-output failure, fenced-JSON normalization,
+fixture build-profile evidence, optimized-profile evidence rejection, fixture
+profile comparison, Performance Passport generation, and passport tamper
+detection. These tests validate the evidence pipeline and claim gates; they do
+not provide measured Arm performance.

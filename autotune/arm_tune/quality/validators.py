@@ -4,6 +4,8 @@ import json
 import re
 from typing import Any
 
+from autotune.arm_tune.quality.diagnostics import categorize_quality_failure
+from autotune.arm_tune.quality.normalization import NormalizationPolicy, normalize_output
 from autotune.arm_tune.quality.schemas import QualityCase, QualityCaseResult, QualityValidatorSpec, ValidatorResult
 
 
@@ -15,9 +17,20 @@ def validate_quality_case(
     stream_parse_status: str = "parsed",
     output_artifact: str = "",
     repetition_index: int | None = None,
+    normalization_policy: NormalizationPolicy | None = None,
 ) -> QualityCaseResult:
+    normalization = normalize_output(generated_output, normalization_policy)
     if request_status != "completed" or stream_parse_status != "parsed":
         reason = f"request_status={request_status}, stream_parse_status={stream_parse_status}"
+        categories = categorize_quality_failure(
+            case=case,
+            generated_output=generated_output,
+            request_status=request_status,
+            stream_parse_status=stream_parse_status,
+            validator_results=[],
+            normalization=normalization,
+            parse_error="",
+        )
         return QualityCaseResult(
             case_id=case.case_id,
             category=case.category,
@@ -28,12 +41,32 @@ def validate_quality_case(
             validator_results=[],
             output_artifact=output_artifact,
             generated_output=generated_output,
+            raw_output_sha256=normalization.raw_output_sha256,
+            normalized_output=normalization.normalized_output,
+            normalized_output_sha256=normalization.normalized_output_sha256,
+            normalization_policy_version=normalization.normalization_policy_version,
+            normalization_applied=normalization.normalization_applied,
+            normalization_steps=normalization.normalization_steps,
+            parser_status="execution_not_validated",
+            validation_input=normalization.validation_input,
+            failure_categories=categories,
             repetition_index=repetition_index,
             failure_reasons=[reason],
         )
-    parsed, parse_error = _parse_json(generated_output)
-    results = [run_validator(validator, generated_output, parsed, parse_error) for validator in case.validators]
+    validation_text = normalization.normalized_output if normalization.validation_input == "normalized" else generated_output
+    parsed, parse_error = _parse_json(validation_text)
+    parser_status = _parser_status(parse_error, normalization)
+    results = [run_validator(validator, validation_text, parsed, parse_error) for validator in case.validators]
     critical_failures = [result for result in results if result.critical and result.status != "passed"]
+    categories = categorize_quality_failure(
+        case=case,
+        generated_output=generated_output,
+        request_status=request_status,
+        stream_parse_status=stream_parse_status,
+        validator_results=results,
+        normalization=normalization,
+        parse_error=parse_error,
+    )
     status = "failed" if critical_failures else "passed"
     return QualityCaseResult(
         case_id=case.case_id,
@@ -45,6 +78,15 @@ def validate_quality_case(
         validator_results=results,
         output_artifact=output_artifact,
         generated_output=generated_output,
+        raw_output_sha256=normalization.raw_output_sha256,
+        normalized_output=normalization.normalized_output,
+        normalized_output_sha256=normalization.normalized_output_sha256,
+        normalization_policy_version=normalization.normalization_policy_version,
+        normalization_applied=normalization.normalization_applied,
+        normalization_steps=normalization.normalization_steps,
+        parser_status=parser_status,
+        validation_input=normalization.validation_input,
+        failure_categories=categories,
         repetition_index=repetition_index,
         failure_reasons=[result.message for result in critical_failures],
     )
@@ -89,6 +131,14 @@ def _parse_json(output: str) -> tuple[Any, str]:
         return json.loads(output), ""
     except json.JSONDecodeError as exc:
         return None, str(exc)
+
+
+def _parser_status(parse_error: str, normalization) -> str:
+    if normalization.parser_status == "normalization_rejected":
+        return "normalization_rejected"
+    if parse_error:
+        return "invalid_json"
+    return "normalized_json_valid" if normalization.validation_input == "normalized" else "raw_json_valid"
 
 
 def _json_schema(validator: QualityValidatorSpec, parsed_json: Any, parse_error: str) -> ValidatorResult:

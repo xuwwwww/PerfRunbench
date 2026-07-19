@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "unverified",
+  "target": {
+    "type": "ssh",
+    "host": "arm-target.example",
+    "user": "ubuntu",
+    "remote_workdir": "~/armtune-runs",
+    "strict_host_key_checking": true
+  },
+  "runtime": {
+    "adapter": "llama_server"
+  },
+  "executable": {
+    "path": "/opt/llama.cpp/build/bin/llama-server",
+    "expected_sha256": null
+  },
+  "model": {
+    "path": "/opt/models/small-public-model.gguf",
+    "expected_sha256": null
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": "auto",
+    "startup_timeout_seconds": 30.0,
+    "request_timeout_seconds": 30.0,
+    "shutdown_timeout_seconds": 5.0,
+    "threads": 2,
+    "context_size": 512,
+    "batch_size": 128,
+    "ubatch_size": 128,
+    "seed": 42,
+    "temperature": 0.0
+  },
+  "workload": {
+    "mode": "server",
+    "prompt_suite_path": "/opt/armtune/boottrace_prompt_suite.json",
+    "predict_tokens": 96,
+    "repetitions": 1,
+    "warmup_requests": 0,
+    "streaming": true,
+    "cooldown_seconds": 0.0
+  },
+  "quality_gate": {
+    "enabled": true,
+    "suite_path": "configs/armtune/quality/boottrace_suite.json"
+  },
+  "normalization": {
+    "schema_version": "1.0",
+    "enabled": false,
+    "strict": true,
+    "allow_markdown_fence": false,
+    "allow_prose_outside_fence": false
+  },
+  "artifacts": {
+    "preserve_server_stdout": true,
+    "preserve_server_stderr": true,
+    "preserve_request_stream": true,
+    "preserve_generated_output": true
+  }
+}

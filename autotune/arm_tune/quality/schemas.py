@@ -85,6 +85,15 @@ class QualityCaseResult:
     validator_results: list[ValidatorResult]
     output_artifact: str = ""
     generated_output: str = ""
+    raw_output_sha256: str = ""
+    normalized_output: str = ""
+    normalized_output_sha256: str = ""
+    normalization_policy_version: str = ""
+    normalization_applied: bool = False
+    normalization_steps: list[str] = field(default_factory=list)
+    parser_status: str = "not_checked"
+    validation_input: str = "raw"
+    failure_categories: list[str] = field(default_factory=list)
     repetition_index: int | None = None
     failure_reasons: list[str] = field(default_factory=list)
     schema_version: str = SCHEMA_VERSION
@@ -105,6 +114,7 @@ class QualityAggregateResult:
     evidence_citation_correctness: float
     quality_gate_status: str
     failure_reasons: list[str] = field(default_factory=list)
+    failure_category_histogram: dict[str, int] = field(default_factory=dict)
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:

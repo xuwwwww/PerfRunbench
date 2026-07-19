@@ -115,6 +115,24 @@ class ArmTuneCliTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("PerfRunbench resource and tuning toolkit", output.getvalue())
 
+    def test_phase5_arm_commands_are_registered(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["arm", "--help"])
+
+        self.assertEqual(code, 0)
+        text = output.getvalue()
+        for command in [
+            "quality-calibrate",
+            "build-plan",
+            "build-profile",
+            "inspect-build",
+            "profile-compare",
+            "passport",
+            "verify-passport",
+        ]:
+            self.assertIn(command, text)
+
 
 if __name__ == "__main__":
     unittest.main()

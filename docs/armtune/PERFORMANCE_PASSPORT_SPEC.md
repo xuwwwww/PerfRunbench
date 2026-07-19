@@ -6,34 +6,30 @@ The Arm Performance Passport is the primary reproducibility artifact for an
 ArmTune run. It must be readable and comparable without access to the original
 machine.
 
-Planned file:
+Phase 5 MVP files:
 
 ```text
-.autotuneai/runs/<run_id>/armtune/arm_performance_passport.json
+.autotuneai/runs/<run_id>/armtune/passport/performance_passport.json
+.autotuneai/runs/<run_id>/armtune/passport/performance_passport.md
+.autotuneai/runs/<run_id>/armtune/passport/performance_passport_verification.json
 ```
 
 ## Top-Level Requirements
 
-Every passport includes:
+The Phase 5 MVP passport includes:
 
 - `schema_version`
-- `armtune_version`
-- `perfrunbench_version`
-- `repository`
-- `target`
-- `platform`
-- `runtime`
-- `model`
-- `workload`
-- `benchmark_protocol`
-- `search_space`
-- `baseline`
-- `recommendation`
-- `quality`
-- `artifacts`
-- `validity`
+- `run_id`
+- `claim_eligibility_state`
+- `claim_summary`
+- `result_origin`
+- `comparison_result_path`
+- `comparison_result_sha256`
+- `artifact_manifest_path`
+- `artifact_manifest_sha256`
+- `benchmark_claims`
+- `provenance_summary`
 - `limitations`
-- `reproducibility`
 - `created_at_utc`
 
 ## Required Evidence Groups
@@ -117,3 +113,31 @@ Public summaries must not include:
 
 Public summaries must distinguish measured, synthetic, fixture, example, and
 unverified data.
+
+## Claim Eligibility States
+
+The passport must use one of these claim states:
+
+- `eligible_preliminary`
+- `ineligible_quality`
+- `ineligible_provenance`
+- `ineligible_statistics`
+- `ineligible_cleanup`
+- `fixture_only`
+
+`fixture_only` passports can demonstrate pipeline behavior, but they are not
+measured Arm performance claims.
+
+## Verification
+
+`autotuneai arm verify-passport --passport <path>` checks:
+
+- passport schema version
+- supported claim eligibility state
+- fixture result-origin consistency
+- comparison-result digest
+- artifact-manifest digest when present
+- versioned benchmark-claim structure
+
+Verification failure means the passport must not be used as a public
+performance claim.
