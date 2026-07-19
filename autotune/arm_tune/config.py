@@ -8,6 +8,7 @@ from autotune.arm_tune import SCHEMA_VERSION
 from autotune.arm_tune.benchmark.llama_bench import BENCHMARK_OPERATION, PROTOCOL_VERSION
 from autotune.arm_tune.benchmark.llama_server import SERVER_BENCHMARK_OPERATION
 from autotune.arm_tune.errors import ArmTuneConfigError
+from autotune.arm_tune.quality.normalization import normalization_policy_from_payload
 from autotune.arm_tune.schemas import (
     BenchmarkArtifactsSpec,
     BenchmarkExecutableSpec,
@@ -322,11 +323,11 @@ def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBen
         isinstance(workload_payload, dict)
         and workload_payload.get("mode") == "server"
     )
-    allowed_top_level = (SERVER_BENCHMARK_TOP_LEVEL_KEYS | {"search", "quality_gate"}) if server_optimize else OPTIMIZE_TOP_LEVEL_KEYS
+    allowed_top_level = (SERVER_BENCHMARK_TOP_LEVEL_KEYS | {"search", "quality_gate", "normalization"}) if server_optimize else OPTIMIZE_TOP_LEVEL_KEYS
     unknown = set(payload) - allowed_top_level
     if unknown:
         raise ArmTuneConfigError(f"unknown optimize config field(s): {sorted(unknown)}")
-    benchmark_payload = {key: value for key, value in payload.items() if key not in {"search", "quality_gate"}}
+    benchmark_payload = {key: value for key, value in payload.items() if key not in {"search", "quality_gate", "normalization"}}
     target, job = parse_benchmark_config(benchmark_payload)
     search_payload = payload.get("search", {})
     if search_payload is None:
@@ -344,6 +345,10 @@ def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBen
     suite_path = _optional_config_path(quality_payload.get("suite_path"), "quality_gate.suite_path")
     if quality_enabled and not suite_path:
         raise ArmTuneConfigError("quality_gate.suite_path is required when quality_gate.enabled is true")
+    try:
+        normalization_policy = normalization_policy_from_payload(payload.get("normalization")) if server_optimize and quality_enabled else None
+    except ValueError as exc:
+        raise ArmTuneConfigError(str(exc)) from exc
     config = SearchConfig(
         warmup_runs=_non_negative_int(search_payload.get("warmup_runs", 2), "search.warmup_runs"),
         search_runs=_positive_int(search_payload.get("search_runs", 5), "search.search_runs"),
@@ -359,6 +364,7 @@ def parse_optimize_config(payload: dict[str, Any]) -> tuple[TargetSpec, LlamaBen
         affinity_modes=_optional_affinity_modes(search_payload.get("affinity_modes"), "search.affinity_modes"),
         quality_gate_enabled=quality_enabled,
         quality_suite_path=suite_path,
+        quality_normalization_policy=normalization_policy.to_dict() if normalization_policy is not None else None,
     )
     return target, job, config
 

@@ -70,7 +70,8 @@ def boottrace_prompt_contract(
     calibration_cases: list[QualityCase] | None = None,
 ) -> dict[str, Any]:
     version = normalize_boottrace_prompt_contract_version(prompt_contract_version)
-    schema_digest = stable_digest(BOOTTRACE_EXPECTED_RESPONSE_SCHEMA)
+    expected_response_schema = _expected_response_schema_for_cases(cases)
+    schema_digest = stable_digest(expected_response_schema)
     rendered_prompts = [
         {
             "schema_version": SCHEMA_VERSION,
@@ -98,7 +99,7 @@ def boottrace_prompt_contract(
         "contract_version": version,
         "taxonomy_version": BOOTTRACE_TAXONOMY_VERSION,
         "suite_manifest": suite_manifest.to_dict(),
-        "expected_response_schema": BOOTTRACE_EXPECTED_RESPONSE_SCHEMA,
+        "expected_response_schema": expected_response_schema,
         "expected_response_schema_sha256": schema_digest,
         "generation_settings": to_plain(generation_settings),
         "normalization_policy": to_plain(normalization_policy),
@@ -164,10 +165,8 @@ def render_boottrace_prompt(
         "Output contract:\n"
         "- Return exactly one raw compact JSON object.\n"
         "- Do not include Markdown fences or prose outside the JSON object.\n"
-        "- Use only these fields: case_id, status, event_sequence_valid, latency_ms, summary, evidence_line_ids.\n"
-        "- Copy case_id and evidence_line_ids exactly from the trace.\n"
-        "- Use a numeric latency_ms value; do not use null.\n"
-        "- Do not invent evidence line IDs.\n"
+        + _output_field_contract(case)
+        + "- Do not invent evidence line IDs.\n"
     )
     return "\n\n".join(sections)
 
@@ -216,6 +215,46 @@ def _taxonomy_and_decision_rules() -> str:
         "- Device did not become ready before timeout -> status failure, root cause device_initialization_timeout.\n"
         "- Firmware checksum or component verification failure blocks boot -> status failure, root cause firmware_component_failure.\n"
     )
+
+
+def _output_field_contract(case: QualityCase) -> str:
+    fields = _required_fields_for_case(case)
+    if {"failure_stage", "root_cause_category"}.issubset(set(fields)):
+        return (
+            "- Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids.\n"
+            "- Copy case_id, status, failure_stage, root_cause_category, and evidence_line_ids exactly from explicit trace fields.\n"
+            "- Use unknown when a required classification field is absent.\n"
+        )
+    return (
+        "- Use only these fields: case_id, status, event_sequence_valid, latency_ms, summary, evidence_line_ids.\n"
+        "- Copy case_id and evidence_line_ids exactly from the trace.\n"
+        "- Use a numeric latency_ms value; do not use null.\n"
+    )
+
+
+def _required_fields_for_case(case: QualityCase) -> list[str]:
+    for validator in case.validators:
+        if validator.validator_type == "json_schema" and isinstance(validator.expected, dict):
+            required = validator.expected.get("required")
+            if isinstance(required, list) and all(isinstance(item, str) for item in required):
+                return list(required)
+    return list(BOOTTRACE_EXPECTED_RESPONSE_SCHEMA["required"])
+
+
+def _expected_response_schema_for_cases(cases: list[QualityCase]) -> dict[str, Any]:
+    for case in cases:
+        for validator in case.validators:
+            if validator.validator_type == "json_schema" and isinstance(validator.expected, dict):
+                schema = {
+                    "schema_version": SCHEMA_VERSION,
+                    "type": "object",
+                    "required": list(validator.expected.get("required", [])),
+                    "properties": dict(validator.expected.get("properties", {})),
+                    "additionalProperties": False,
+                }
+                if schema["required"] and schema["properties"]:
+                    return schema
+    return dict(BOOTTRACE_EXPECTED_RESPONSE_SCHEMA)
 
 
 def _few_shot_examples(cases: list[QualityCase]) -> str:

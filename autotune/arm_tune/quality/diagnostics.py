@@ -58,9 +58,11 @@ def categorize_quality_failure(
         categories.add("wrong_status")
         if expected_status == "failure" and observed_status in {"success", "warning"}:
             categories.add("wrong_failure_stage")
-    for result in validator_results:
+    for index, result in enumerate(validator_results):
         if result.status == "passed":
             continue
+        spec = case.validators[index] if index < len(case.validators) else None
+        field = spec.field if spec is not None else None
         message = result.message.lower()
         if result.validator_type == "valid_json":
             categories.add("invalid_json")
@@ -70,8 +72,19 @@ def categorize_quality_failure(
                 categories.add("missing_required_field")
             else:
                 categories.add("response_format_violation")
-        elif result.validator_type == "allowed_values" and result.observed != result.expected:
+        elif result.validator_type == "exact_field" and field == "status":
             categories.add("wrong_status")
+        elif result.validator_type == "exact_field" and field == "failure_stage":
+            categories.add("wrong_failure_stage")
+        elif result.validator_type == "exact_field" and field == "root_cause_category":
+            categories.add("wrong_root_cause")
+        elif result.validator_type == "allowed_values" and result.observed != result.expected:
+            if field == "failure_stage":
+                categories.add("wrong_failure_stage")
+            elif field == "root_cause_category":
+                categories.add("wrong_root_cause")
+            else:
+                categories.add("wrong_status")
         elif result.validator_type in {"required_substrings", "regex"}:
             categories.add("wrong_root_cause")
         elif result.validator_type == "evidence_line_ids":

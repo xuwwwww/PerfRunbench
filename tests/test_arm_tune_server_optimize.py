@@ -30,6 +30,7 @@ from autotune.cli import main
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_SCRIPT = Path(__file__).parent / "fixtures" / "arm_tune" / "fake_llama_server.py"
 QUALITY_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_suite.json"
+TUNING_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_tuning_suite.json"
 
 
 class ArmTuneServerOptimizeTest(unittest.TestCase):
@@ -44,6 +45,8 @@ class ArmTuneServerOptimizeTest(unittest.TestCase):
         self.assertEqual(search.affinity_modes, ["scheduler-default", "compact"])
         self.assertTrue(search.quality_gate_enabled)
         self.assertEqual(search.quality_suite_path, str(QUALITY_SUITE))
+        self.assertIsNotNone(search.quality_normalization_policy)
+        self.assertTrue(search.quality_normalization_policy["allow_markdown_fence"])
 
     def test_public_fake_server_quality_aware_optimize_e2e(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -90,6 +93,67 @@ class ArmTuneServerOptimizeTest(unittest.TestCase):
             self.assertEqual(validation.validation_status, "passed")
             self.assertTrue(_candidate_ports_released(payload, root))
 
+    def test_public_fake_qwen_like_server_passes_tuning_suite(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = _write_config(root, _optimize_config(root, suite_path=TUNING_SUITE))
+            output = io.StringIO()
+            with _cwd(root), patch.object(LocalArmTarget, "inspect", return_value=_inspection()):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "FAKE_LLAMA_SERVER_QUALITY_MODE": "boottrace_tuning",
+                        "FAKE_LLAMA_SERVER_DELAY_PROFILE": "quality",
+                        "FAKE_LLAMA_SERVER_EVENT_DELAY": "0.001",
+                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "7",
+                    },
+                ):
+                    with redirect_stdout(output):
+                        exit_code = main(["arm", "optimize", "--config", str(config_path)])
+
+            result_path = next((root / ".autotuneai" / "runs").glob("*/armtune/server_optimize/server_optimize_result.json"))
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["quality_suite_manifest"]["suite_id"], "synthetic_boottrace_tuning_v1")
+            self.assertEqual(payload["candidate_count"], 3)
+            self.assertEqual(payload["eligible_candidate_count"], 2)
+            self.assertEqual(payload["recommendation"]["status"], "recommended")
+            rejected = {item["candidate_id"]: item for item in payload["rejected_candidates"]}
+            self.assertEqual(rejected["server-batch256-ubatch128"]["eligibility_status"], "rejected_quality")
+            selected = next(item for item in payload["candidates"] if item["candidate"]["candidate_id"] == payload["selected_candidate_id"])
+            self.assertEqual(selected["quality_result"]["aggregate"]["quality_gate_status"], "passed")
+            self.assertEqual(selected["quality_result"]["aggregate"]["required_case_pass_rate"], 1.0)
+            self.assertIn("quality_suite_id: synthetic_boottrace_tuning_v1", output.getvalue())
+            self.assertTrue(_candidate_ports_released(payload, root))
+
+    def test_server_optimize_fenced_tuning_json_passes_with_recorded_normalization(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = _write_config(root, _optimize_config(root, suite_path=TUNING_SUITE, max_candidates=1))
+            with _cwd(root), patch.object(LocalArmTarget, "inspect", return_value=_inspection()):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "FAKE_LLAMA_SERVER_QUALITY_MODE": "boottrace_tuning_fenced",
+                        "FAKE_LLAMA_SERVER_EVENT_DELAY": "0.001",
+                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "7",
+                    },
+                ):
+                    exit_code = main(["arm", "optimize", "--config", str(config_path)])
+
+            result_path = next((root / ".autotuneai" / "runs").glob("*/armtune/server_optimize/server_optimize_result.json"))
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            baseline = next(item for item in payload["candidates"] if item["candidate"]["candidate_id"] == "baseline")
+            first_case = baseline["quality_result"]["cases"][0]
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(baseline["quality_result"]["aggregate"]["quality_gate_status"], "passed")
+            self.assertEqual(first_case["validation_input"], "normalized")
+            self.assertEqual(first_case["parser_status"], "normalized_json_valid")
+            self.assertTrue(first_case["normalization_applied"])
+            self.assertIn("extract_single_markdown_fenced_json_block", first_case["normalization_steps"])
+            self.assertEqual(len(first_case["raw_output_sha256"]), 64)
+            self.assertEqual(len(first_case["normalized_output_sha256"]), 64)
+
     def test_quality_gate_failure_returns_no_eligible_candidate(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -115,7 +179,7 @@ class ArmTuneServerOptimizeTest(unittest.TestCase):
             self.assertIn("recommendation_state: no_eligible_candidate", output.getvalue())
 
 
-def _optimize_config(root: Path, *, max_candidates: int = 3) -> dict:
+def _optimize_config(root: Path, *, max_candidates: int = 3, suite_path: Path = QUALITY_SUITE) -> dict:
     prompt_suite = root / "unused_prompt_suite.json"
     prompt_suite.write_text(json.dumps({"schema_version": "1.0", "prompts": [{"prompt_id": "unused", "prompt": "unused"}]}), encoding="utf-8")
     return {
@@ -160,7 +224,14 @@ def _optimize_config(root: Path, *, max_candidates: int = 3) -> dict:
         },
         "quality_gate": {
             "enabled": True,
-            "suite_path": str(QUALITY_SUITE),
+            "suite_path": str(suite_path),
+        },
+        "normalization": {
+            "schema_version": "1.0",
+            "enabled": True,
+            "strict": False,
+            "allow_markdown_fence": True,
+            "allow_prose_outside_fence": False,
         },
         "artifacts": {
             "preserve_server_stdout": True,

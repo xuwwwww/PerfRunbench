@@ -136,6 +136,8 @@ def _quality_response_text(body: bytes, parsed: argparse.Namespace, quality_mode
     case_id = _case_id_from_prompt(prompt)
     if quality_mode == "boottrace_invalid_json":
         return "{not-json"
+    if quality_mode.startswith("boottrace_tuning"):
+        return _tuning_quality_response_text(case_id, parsed, quality_mode)
     if quality_mode == "boottrace_fail_all" or (parsed.batch_size is not None and parsed.batch_size >= 256):
         return json.dumps(
             {
@@ -162,6 +164,38 @@ def _quality_response_text(body: bytes, parsed: argparse.Namespace, quality_mode
     if quality_mode == "boottrace_fenced":
         return "```json\n" + response + "\n```"
     if quality_mode == "boottrace_fenced_with_prose":
+        return "Here is the result:\n```json\n" + response + "\n```"
+    return response
+
+
+def _tuning_quality_response_text(case_id: str, parsed: argparse.Namespace, quality_mode: str) -> str:
+    if quality_mode == "boottrace_tuning_invalid_json":
+        return "{not-json"
+    if quality_mode == "boottrace_tuning_fail_all" or (parsed.batch_size is not None and parsed.batch_size >= 256):
+        response = json.dumps(
+            {
+                "case_id": case_id,
+                "status": "success",
+                "failure_stage": "none",
+                "root_cause_category": "none",
+                "evidence_line_ids": ["L999"],
+            },
+            sort_keys=True,
+        )
+    else:
+        response = json.dumps(
+            {
+                "case_id": case_id,
+                "status": _tuning_status_for_case(case_id),
+                "failure_stage": _tuning_failure_stage_for_case(case_id),
+                "root_cause_category": _tuning_root_cause_for_case(case_id),
+                "evidence_line_ids": _tuning_evidence_for_case(case_id),
+            },
+            sort_keys=True,
+        )
+    if quality_mode == "boottrace_tuning_fenced":
+        return "```json\n" + response + "\n```"
+    if quality_mode == "boottrace_tuning_fenced_with_prose":
         return "Here is the result:\n```json\n" + response + "\n```"
     return response
 
@@ -224,6 +258,54 @@ def _evidence_for_case(case_id: str) -> list[str]:
         "boot_device_timeout": ["L030", "L031", "L032"],
         "boot_firmware_component_failure": ["L040", "L041", "L042", "L043"],
     }.get(case_id, ["L001"])
+
+
+def _tuning_status_for_case(case_id: str) -> str:
+    return {
+        "tuning_successful_boot": "success",
+        "tuning_recoverable_warning": "warning",
+        "tuning_device_initialization_timeout": "failure",
+        "tuning_missing_boot_device": "failure",
+        "tuning_firmware_component_failure": "failure",
+        "tuning_incomplete_unknown": "unknown",
+        "tuning_retry_recovered": "warning",
+    }.get(case_id, "unknown")
+
+
+def _tuning_failure_stage_for_case(case_id: str) -> str:
+    return {
+        "tuning_successful_boot": "none",
+        "tuning_recoverable_warning": "device_initialization",
+        "tuning_device_initialization_timeout": "device_initialization",
+        "tuning_missing_boot_device": "boot_selection",
+        "tuning_firmware_component_failure": "firmware_validation",
+        "tuning_incomplete_unknown": "evidence_collection",
+        "tuning_retry_recovered": "boot_selection",
+    }.get(case_id, "evidence_collection")
+
+
+def _tuning_root_cause_for_case(case_id: str) -> str:
+    return {
+        "tuning_successful_boot": "none",
+        "tuning_recoverable_warning": "recoverable_device_warning",
+        "tuning_device_initialization_timeout": "device_initialization_timeout",
+        "tuning_missing_boot_device": "boot_device_missing",
+        "tuning_firmware_component_failure": "firmware_component_failure",
+        "tuning_incomplete_unknown": "insufficient_evidence",
+        "tuning_retry_recovered": "boot_device_missing",
+    }.get(case_id, "insufficient_evidence")
+
+
+def _tuning_evidence_for_case(case_id: str) -> list[str]:
+    return {
+        "tuning_successful_boot": ["L101", "L102", "L103", "L104"],
+        "tuning_recoverable_warning": ["L111", "L112", "L113", "L114"],
+        "tuning_device_initialization_timeout": ["L121", "L122", "L123", "L124"],
+        "tuning_missing_boot_device": ["L131", "L132", "L133", "L134"],
+        "tuning_firmware_component_failure": ["L141", "L142", "L143", "L144"],
+        "tuning_incomplete_unknown": ["L151", "L152", "L153", "L154"],
+        "tuning_retry_recovered": ["L161", "L162", "L163", "L164", "L165"],
+    }.get(case_id, ["L151"])
 
 
 def _quality_ttft_delay(parsed: argparse.Namespace) -> float:

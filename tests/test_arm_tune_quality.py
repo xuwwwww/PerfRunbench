@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 import unittest.mock
 from pathlib import Path
@@ -24,6 +25,7 @@ from autotune.arm_tune.quality.validators import validate_quality_case
 ROOT = Path(__file__).resolve().parents[1]
 QUALITY_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_suite.json"
 CALIBRATION_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_calibration_suite.json"
+TUNING_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_tuning_suite.json"
 CASE_AUDIT = ROOT / "configs" / "armtune" / "quality" / "boottrace_case_audit.json"
 FIXTURES = Path(__file__).parent / "fixtures" / "arm_tune" / "boottrace"
 
@@ -47,6 +49,119 @@ class ArmTuneQualityTest(unittest.TestCase):
                 "boot_firmware_component_failure",
             ],
         )
+
+    def test_tuning_suite_is_separate_deterministic_quality_gate(self) -> None:
+        _, capability_cases, capability_manifest, _ = load_quality_suite(QUALITY_SUITE)
+        tuning_id, tuning_cases, tuning_manifest, tuning_payload = load_quality_suite(TUNING_SUITE)
+
+        self.assertEqual(tuning_id, "synthetic_boottrace_tuning_v1")
+        self.assertEqual(tuning_manifest.case_count, 7)
+        self.assertEqual(tuning_manifest.required_case_count, 7)
+        self.assertEqual(capability_manifest.suite_digest, "42a784ba1da5c624f14dfb9d2d89917768650c8e60ad0918f98c2e4da96d1169")
+        self.assertNotEqual(tuning_manifest.suite_digest, capability_manifest.suite_digest)
+        self.assertFalse({case.case_id for case in capability_cases} & {case.case_id for case in tuning_cases})
+        self.assertEqual(tuning_payload["schema_version"], "1.0")
+
+        expected_tuples = {
+            (
+                case.expected["status"],
+                case.expected["failure_stage"],
+                case.expected["root_cause_category"],
+                tuple(case.expected["required_evidence_line_ids"]),
+            )
+            for case in tuning_cases
+        }
+        self.assertEqual(len(expected_tuples), len(tuning_cases))
+
+    def test_tuning_suite_referenced_evidence_ids_exist(self) -> None:
+        _, cases, _, _ = load_quality_suite(TUNING_SUITE)
+
+        for case in cases:
+            with self.subTest(case_id=case.case_id):
+                prompt_line_ids = set(re.findall(r"^(L\d+)\s", case.prompt, flags=re.MULTILINE))
+                required = set(case.expected["required_evidence_line_ids"])
+                allowed = set(case.expected["allowed_evidence_line_ids"])
+                self.assertTrue(required)
+                self.assertLessEqual(required, prompt_line_ids)
+                self.assertLessEqual(allowed, prompt_line_ids)
+
+    def test_tuning_gate_valid_canonical_responses_pass(self) -> None:
+        _, cases, _, _ = load_quality_suite(TUNING_SUITE)
+
+        for case in cases:
+            with self.subTest(case_id=case.case_id):
+                result = validate_quality_case(case, _canonical_tuning_response(case))
+
+                self.assertEqual(result.status, "passed")
+                self.assertTrue(all(item.status == "passed" for item in result.validator_results))
+                self.assertEqual(result.parser_status, "raw_json_valid")
+
+    def test_tuning_gate_rejects_wrong_status_root_and_evidence(self) -> None:
+        _, cases, _, _ = load_quality_suite(TUNING_SUITE)
+        case = next(item for item in cases if item.case_id == "tuning_device_initialization_timeout")
+
+        wrong_status = validate_quality_case(case, _canonical_tuning_response(case, status="success"))
+        wrong_root = validate_quality_case(case, _canonical_tuning_response(case, root_cause_category="none"))
+        invented = validate_quality_case(case, _canonical_tuning_response(case, evidence_line_ids=["L121", "L122", "L123", "L124", "L999"]))
+        missing = validate_quality_case(case, _canonical_tuning_response(case, evidence_line_ids=["L121", "L122", "L123"]))
+
+        self.assertEqual(wrong_status.status, "failed")
+        self.assertIn("wrong_status", wrong_status.failure_categories)
+        self.assertEqual(wrong_root.status, "failed")
+        self.assertIn("wrong_root_cause", wrong_root.failure_categories)
+        self.assertEqual(invented.status, "failed")
+        self.assertIn("invented_evidence", invented.failure_categories)
+        self.assertEqual(missing.status, "failed")
+        self.assertIn("missing_required_evidence", missing.failure_categories)
+
+    def test_tuning_gate_single_fence_normalization_records_evidence_without_semantic_repair(self) -> None:
+        _, cases, _, _ = load_quality_suite(TUNING_SUITE)
+        case = next(item for item in cases if item.case_id == "tuning_firmware_component_failure")
+        policy = NormalizationPolicy(
+            enabled=True,
+            strict=False,
+            allow_markdown_fence=True,
+            allow_prose_outside_fence=False,
+        )
+        canonical = _canonical_tuning_response(case)
+
+        passed = validate_quality_case(case, "```json\n" + canonical + "\n```", normalization_policy=policy)
+        wrong = validate_quality_case(
+            case,
+            "```json\n" + _canonical_tuning_response(case, root_cause_category="none") + "\n```",
+            normalization_policy=policy,
+        )
+
+        self.assertEqual(passed.status, "passed")
+        self.assertEqual(passed.validation_input, "normalized")
+        self.assertEqual(passed.parser_status, "normalized_json_valid")
+        self.assertTrue(passed.normalization_applied)
+        self.assertIn("extract_single_markdown_fenced_json_block", passed.normalization_steps)
+        self.assertEqual(len(passed.raw_output_sha256), 64)
+        self.assertEqual(len(passed.normalized_output_sha256), 64)
+        self.assertEqual(passed.normalized_output, canonical)
+        self.assertEqual(wrong.status, "failed")
+        self.assertIn('"root_cause_category":"none"', wrong.normalized_output)
+        self.assertIn("wrong_root_cause", wrong.failure_categories)
+
+    def test_tuning_prompt_contract_schema_matches_tuning_fields(self) -> None:
+        _, cases, manifest, _ = load_quality_suite(TUNING_SUITE)
+
+        contract = boottrace_prompt_contract(
+            suite_manifest=manifest,
+            cases=cases,
+            generation_settings={"temperature": 0.0, "seed": 42},
+            normalization_policy=NormalizationPolicy(
+                enabled=True,
+                strict=False,
+                allow_markdown_fence=True,
+                allow_prose_outside_fence=False,
+            ).to_dict(),
+        )
+
+        self.assertIn("failure_stage", contract["expected_response_schema"]["required"])
+        self.assertIn("root_cause_category", contract["expected_response_schema"]["required"])
+        self.assertEqual(len(contract["expected_response_schema_sha256"]), 64)
 
     def test_boottrace_case_audit_covers_held_out_suite_without_answer_changes(self) -> None:
         _, cases, _, _ = load_quality_suite(QUALITY_SUITE)
@@ -276,6 +391,26 @@ class ArmTuneQualityTest(unittest.TestCase):
         with self.assertRaisesRegex(ArmTuneConfigError, "duplicate quality case_id"):
             with unittest.mock.patch.object(Path, "read_text", return_value=json.dumps(payload)):
                 load_quality_suite(Path("synthetic.json"))
+
+def _canonical_tuning_response(
+    case,
+    *,
+    status: str | None = None,
+    failure_stage: str | None = None,
+    root_cause_category: str | None = None,
+    evidence_line_ids: list[str] | None = None,
+) -> str:
+    return json.dumps(
+        {
+            "case_id": case.case_id,
+            "status": status or case.expected["status"],
+            "failure_stage": failure_stage or case.expected["failure_stage"],
+            "root_cause_category": root_cause_category or case.expected["root_cause_category"],
+            "evidence_line_ids": evidence_line_ids or case.expected["required_evidence_line_ids"],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 if __name__ == "__main__":

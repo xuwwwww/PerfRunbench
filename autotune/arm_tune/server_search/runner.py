@@ -10,6 +10,7 @@ from autotune.arm_tune.benchmark.artifact_validation import validate_artifact_ma
 from autotune.arm_tune.benchmark.artifacts import artifact_record, write_artifact_manifest
 from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.quality.aggregation import aggregate_quality_results
+from autotune.arm_tune.quality.normalization import normalization_policy_from_payload
 from autotune.arm_tune.quality.schemas import (
     CandidateQualityResult,
     QualityAggregateResult,
@@ -248,6 +249,7 @@ def run_server_search(
             quality_cases=quality_cases,
             quality_manifest=quality_manifest,
             quality_enabled=config.quality_gate_enabled,
+            normalization_policy_payload=config.quality_normalization_policy,
         )
         selected = _select_best_eligible(candidate_summaries)
         stages.append(
@@ -267,6 +269,7 @@ def run_server_search(
         quality_cases=quality_cases,
         quality_manifest=quality_manifest,
         quality_enabled=config.quality_gate_enabled,
+        normalization_policy_payload=config.quality_normalization_policy,
     )
     selected_before_confirmation = _select_best_eligible(initial_summaries)
     if selected_before_confirmation is not None:
@@ -287,6 +290,7 @@ def run_server_search(
         quality_cases=quality_cases,
         quality_manifest=quality_manifest,
         quality_enabled=config.quality_gate_enabled,
+        normalization_policy_payload=config.quality_normalization_policy,
     )
     selected = _select_best_eligible(candidate_summaries)
     baseline_summary = next(item for item in candidate_summaries if item.candidate.candidate_id == baseline.candidate_id)
@@ -490,11 +494,19 @@ def _candidate_summaries(
     quality_cases: list[QualityCase],
     quality_manifest: QualitySuiteManifest,
     quality_enabled: bool,
+    normalization_policy_payload: dict[str, Any] | None,
 ) -> list[ServerSearchCandidateResult]:
     summaries: list[ServerSearchCandidateResult] = []
     for candidate_id, candidate in candidates_by_id.items():
         results = benchmark_results.get(candidate_id, [])
-        quality = _quality_result(candidate_id, quality_cases, quality_manifest, results, quality_enabled=quality_enabled)
+        quality = _quality_result(
+            candidate_id,
+            quality_cases,
+            quality_manifest,
+            results,
+            quality_enabled=quality_enabled,
+            normalization_policy_payload=normalization_policy_payload,
+        )
         distributions = _performance_distributions(results)
         eligible, status, reasons = _eligibility(results, quality, quality_enabled=quality_enabled)
         summaries.append(
@@ -519,6 +531,7 @@ def _quality_result(
     benchmark_results: list[LlamaServerBenchmarkResult],
     *,
     quality_enabled: bool,
+    normalization_policy_payload: dict[str, Any] | None,
 ) -> CandidateQualityResult:
     if not quality_enabled:
         aggregate = QualityAggregateResult(
@@ -533,6 +546,7 @@ def _quality_result(
             quality_gate_status="not_evaluated",
         )
         return CandidateQualityResult(candidate_id=candidate_id, suite_manifest=manifest, aggregate=aggregate, cases=[])
+    normalization_policy = normalization_policy_from_payload(normalization_policy_payload)
     case_by_id = {case.case_id: case for case in cases}
     case_results: list[QualityCaseResult] = []
     observed_cases: set[str] = set()
@@ -552,6 +566,7 @@ def _quality_result(
                     stream_parse_status=request.stream_parse_status,
                     output_artifact=request.request_artifact_dir,
                     repetition_index=request.repetition_index,
+                    normalization_policy=normalization_policy,
                 )
             )
     for case in cases:
@@ -562,6 +577,7 @@ def _quality_result(
                     "",
                     request_status="not_run",
                     stream_parse_status="not_parsed",
+                    normalization_policy=normalization_policy,
                 )
             )
     return CandidateQualityResult(
@@ -857,6 +873,7 @@ def _effective_config_payload(target: ArmTuneTarget, base_job: LlamaServerJobSpe
             "enabled": config.quality_gate_enabled,
             "suite_path": config.quality_suite_path,
         },
+        "normalization": config.quality_normalization_policy,
     }
 
 

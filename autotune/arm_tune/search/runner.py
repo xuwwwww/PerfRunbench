@@ -37,6 +37,7 @@ class SearchConfig:
     affinity_modes: list[str] | None = None
     quality_gate_enabled: bool = False
     quality_suite_path: str | None = None
+    quality_normalization_policy: dict[str, Any] | None = None
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
