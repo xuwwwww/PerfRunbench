@@ -6,10 +6,10 @@
     {
       "case_id": "tuning_successful_boot",
       "category": "boottrace_tuning_success",
-      "prompt": "CASE_ID=tuning_successful_boot\nYou are validating a deterministic synthetic BootTrace tuning case.\nTrace lines:\nL101 STATUS=success\nL102 FAILURE_STAGE=none\nL103 ROOT_CAUSE=none\nL104 BOOT_RESULT=OS_HANDOFF_COMPLETE\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "prompt": "CASE_ID=tuning_successful_boot\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L101,L102,L103,L104\nTrace lines:\nL101 STATUS=success\nL102 FAILURE_STAGE=none\nL103 ROOT_CAUSE=none\nL104 BOOT_RESULT=OS_HANDOFF_COMPLETE\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
       "response_format": "json",
       "required": true,
-      "maximum_predicted_tokens": 80,
+      "maximum_predicted_tokens": 128,
       "generation_settings": {
         "temperature": 0.0,
         "seed": 42
@@ -58,10 +58,10 @@
     {
       "case_id": "tuning_recoverable_warning",
       "category": "boottrace_tuning_warning",
-      "prompt": "CASE_ID=tuning_recoverable_warning\nYou are validating a deterministic synthetic BootTrace tuning case.\nTrace lines:\nL111 STATUS=warning\nL112 FAILURE_STAGE=device_initialization\nL113 ROOT_CAUSE=recoverable_device_warning\nL114 BOOT_RESULT=CONTINUED_AFTER_DEVICE_RETRY\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "prompt": "CASE_ID=tuning_recoverable_warning\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L111,L112,L113,L114\nTrace lines:\nL111 STATUS=warning\nL112 FAILURE_STAGE=device_initialization\nL113 ROOT_CAUSE=recoverable_device_warning\nL114 BOOT_RESULT=CONTINUED_AFTER_DEVICE_RETRY\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
       "response_format": "json",
       "required": true,
-      "maximum_predicted_tokens": 80,
+      "maximum_predicted_tokens": 128,
       "generation_settings": {
         "temperature": 0.0,
         "seed": 42
@@ -110,10 +110,10 @@
     {
       "case_id": "tuning_device_initialization_timeout",
       "category": "boottrace_tuning_failure",
-      "prompt": "CASE_ID=tuning_device_initialization_timeout\nYou are validating a deterministic synthetic BootTrace tuning case.\nTrace lines:\nL121 STATUS=failure\nL122 FAILURE_STAGE=device_initialization\nL123 ROOT_CAUSE=device_initialization_timeout\nL124 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "prompt": "CASE_ID=tuning_device_initialization_timeout\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L121,L122,L123,L124\nTrace lines:\nL121 STATUS=failure\nL122 FAILURE_STAGE=device_initialization\nL123 ROOT_CAUSE=device_initialization_timeout\nL124 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
       "response_format": "json",
       "required": true,
-      "maximum_predicted_tokens": 80,
+      "maximum_predicted_tokens": 128,
       "generation_settings": {
         "temperature": 0.0,
         "seed": 42
@@ -162,10 +162,10 @@
     {
       "case_id": "tuning_missing_boot_device",
       "category": "boottrace_tuning_failure",
-      "prompt": "CASE_ID=tuning_missing_boot_device\nYou are validating a deterministic synthetic BootTrace tuning case.\nTrace lines:\nL131 STATUS=failure\nL132 FAILURE_STAGE=boot_selection\nL133 ROOT_CAUSE=boot_device_missing\nL134 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "prompt": "CASE_ID=tuning_missing_boot_device\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L131,L132,L133,L134\nTrace lines:\nL131 STATUS=failure\nL132 FAILURE_STAGE=boot_selection\nL133 ROOT_CAUSE=boot_device_missing\nL134 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
       "response_format": "json",
       "required": true,
-      "maximum_predicted_tokens": 80,
+      "maximum_predicted_tokens": 128,
       "generation_settings": {
         "temperature": 0.0,
         "seed": 42
@@ -214,10 +214,10 @@
     {
       "case_id": "tuning_firmware_component_failure",
       "category": "boottrace_tuning_failure",
-      "prompt": "CASE_ID=tuning_firmware_component_failure\nYou are validating a deterministic synthetic BootTrace tuning case.\nTrace lines:\nL141 STATUS=failure\nL142 FAILURE_STAGE=firmware_validation\nL143 ROOT_CAUSE=firmware_component_failure\nL144 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "prompt": "CASE_ID=tuning_firmware_component_failure\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L141,L142,L143,L144\nTrace lines:\nL141 STATUS=failure\nL142 FAILURE_STAGE=firmware_validation\nL143 ROOT_CAUSE=firmware_component_failure\nL144 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
       "response_format": "json",
       "required": true,
-      "maximum_predicted_tokens": 80,
+      "maximum_predicted_tokens": 128,
       "generation_settings": {
         "temperature": 0.0,
         "seed": 42
@@ -266,10 +266,10 @@
     {
       "case_id": "tuning_incomplete_unknown",
       "category": "boottrace_tuning_unknown",
-      "prompt": "CASE_ID=tuning_incomplete_unknown\nYou are validating a deterministic synthetic BootTrace tuning case.\nTrace lines:\nL151 STATUS=unknown\nL152 FAILURE_STAGE=evidence_collection\nL153 ROOT_CAUSE=insufficient_evidence\nL154 BOOT_RESULT=UNKNOWN_INCOMPLETE_TRACE\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "prompt": "CASE_ID=tuning_incomplete_unknown\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L151,L152,L153,L154\nTrace lines:\nL151 STATUS=unknown\nL152 FAILURE_STAGE=evidence_collection\nL153 ROOT_CAUSE=insufficient_evidence\nL154 BOOT_RESULT=UNKNOWN_INCOMPLETE_TRACE\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
       "response_format": "json",
       "required": true,
-      "maximum_predicted_tokens": 80,
+      "maximum_predicted_tokens": 128,
       "generation_settings": {
         "temperature": 0.0,
         "seed": 42
@@ -318,10 +318,10 @@
     {
       "case_id": "tuning_retry_recovered",
       "category": "boottrace_tuning_warning",
-      "prompt": "CASE_ID=tuning_retry_recovered\nYou are validating a deterministic synthetic BootTrace tuning case.\nTrace lines:\nL161 STATUS=warning\nL162 FAILURE_STAGE=boot_selection\nL163 ROOT_CAUSE=boot_device_missing\nL164 EVENT=RETRY_SELECTED_BACKUP_DEVICE\nL165 BOOT_RESULT=RECOVERED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "prompt": "CASE_ID=tuning_retry_recovered\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L161,L162,L163,L164,L165\nTrace lines:\nL161 STATUS=warning\nL162 FAILURE_STAGE=boot_selection\nL163 ROOT_CAUSE=boot_device_missing\nL164 EVENT=RETRY_SELECTED_BACKUP_DEVICE\nL165 BOOT_RESULT=RECOVERED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
       "response_format": "json",
       "required": true,
-      "maximum_predicted_tokens": 80,
+      "maximum_predicted_tokens": 128,
       "generation_settings": {
         "temperature": 0.0,
         "seed": 42
