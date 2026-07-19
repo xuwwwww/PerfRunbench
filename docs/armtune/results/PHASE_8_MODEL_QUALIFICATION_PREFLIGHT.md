@@ -136,6 +136,37 @@ and record evidence. If Gemma is suitable, continue into build profiles,
 quality calibration for every profile, runtime tuning, quality-aware
 comparison, Performance Passport generation, and Passport verification.
 
+## Follow-Up Real Qualification
+
+Gemma gated-file access was later granted outside the repository. The follow-up
+real held-out qualification is recorded in:
+
+```text
+docs/armtune/results/PHASE_8_GEMMA12B_QUALIFICATION.md
+```
+
+The follow-up run downloaded and hashed
+`gemma-3-12b-it-q4_0.gguf`, executed one measured held-out qualification on the
+same frozen `taxonomy-rules-and-disjoint-few-shot` contract, and rejected the
+model/profile:
+
+```text
+run_id: 20260719_183725_010839
+result_origin: measured
+request_success_count: 5/5
+raw_json_valid_count: 0/5
+required_quality_cases_passed: 0/5
+critical_failure_count: 45
+quality_gate_status: failed
+model_profile_suitability: unsuitable
+artifact_validation: passed
+cleanup: passed
+```
+
+Gemma emitted Markdown-fenced JSON for every held-out case. Strict
+normalization remained disabled by the frozen Phase 7 qualification contract,
+so the fenced outputs were rejected rather than normalized into a pass.
+
 ## Claim Boundary
 
 This preflight supports:

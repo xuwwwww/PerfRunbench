@@ -1579,8 +1579,9 @@ Phase 7 real-target result boundary:
 
 ## Phase 8 Plan: Final Model Qualification And Conditional Arm Tuning
 
-Status: preflight blocked on Gemma 3 12B GGUF file access. Phase 8 must not add
-benchmark infrastructure or weaken the held-out quality gate.
+Status: real Gemma 3 12B held-out qualification completed and rejected as
+`unsuitable`. Phase 8 did not add benchmark infrastructure or weaken the
+held-out quality gate.
 
 Phase 8 starts from the frozen Phase 7 contract:
 
@@ -1622,6 +1623,40 @@ Gemma 3 12B access preflight:
 - No AWS instance was started, no Gemma file was downloaded, and no Gemma
   qualification run was attempted.
 
+Phase 8 real Gemma qualification:
+
+- Evidence file:
+  `docs/armtune/results/PHASE_8_GEMMA12B_QUALIFICATION.md`.
+- Official gated-file access was later granted outside the repository without
+  printing, storing, or committing any credential value.
+- Windows controller and remote target `hf download --dry-run` both reported
+  one downloadable file:
+  `gemma-3-12b-it-q4_0.gguf`, approximately `8.1G`.
+- Downloaded model digest:
+  `dd53172ff3a7b1b16c8fb3d944b87f42a6228ff2de3825b8813ae90d988434cd`.
+- Remote PerfRunbench checkout was fast-forwarded to
+  `5f021962ba9c532f3499dae205635e114581df23`.
+- Target remained a user-provisioned C7g / Graviton3 Linux Arm64 system:
+  `aarch64`, kernel `6.17.0-1019-aws`, Neoverse-V1, 8 logical CPUs.
+- Held-out run:
+  `20260719_183725_010839`.
+- Result:
+  5/5 measured requests completed, 0/5 raw-valid JSON, 0/5 normalized-valid
+  JSON, 0/5 required cases passed, 45 critical failures,
+  `quality_gate_status: failed`, `model_profile_suitability: unsuitable`.
+- Failure histogram:
+  `invalid_json: 5`, `markdown_fence_present: 5`,
+  `response_format_violation: 5`, `model_capability_failure: 5`,
+  `wrong_root_cause: 5`, `wrong_status: 5`.
+- The model emitted Markdown-fenced JSON for every held-out case. Strict
+  normalization remained disabled by the frozen Phase 7 contract, so the
+  fenced outputs were intentionally rejected.
+- Independent post-download artifact revalidation passed for the outer
+  quality-calibration manifest (`42` checked artifacts) and nested benchmark
+  manifest (`32` checked artifacts).
+- Cleanup passed: no residual `llama-server`, controller process exited, and
+  the benchmark loopback port was released.
+
 Phase 8 execution gate:
 
 1. Confirm official Gemma GGUF file access before starting AWS.
@@ -1638,3 +1673,15 @@ Phase 8 execution gate:
 Do not claim KleidiAI unless build and runtime evidence satisfy the existing
 two-evidence policy. Do not run additional model ladder candidates
 automatically after Gemma failure or access blockage.
+
+Phase 8-R decision:
+
+- Stop the model ladder under the current held-out BootTrace qualification
+  protocol.
+- Do not proceed to build-profile comparison, runtime tuning, Performance
+  Passport generation, KleidiAI claims, Performix evidence, or final
+  performance claims from this unsuitable model/profile.
+- The next technical decision is whether to keep the current five held-out
+  cases as a capability benchmark and define a separate deterministic workload
+  better matched to CPU inference tuning, or qualify a different model/profile
+  under a separately justified protocol.

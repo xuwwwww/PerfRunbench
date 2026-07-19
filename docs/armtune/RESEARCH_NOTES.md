@@ -528,3 +528,66 @@ Access date for all entries: 2026-07-13.
   this preflight does not validate Gemma quality, build-profile comparison,
   runtime tuning, Performance Passport eligibility, KleidiAI, Performix, or
   final competition evidence.
+
+## Phase 8-R Gemma 3 12B Held-Out Qualification
+
+- Evidence file:
+  `docs/armtune/results/PHASE_8_GEMMA12B_QUALIFICATION.md`
+- Source:
+  user-provisioned AWS C7g / Graviton3 Linux Arm64 development target.
+- Remote target:
+  `aarch64`, kernel `6.17.0-1019-aws`, Neoverse-V1, 8 logical CPUs.
+- Remote PerfRunbench worker commit:
+  `5f021962ba9c532f3499dae205635e114581df23`.
+- Model repository:
+  `google/gemma-3-12b-it-qat-q4_0-gguf`.
+- Model file:
+  `gemma-3-12b-it-q4_0.gguf`.
+- Model size:
+  `8074473920` bytes.
+- Model SHA-256:
+  `dd53172ff3a7b1b16c8fb3d944b87f42a6228ff2de3825b8813ae90d988434cd`.
+- llama-server SHA-256:
+  `6faba7459f6d4ed13564bc5ec876e0bde0c0aa538fb371865dd89e03b11b254e`.
+- llama.cpp runtime build:
+  `version: 10050 (b15ca938a) built with GNU 13.3.0 for Linux aarch64`.
+- Frozen prompt contract:
+  `taxonomy-rules-and-disjoint-few-shot`.
+- Held-out suite digest:
+  `42a784ba1da5c624f14dfb9d2d89917768650c8e60ad0918f98c2e4da96d1169`.
+- Development suite digest recorded for provenance:
+  `86e4bfc54e36de6a5e05257f621b9404104ce7c42bf9e90fce0019a7a9ea10db`.
+- Normalization policy:
+  `boottrace-normalization-v1`, strict, disabled,
+  `allow_markdown_fence: false`.
+- Generation settings:
+  `temperature: 0.0`, `seed: 42`, `threads: 8`, `context_size: 4096`,
+  `batch_size: 256`, `ubatch_size: 128`, `predict_tokens: 192`.
+- Run ID:
+  `20260719_183725_010839`.
+- Result origin:
+  `measured`.
+- Qualification result:
+  5/5 requests completed, 0/5 raw-valid JSON, 0/5 normalized-valid JSON,
+  0/5 required cases passed, 45 critical failures,
+  `quality_gate_status: failed`, `suitability: unsuitable`.
+- Failure histogram:
+  `invalid_json: 5`, `markdown_fence_present: 5`,
+  `model_capability_failure: 5`, `response_format_violation: 5`,
+  `wrong_root_cause: 5`, and `wrong_status: 5`.
+- Artifact validation:
+  outer quality-calibration manifest passed with 42 checked artifacts; nested
+  benchmark manifest passed with 32 checked artifacts.
+- Cleanup evidence:
+  no residual `llama-server`, controller process exited, and the benchmark
+  loopback port was released.
+- Relevant conclusion:
+  Gemma 3 12B QAT Q4_0 is unsuitable under the unchanged Phase 7 frozen
+  held-out BootTrace qualification contract. The rejection is a strict quality
+  gate result, not an SSH, digest, cleanup, artifact, or request-execution
+  failure.
+- Claim boundary:
+  this is model qualification and quality-rejection evidence. It is not
+  quality-preserving performance improvement, build-profile comparison,
+  Performance Passport eligibility, KleidiAI execution, Performix evidence, or
+  final competition benchmark evidence.

@@ -289,7 +289,8 @@ should be labeled unverified.
 ## Phase 8 Planned Limitations
 
 - Phase 8 preflight did not start AWS and did not execute a new model
-  qualification run.
+  qualification run. A later explicitly approved Phase 8-R run used the same
+  frozen held-out contract on the user-provisioned C7g target.
 - The Qwen2.5-7B and Qwen2.5-14B held-out failure matrix is diagnostic
   evidence only. It must not be used to weaken validators, rewrite canonical
   answers, or tune prompts against the held-out cases.
@@ -297,11 +298,19 @@ should be labeled unverified.
   completion, 5/5 raw-valid JSON output, zero invented evidence, cleanup
   success, and artifact-validation success. This leaves model/profile
   suitability blocked.
-- Gemma 3 12B QAT Q4_0 remains unevaluated. The current controller
-  environment could see repository metadata but received HTTP `401` when
-  resolving the GGUF file, and no Hugging Face token was present.
+- Gemma 3 12B QAT Q4_0 gated-file access was later resolved, but the measured
+  held-out qualification still failed under the unchanged strict Phase 7
+  contract: 5/5 requests completed, 0/5 raw-valid JSON, 0/5 required cases
+  passed, and `model_profile_suitability: unsuitable`.
+- Gemma emitted Markdown-fenced JSON for every held-out case. Strict
+  normalization remained disabled, so those outputs were intentionally rejected
+  instead of being normalized into a pass.
 - AWS lifecycle remains user-controlled for Phase 8. ArmTune must not
   automatically start, stop, provision, resize, or replace cloud resources.
 - Runtime tuning, build-profile comparison, Performance Passport generation,
   KleidiAI claims, Performix evidence, and final competition conclusions remain
   blocked until an unchanged held-out qualification run reaches `suitable`.
+- After Qwen2.5-7B, Qwen2.5-14B, and Gemma 3 12B all remained unsuitable,
+  ArmTune should stop the current model ladder and decide whether to keep the
+  five held-out cases as a capability benchmark while defining a separate
+  deterministic CPU-inference tuning workload.
