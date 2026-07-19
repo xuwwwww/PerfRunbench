@@ -1832,3 +1832,50 @@ Local validation boundary:
   manually started and explicitly confirmed by the operator.
 
 Do not call the selected configuration a global optimum.
+
+## Phase 9 Result: First Real Arm Build And Runtime Tuning
+
+Status: completed and recorded in
+`docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md`.
+
+Summary:
+
+- Controller and remote PerfRunbench commit:
+  `f17297111a66716d0f65c2a4336ebf8f4ea817a6`.
+- Target:
+  user-provisioned C7g / Graviton3 Linux Arm64, Neoverse-V1,
+  8 logical CPUs.
+- Model:
+  Qwen2.5-7B Q4_K_M,
+  SHA-256 `1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49`.
+- llama.cpp source commit:
+  `b15ca938ad00aa6b3ee6c2edda7363fd02826b18`.
+- Build profiles:
+  `portable-baseline`, `arm-native`, and `arm-optimized` built and inspected.
+- Fixed `llama-bench` profile comparison:
+  `arm-native` had the best observed decode median among the tested build
+  profiles: `17.530` tok/s versus `10.825` tok/s for `portable-baseline`.
+- Bounded runtime search:
+  10 candidates and 50 repetitions; selected
+  `affinity-compact-0_1_2_3_4_5_6_7`; decode median improved from `13.630`
+  to `17.480` tok/s, `+28.246515%`, outside the configured 2% noise band.
+- Secondary `llama-server` profile comparison:
+  `arm-native` reduced TTFT median from `97.260` ms to `62.826` ms,
+  `+35.404072%` lower latency.
+- Performance Passport:
+  generated and verified, `claim_eligibility_state: eligible_preliminary`,
+  `verification_status: passed`.
+- Artifact validation:
+  82 artifact manifests independently revalidated, 0 failed.
+- Cleanup:
+  no residual `llama-server`, no residual ArmTune worker, and no observed
+  leftover benchmark listen port.
+
+Claim boundary:
+
+- The result supports the bounded wording "Best observed eligible
+  configuration under the tested Arm target, model, inference workload, and
+  measurement protocol."
+- It does not claim global optimality, BootTrace semantic correctness,
+  Performix evidence, cross-instance portability, or final competition-wide
+  performance.

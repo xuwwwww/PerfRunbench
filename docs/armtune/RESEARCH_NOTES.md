@@ -670,3 +670,53 @@ Access date for all entries: 2026-07-13.
 - Real tuning gate:
   proceed to the existing user-provisioned C7g target only after the operator
   manually starts it and explicitly confirms readiness.
+
+## Phase 9 First Real Arm Build And Runtime Tuning
+
+- Evidence file:
+  `docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md`.
+- Controller and remote PerfRunbench commit:
+  `f17297111a66716d0f65c2a4336ebf8f4ea817a6`.
+- Target:
+  user-provisioned C7g / Graviton3 Linux Arm64,
+  `aarch64`, kernel `6.17.0-1019-aws`, Neoverse-V1,
+  8 logical CPUs.
+- llama.cpp source commit:
+  `b15ca938ad00aa6b3ee6c2edda7363fd02826b18`.
+- Model:
+  Qwen2.5-7B Q4_K_M,
+  SHA-256 `1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49`.
+- Build-profile run:
+  `20260719_143632_632820`; `portable-baseline`, `arm-native`, and
+  `arm-optimized` all completed. `arm-optimized` recorded
+  `enabled_and_evidenced` KleidiAI build evidence, but did not beat
+  `arm-native` in measured throughput.
+- Fixed `llama-bench` profile comparison:
+  `portable-baseline` decode median `10.825` tok/s, `arm-native`
+  `17.530` tok/s, `arm-optimized` `17.380` tok/s; all measured, all artifact
+  validations passed, zero failed trials.
+- Bounded runtime search:
+  run `20260719_231546_862081`, 10 candidates, 50 repetitions,
+  selected `affinity-compact-0_1_2_3_4_5_6_7`; decode median improved from
+  `13.630` to `17.480` tok/s, `+28.246515%`, outside the 2% noise band.
+- Secondary `llama-server` measurements:
+  `portable-baseline` TTFT median `97.260` ms, `arm-native` `62.826` ms,
+  `arm-optimized` `63.318` ms; 9/9 nonempty outputs for every profile and
+  cleanup passed.
+- Profile comparison:
+  run `20260720_005316_963862`, result origin `measured`,
+  recommended `arm-native`, TTFT median improvement `35.404072%`.
+- Performance Passport:
+  run `20260720_005329_881317`,
+  `claim_eligibility_state: eligible_preliminary`,
+  `verification_status: passed`.
+- Independent artifact-manifest revalidation:
+  82 manifests checked, 0 failed.
+- Cleanup:
+  no residual `llama-server`, no residual ArmTune worker, no observed
+  leftover benchmark listen port.
+- Claim boundary:
+  this supports only the bounded wording "Best observed eligible
+  configuration under the tested Arm target, model, inference workload, and
+  measurement protocol." It is not a global optimum, BootTrace quality pass,
+  Performix result, or final competition-wide claim.
