@@ -85,7 +85,7 @@ The Phase 5 MVP passport includes:
 - baseline distributions
 - recommended distributions
 - percentage deltas
-- quality results
+- optional experimental quality results when explicitly enabled
 - Pareto candidates
 - recommendation rationale
 

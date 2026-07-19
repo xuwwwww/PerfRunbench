@@ -630,3 +630,43 @@ Access date for all entries: 2026-07-13.
   Stop the current model ladder and treat the existing held-out suite as a
   capability benchmark while defining a separate deterministic CPU-inference
   tuning workload.
+
+## Phase 9-L Arm Build And Runtime Tuning Refocus
+
+- Scope:
+  stop BootTrace prompt research, model qualification, and UEFI-specific
+  development. ArmTune's default flow is Arm target inspection, workload
+  runtime inspection, portable baseline benchmarking, Arm build profiles,
+  bounded runtime candidate search, confirmation, and Performance Passport
+  generation.
+- Product boundary:
+  ArmTune is an Arm-focused counterpart to PerfRunbench: Arm platform
+  inspection, reproducible AI benchmarking, build/runtime configuration
+  search, statistical comparison, and auditable recommendation. `llama.cpp`
+  remains the first workload adapter, not the product identity.
+- BootTrace boundary:
+  existing BootTrace code, suites, tests, normalization diagnostics, and
+  evidence are preserved as optional experimental capability workloads. They
+  no longer participate in default candidate eligibility.
+- Local implementation:
+  public CLI wording, example configs, profile comparison, server optimize
+  eligibility, passport wording, and docs now default to evidence-backed Arm
+  build/runtime tuning. Optional quality evidence remains opt-in.
+- New public config:
+  `configs/armtune/llama_bench_optimize.example.json` defines a bounded
+  `llama-bench` runtime search template with strict SSH host-key checking,
+  deterministic search controls, paired baseline insertion, confirmation
+  runs, and affinity allowlisting.
+- Local validation commands:
+  `python -m json.tool` on the updated Phase 9 public JSON examples passed;
+  `python -m compileall autotune\arm_tune` passed;
+  `python -m unittest discover -s tests -p "test_arm_tune*.py" -v` ran 164
+  ArmTune tests and passed; `python scripts\run_tests.py --fast` ran 302
+  tests and passed.
+- Execution boundary:
+  no AWS command was run, no model was downloaded, no prompt was changed, no
+  llama.cpp source update was performed, and no real benchmark result was
+  produced by this local refocus.
+- Real tuning gate:
+  proceed to the existing user-provisioned C7g target only after the operator
+  manually starts it and explicitly confirms readiness.

@@ -202,10 +202,12 @@ auditability, but the operator must upload the same prompt-suite payload to the
 configured target path before a bounded real Phase 4 validation run.
 
 The controller downloads each candidate's completed server benchmark artifact
-directory, validates candidate artifact manifests, writes the quality-aware
+directory, validates candidate artifact manifests, writes the
 `server_optimize_result.json`, and validates the root `server_optimize`
-artifact manifest. Credentials, identity-file paths, and private host details
-must not be written to public artifacts.
+artifact manifest. When an optional experimental quality gate is explicitly
+enabled, quality evidence is included in that same result without changing the
+fixed worker protocol. Credentials, identity-file paths, and private host
+details must not be written to public artifacts.
 
 ## Phase 5 Evidence Commands on SSH Targets
 

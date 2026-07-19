@@ -327,8 +327,10 @@ should be labeled unverified.
 - Phase 9 does not weaken or rewrite the existing held-out BootTrace capability
   benchmark. Existing Qwen2.5 and Gemma results remain failed or unsuitable as
   originally recorded.
-- The new deterministic tuning quality gate is not a claim that the model
-  passed the harder capability benchmark.
+- BootTrace quality gates, prompt contracts, normalization diagnostics, and
+  historical results are optional experimental capability workloads. They do
+  not participate in default candidate eligibility unless explicitly enabled
+  for a separate experimental run.
 - Phase 9 does not download, replace, or ladder additional models. The fixed
   workload remains Qwen2.5-7B-Instruct-GGUF Q4_K_M.
 - Phase 9 does not update the llama.cpp source commit.
@@ -338,5 +340,7 @@ should be labeled unverified.
 - Phase 9 does not claim KleidiAI unless build and runtime evidence both
   support the claim.
 - Build-profile comparison, runtime tuning, and Performance Passport
-  generation remain invalid unless every recommended candidate passes the new
-  deterministic tuning quality gate and artifact validation.
+  generation remain invalid unless every recommended candidate has measured
+  Linux Arm64 provenance, matching model/target/protocol digests, valid build
+  evidence, successful execution and parsing, cleanup, sufficient samples,
+  artifact validation, and a difference outside the configured noise band.

@@ -20,9 +20,10 @@ Cloud AI
 
 ArmTune is an Arm-first AI inference autotuning subsystem inside PerfRunbench.
 It helps developers run controlled llama.cpp experiments on real Linux Arm64
-targets, compare portable and optimized configurations, validate output
-quality, and generate a versioned Arm Performance Passport that captures the
-evidence needed to reproduce and audit the result.
+targets, inspect Arm platform and runtime evidence, compare portable and
+Arm-specific build/runtime configurations, and generate a versioned Arm
+Performance Passport that captures the evidence needed to reproduce and audit
+the result.
 
 ## Problem
 
@@ -37,20 +38,20 @@ another developer can reproduce the same experiment.
 - Arm host identity, feature, and topology inspection.
 - llama.cpp build and runtime evidence.
 - Repeated baseline and candidate measurements.
-- Deterministic quality validation using a public synthetic BootTrace
-  reference workload.
-- Separation between a difficult BootTrace Capability Benchmark and a
-  deterministic tuning quality gate used for performance eligibility.
-- Quality calibration with strict raw-output mode and optional audited
-  fenced-JSON normalization.
 - Declarative build-profile evidence for `portable-baseline`, `arm-native`,
   and `arm-optimized`.
-- Quality-aware profile comparison and Performance Passport JSON/Markdown
-  generation with digest verification.
+- Bounded runtime search with repeated measurements, paired baselines,
+  confirmation runs, and noise-band classification.
+- `llama-server` secondary runtime measurements for request completion,
+  nonempty output, stream parsing, TTFT, end-to-end latency, cleanup, and port
+  release.
+- Performance Passport JSON/Markdown generation with digest verification.
+- Optional experimental BootTrace capability workloads, preserved separately
+  from default performance-tuning eligibility.
 
 ## Planned Functionality
 
-- Real quality-preserving build-profile comparison on an existing Linux Arm64
+- Real build-profile and runtime tuning comparison on an existing Linux Arm64
   target.
 - Optional Arm Performix profiling evidence.
 - Passport comparison and CI regression gate.
@@ -58,20 +59,17 @@ another developer can reproduce the same experiment.
 ## Result Claims and Boundaries
 
 ArmTune has bounded real Arm pipeline evidence for `llama-bench`,
-`llama-server`, streaming request timing, quality-aware rejection, cleanup, and
-artifact digest validation. Phase 5 also has a bounded measured quality
-calibration run showing that an unsuitable real model/profile is rejected
-before profile comparison. These runs are not final competition benchmark
-results and do not prove KleidiAI usage or an optimized profile.
+`llama-server`, streaming request timing, cleanup, and artifact digest
+validation. These runs are not final competition benchmark results and do not
+prove KleidiAI usage or an optimized profile.
 
 Phase 5 fixture passports are pipeline-validation artifacts only. They must not
 be presented as measured Arm performance.
 
-The difficult BootTrace held-out suite is a capability benchmark and has not
-been passed by the tested real models. Phase 9 uses a separate deterministic
-tuning quality gate to verify that build-profile and runtime optimizations do
-not corrupt directly evidenced behavior. Passing the tuning gate must not be
-presented as passing the harder capability benchmark.
+The difficult BootTrace held-out suite is now an optional experimental
+capability benchmark and has not been passed by the tested real models. It is
+preserved as evidence of model limitations, but it does not block the default
+Arm build/runtime tuning flow.
 
 ## Setup
 
@@ -81,7 +79,7 @@ templates only.
 
 ## Demo
 
-The current demo flow shows `arm doctor`, `arm inspect-host`,
-`arm quality-calibrate`, `arm build-plan`, `arm build-profile`,
-`arm profile-compare`, `arm passport`, and `arm verify-passport`. Fixture
-passport output is explicitly labeled `fixture_only`.
+The current demo flow shows `arm doctor`, `arm inspect-host`, `arm benchmark`,
+`arm build-plan`, `arm build-profile`, `arm optimize`, `arm profile-compare`,
+`arm passport`, and `arm verify-passport`. Fixture passport output is
+explicitly labeled `fixture_only`.

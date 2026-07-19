@@ -1702,91 +1702,133 @@ Phase 8-R decision:
   matched to CPU inference tuning, or qualify a different model/profile under a
   separately justified protocol.
 
-## Phase 9 Plan: Deterministic Tuning Workload And First Real Arm Autotuning
+## Phase 9 Plan: First Real Arm Build And Runtime Autotuning
 
-Status: planning and local implementation. Do not start, stop, provision,
-resize, or otherwise manage AWS resources from this phase. Real target work
-may continue only after the operator confirms that the existing C7g target is
-already running.
+Status: local configuration and validation in progress. Do not start, stop,
+provision, resize, or otherwise manage AWS resources from this phase. Real
+target work may continue only after the operator explicitly confirms that the
+existing C7g target has been manually started.
 
-Phase 9 stops model-ladder work and separates two quality purposes:
+Phase 9 stops BootTrace prompt research, model qualification, and
+UEFI-specific development. ArmTune's default product flow is now:
 
-1. BootTrace Capability Benchmark
-2. Deterministic Tuning Quality Gate
+```text
+inspect Arm target
+-> inspect workload runtime
+-> benchmark portable baseline
+-> build Arm profiles
+-> search runtime candidates
+-> confirm selected candidate
+-> generate Performance Passport
+```
 
-BootTrace Capability Benchmark:
+Product boundary:
 
-- The existing held-out suite remains
-  `configs/armtune/quality/boottrace_suite.json`.
-- Existing canonical answers, validators, audit notes, and historical results
-  are preserved.
-- Existing outcomes remain recorded:
-  Qwen2.5-7B `unsuitable`, Qwen2.5-14B `unsuitable`, and Gemma 3 12B strict
-  raw-JSON qualification `failed`.
-- Capability-benchmark results may expose model limitations, but they no
-  longer block inference performance tuning.
-- Capability results must not be rewritten, weakened, or represented as passed.
+- ArmTune is an Arm-focused counterpart to PerfRunbench: Arm platform
+  inspection, reproducible AI benchmarking, build/runtime configuration
+  search, statistical comparison, and auditable recommendation.
+- `llama.cpp` is the first workload adapter. It is not the product identity.
+- BootTrace quality features, prompt contracts, normalization diagnostics, and
+  historical results are preserved only as optional experimental capability
+  workloads.
+- BootTrace must not participate in default candidate eligibility unless a
+  separate experimental quality gate is explicitly enabled for that run.
+- Prior BootTrace results must not be deleted, rewritten, or represented as
+  passed.
 
-Deterministic Tuning Quality Gate:
+Fixed Phase 9 workload:
 
-- Add a separate suite:
-  `configs/armtune/quality/boottrace_tuning_suite.json`.
-- The suite contains 6 to 8 new public synthetic cases disjoint from the
-  capability suite.
-- Each case uses explicit key-value trace lines with one directly extractable
-  answer and one valid evidence-line set.
-- Critical validators are limited to nonempty output, valid JSON after the
-  configured versioned normalization policy, required fields, allowed enum
-  values, exact `status`, exact `failure_stage`, exact
-  `root_cause_category`, required evidence IDs, and no invented evidence IDs.
-- Free-form `recommended_action` is not a critical validator.
-- Normalization may extract exactly one Markdown JSON fence with the existing
-  versioned policy, but it must not modify JSON values, add fields, or repair
-  semantic answers.
+- Existing user-provisioned C7g / Linux Arm64 / Neoverse-V1 target.
+- Existing Qwen2.5-7B Q4_K_M model.
+- Existing pinned llama.cpp source commit.
+- Existing `llama-bench` benchmark pipeline.
+- Existing `llama-server` benchmark pipeline for secondary runtime evidence.
+- Existing staged search engine, build-profile framework, and Performance
+  Passport framework.
+- No new model downloads, prompt updates, quality suites, or llama.cpp source
+  updates.
 
-Fixed workload boundary:
+Build profiles:
 
-- Reuse Qwen2.5-7B-Instruct-GGUF Q4_K_M as the fixed inference workload.
-- Do not download or switch models.
-- Do not update the llama.cpp source commit.
-- Preserve model digest, runtime binary digest, prompt-contract digest,
-  tuning-suite digest, schema digest, normalization-policy version,
-  generation seed, temperature, context size, and predict-token limit in real
-  evidence artifacts.
+- `portable-baseline`
+- `arm-native`
+- `arm-optimized` only when supported and evidenced
 
-Local validation boundary:
+Every build must preserve source commit and dirty state, compiler/CMake
+versions, exact build command when available, effective CMake cache, compile
+flags, linked-library evidence, binary SHA-256 and size, and raw build
+stdout/stderr when an executing build flow supplies them.
 
-- First complete local schema/unit/fake integration tests without AWS.
-- Required local checks include tuning-suite schema validation, disjointness
-  from the capability suite, evidence-ID consistency, canonical-answer pass,
-  wrong status failure, wrong root-cause failure, invented evidence failure,
-  missing evidence failure, single-fence normalization evidence, unchanged
-  capability-suite digest, fake Qwen-like server pass, corrupt fast candidate
-  rejection, and quality-preserving candidate eligibility.
-- After local validation passes, report:
-  `ready_for_real_arm_tuning: true`.
-- Stop before real Phase 9 target execution until the existing C7g target is
-  confirmed running by the operator.
+KleidiAI claim policy:
 
-Real Phase 9 target sequence after explicit operator confirmation:
+- Do not claim KleidiAI from a requested flag.
+- Use `enabled_and_evidenced` only with sufficient build/runtime evidence.
+- Otherwise record `requested_but_unverified`, `runtime_unverified`,
+  `unavailable`, or `build_failed`.
 
-1. Run only the new tuning quality gate on Qwen2.5-7B Q4_K_M.
-2. If it fails, preserve artifacts and fix only integration or
-   prompt-rendering bugs; do not change expected answers to match the model.
-3. If it passes, continue to build profiles without stopping:
-   `portable-baseline`, `arm-native`, and `arm-optimized` only when evidence
-   can support it.
-4. Re-run the tuning quality gate for each build profile.
-5. Compare only quality-passing profiles.
-6. Run bounded runtime autotuning with approximately 8 to 12 unique
-   candidates, sequential requests, paired baseline insertion, deterministic
-   ordering, and TTFT as the primary metric.
-7. Mark faster quality-failing candidates as `rejected_quality`.
-8. Generate and verify the Performance Passport only from eligible evidence.
+Primary comparison:
+
+- Run `llama-bench` profile comparison with identical target, model,
+  prompt/generation counts, CPU allocation, repetitions, and protocol.
+- Measure prefill throughput, decode throughput, median, p95, min, max,
+  variability, and failed trials.
+
+Bounded runtime search:
+
+- Threads: `1`, `2`, `4`, `6`, `8`.
+- `threads-batch` only when the inspected runtime supports it.
+- A small batch/ubatch set.
+- Affinity modes: `scheduler-default`, `compact`, `spread`,
+  `reserve-one-core`.
+- Approximately 8 to 12 unique candidates; no full Cartesian product.
+- Warm-up exclusion, deterministic randomized order, paired baseline
+  insertion, repeated measured runs, confirmation runs, cooldown, and
+  noise-band classification.
+
+Secondary `llama-server` measurements:
+
+- request completion
+- nonempty output
+- stream parsing
+- TTFT
+- end-to-end latency
+- cleanup and port release
+
+Do not require BootTrace semantic correctness for default Phase 9 candidate
+eligibility.
+
+Candidate eligibility requires:
+
+- measured Linux Arm64 provenance
+- matching model/target/protocol digests
+- valid build evidence
+- successful execution and parsing
+- cleanup passed
+- sufficient samples
+- difference outside the configured noise band
+
+Phase 9 outputs:
+
+- build-profile comparison
+- runtime-search result
+- selected candidate or inconclusive result
+- before/after table
+- `performance_passport.json`
+- `performance_passport.md`
+- passport verification
+- independently validated artifact manifests
 
 Recommendation wording remains bounded:
 
 > Best observed eligible configuration under the tested Arm target, model,
-> server workload, and deterministic tuning quality protocol.
+> inference workload, and measurement protocol.
+
+Local validation boundary:
+
+- First finish local configuration and tests without AWS.
+- After local validation passes, report:
+  `ready_for_real_arm_tuning: true`.
+- Stop before real Phase 9 target execution until the existing C7g target is
+  manually started and explicitly confirmed by the operator.
 
 Do not call the selected configuration a global optimum.

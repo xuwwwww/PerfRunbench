@@ -451,12 +451,14 @@ It does not perform deterministic quality scoring, BootTrace validation,
 KleidiAI verification, build-profile comparison, Performix integration,
 Performance Passport generation, cloud provisioning, or real AWS execution.
 
-## Phase 4 Quality-Aware Server Tuning
+## Phase 4 Optional Experimental Quality-Aware Server Tuning
 
 Phase 4 adds a deterministic local quality layer and a bounded
 `llama-server` search path. The quality layer is not an external model judge:
 it validates public synthetic BootTrace cases against explicit expected
-answers and validator rules stored in a versioned quality suite.
+answers and validator rules stored in a versioned quality suite. After the
+Phase 9 refocus, this remains preserved as an optional experimental capability
+path and is not part of default build/runtime tuning eligibility.
 
 The quality package owns deterministic validation:
 
@@ -491,7 +493,7 @@ autotuning is a controller-side orchestration layer over repeated
 the versioned server job spec, including `threads`, `batch_size`,
 `ubatch_size`, `affinity_mode`, and optional `cpu_affinity`.
 
-Candidate comparison is quality-aware:
+In this optional experimental path, candidate comparison is quality-aware:
 
 - Performance distributions use client-observed TTFT as the primary metric and
   end-to-end latency as a secondary metric.
@@ -561,12 +563,13 @@ The existing `autotune/arm_tune/quality/` package is extended with:
 - BootTrace prompt-contract rendering and digesting
 - fixed-profile quality calibration
 
-Quality calibration is separate from performance optimization. A model/profile
-must be suitable before it can participate in quality-aware performance
-comparison. Suitability requires request execution, stream parsing, cleanup,
-deterministic quality validation, zero critical failures, and no invented
-evidence IDs. A normalized output may pass only if normalization is enabled by
-a versioned policy and all semantic validators still pass.
+Quality calibration is separate from default performance optimization. In the
+optional experimental quality path, a model/profile must be suitable before it
+can participate in quality-aware performance comparison. Suitability requires
+request execution, stream parsing, cleanup, deterministic quality validation,
+zero critical failures, and no invented evidence IDs. A normalized output may
+pass only if normalization is enabled by a versioned policy and all semantic
+validators still pass.
 
 Structured-generation support must be evidence-based. The inspected binary
 help output and optional bounded probes determine whether grammar, JSON schema,
@@ -660,44 +663,50 @@ necessity, ambiguity, and unknown-policy applicability for every evaluation
 case. Canonical answers may change only with written rationale that the fixture
 requires correction, not merely because a model failed.
 
-## Phase 9 Quality Split
+## Phase 9 Default Tuning Architecture
 
-Phase 9 separates ArmTune quality evidence into two distinct roles.
-
-`BootTrace Capability Benchmark` is the existing difficult held-out suite:
+Phase 9 refocuses ArmTune on the default product flow:
 
 ```text
-configs/armtune/quality/boottrace_suite.json
+inspect Arm target
+-> inspect workload runtime
+-> benchmark portable baseline
+-> build Arm profiles
+-> search runtime candidates
+-> confirm selected candidate
+-> generate Performance Passport
 ```
 
-It remains public, synthetic, audited, and unchanged. It evaluates whether a
-model can handle less direct BootTrace reasoning. It may report unsuitable
-models, and those results remain useful capability evidence, but the suite is
-not required for performance-tuning eligibility.
+The default eligibility path is evidence-backed performance tuning, not
+BootTrace model qualification. A candidate can be considered eligible only
+when measured Linux Arm64 provenance, matching model/target/protocol digests,
+valid build evidence, successful execution and parsing, cleanup, sufficient
+samples, and a difference outside the configured noise band are present.
 
-`Deterministic Tuning Quality Gate` is a separate suite:
+`llama.cpp` remains the first workload adapter. It provides `llama-bench` as
+the primary throughput comparison path and `llama-server` as a secondary
+runtime measurement path for request completion, nonempty output, streaming
+parsing, TTFT, end-to-end latency, cleanup, and port release. The product
+identity is Arm platform inspection, reproducible AI benchmarking,
+build/runtime configuration search, statistical comparison, and auditable
+recommendation.
 
-```text
-configs/armtune/quality/boottrace_tuning_suite.json
-```
+BootTrace quality modules, suites, validators, normalization diagnostics, and
+historical evidence are preserved as optional experimental capability
+workloads. They are not deleted, rewritten, or weakened, but they do not
+participate in default candidate eligibility unless an operator explicitly
+enables an experimental quality gate for a separate run.
 
-It is designed for repeatable CPU inference tuning. Cases use explicit
-key-value trace lines, fixed enum outputs, and directly evidenced line IDs.
-Critical validation is limited to deterministic structural and semantic checks:
-nonempty output, valid JSON after configured normalization, required fields,
-allowed enum values, exact `status`, exact `failure_stage`, exact
-`root_cause_category`, required evidence IDs, and no invented evidence IDs.
+Build-profile evidence must preserve source commit and dirty state,
+compiler/CMake versions, exact build command when available, effective CMake
+cache, compile flags, linked-library evidence, binary SHA-256 and size, and raw
+build stdout/stderr when an executing build flow supplies them. ArmTune must
+not claim KleidiAI from a requested flag. `enabled_and_evidenced` requires
+sufficient build/runtime evidence; otherwise the result must remain
+`requested_but_unverified`, `runtime_unverified`, `unavailable`, or
+`build_failed`.
 
-The tuning gate may permit the existing versioned single-fence extraction
-policy, but normalization must not edit JSON values, infer missing fields, or
-repair semantic answers. Raw output, normalized output, normalization steps,
-raw SHA-256, and normalized SHA-256 remain artifact evidence.
+The bounded Phase 9 recommendation wording is:
 
-Candidate recommendation in Phase 9 is gated by the tuning suite, not by the
-capability benchmark. The capability benchmark limitation must still be
-carried into the Performance Passport and public claims.
-or answer is demonstrably incorrect or ambiguous.
-
-Phase 5 must preserve the Phase 4 result boundary: a real run with no eligible
-candidate remains valid quality-rejection evidence but is not an optimization
-success.
+> Best observed eligible configuration under the tested Arm target, model,
+> inference workload, and measurement protocol.

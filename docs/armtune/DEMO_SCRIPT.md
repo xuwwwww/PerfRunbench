@@ -35,20 +35,17 @@ autotuneai arm inspect-host --target-config configs/armtune/targets/demo.json
 Highlight CPU identity, topology, host capabilities, and the label that host
 capability is not the same as workload execution evidence.
 
-### 1:00-1:30 - Quality Purposes
+### 1:00-1:30 - Baseline Benchmark
 
 Show:
 
 ```text
-autotuneai arm quality-calibrate --config configs/armtune/quality_calibration.example.json
+autotuneai arm benchmark --config configs/armtune/llama_bench.example.json
 ```
 
-Highlight the difference between the BootTrace Capability Benchmark and the
-Deterministic Tuning Quality Gate. The capability benchmark can remain failed
-while the tuning gate is used to prove that optimization candidates preserve
-directly evidenced behavior. Also highlight strict raw-output validation,
-optional audited normalization, failure-category histogram, prompt-contract
-digest, and model/profile suitability.
+Highlight that `llama-bench` is the primary throughput workload, raw stdout and
+stderr are preserved, missing metrics are not converted to zero, and fixture
+runs remain separate from measured Arm results.
 
 ### 1:30-2:10 - Build Profiles and Comparison
 
@@ -57,13 +54,14 @@ Show:
 ```text
 autotuneai arm build-plan --config configs/armtune/build_profiles.example.json
 autotuneai arm build-profile --config configs/armtune/build_profiles.example.json
+autotuneai arm optimize --config configs/armtune/llama_bench_optimize.example.json
 autotuneai arm profile-compare --config configs/armtune/profile_comparison.example.json
 ```
 
 Highlight that `build-plan` does not execute a build, `build-profile` records
 existing build evidence, `arm-optimized` stays `requested_but_unverified`
-without real KleidiAI evidence, and profile comparison rejects incomplete or
-quality-failing profiles.
+without real KleidiAI evidence, runtime search uses bounded staged candidates,
+and profile comparison rejects incomplete build or measurement evidence.
 
 ### 2:10-2:40 - Passport and Report
 
@@ -82,6 +80,10 @@ Open:
 
 Highlight claim eligibility, limitations, result origin, comparison-result
 digest, and artifact-manifest digest.
+
+Optional experimental BootTrace capability workloads may be shown separately
+only as model-capability evidence. They are not part of the default tuning
+eligibility path.
 
 ### 2:40-3:00 - CI Gate
 

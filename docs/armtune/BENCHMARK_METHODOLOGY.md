@@ -332,7 +332,8 @@ milliseconds. Lower is better. Median end-to-end latency is recorded as a
 secondary metric, but ArmTune does not combine TTFT and end-to-end latency into
 a composite score.
 
-Candidate eligibility requires:
+In the optional experimental Phase 4 BootTrace path, candidate eligibility
+requires:
 
 - `result_origin` is not `unverified`.
 - binary and model validation passed.
@@ -350,8 +351,8 @@ with `rejected_quality` and is not eligible for recommendation. A candidate
 with execution, lifecycle, cleanup, provenance, or artifact-validation failure
 is rejected with `rejected_execution`.
 
-The recommendation text must remain bounded to the tested candidate count, for
-example:
+The optional experimental recommendation text must remain bounded to the
+tested candidate count, for example:
 
 > Best observed quality-passing performance candidate among 3 tested
 > configurations.
@@ -565,77 +566,78 @@ profile comparison, Performance Passport generation, and passport tamper
 detection. These tests validate the evidence pipeline and claim gates; they do
 not provide measured Arm performance.
 
-## Phase 9 Deterministic Tuning Workload
+## Phase 9 Arm Build And Runtime Tuning Method
 
-Phase 9 stops using the difficult held-out BootTrace suite as a prerequisite
-for performance tuning. The existing held-out suite is reclassified as a
-`BootTrace Capability Benchmark`: it is still valid evidence of model
-limitations, but it is not the tuning quality gate.
+Phase 9 uses the fixed Qwen2.5-7B Q4_K_M workload and the pinned llama.cpp
+source already present in prior evidence. It does not download another model,
+update llama.cpp, change prompts, or run further BootTrace qualification.
 
-The tuning quality gate is a new deterministic public synthetic suite:
-
-```text
-configs/armtune/quality/boottrace_tuning_suite.json
-```
-
-Its cases are intentionally direct. Trace lines use explicit key-value facts
-such as `STAGE=...`, `EVENT=...`, `ROOT_CAUSE=...`, and `BOOT_RESULT=...`.
-The required JSON fields are:
+The default execution order is:
 
 ```text
-case_id
-status
-failure_stage
-root_cause_category
-evidence_line_ids
+inspect Arm target
+-> inspect workload runtime
+-> benchmark portable baseline
+-> build Arm profiles
+-> search runtime candidates
+-> confirm selected candidate
+-> generate Performance Passport
 ```
 
-The valid enum sets are fixed by the suite. Every required evidence ID must be
-present in the prompt, and invented evidence IDs are critical failures. The
-suite may include an informational `recommended_action`, but free-form action
-text is not a critical validator.
+Build profiles are:
 
-The tuning gate passes only when:
+- `portable-baseline`
+- `arm-native`
+- `arm-optimized` only when build/runtime evidence can support it
 
-- all required cases pass
-- request execution succeeds for all cases
-- stream parsing passes
-- cleanup passes
-- artifact validation passes
-- critical validator failures are zero
-- invented evidence IDs are zero
+For every build profile, ArmTune preserves source commit and dirty state,
+compiler/CMake versions, exact build command when available, effective CMake
+cache, compile flags, linked-library evidence, binary SHA-256 and size, and
+raw build stdout/stderr when supplied by an executing build flow. KleidiAI is
+never inferred from a requested CMake flag; it must remain
+`requested_but_unverified`, `runtime_unverified`, `unavailable`, or
+`build_failed` unless there is enough build and runtime evidence for
+`enabled_and_evidenced`.
 
-The tuning gate may use the existing versioned single-fence normalization
-policy for exact Markdown JSON fence extraction. Normalization cannot alter
-semantic values, add missing fields, change enum values, or infer evidence.
+`llama-bench` is the primary profile-comparison workload. Compared profiles
+must use identical target, model, prompt/generation counts, CPU allocation,
+repetitions, and protocol. The reported distributions include prefill
+throughput, decode throughput, median, p95, min, max, variability, and failed
+trials. Failed trials remain separate and are never aggregated as zero.
 
-Real Phase 9 tuning fixes the model and runtime inputs before comparison:
+Runtime search is bounded and staged. The planned real run uses thread
+candidates `1`, `2`, `4`, `6`, and `8`; `threads-batch` only when the inspected
+binary supports it; a small batch/ubatch set; and affinity modes
+`scheduler-default`, `compact`, `spread`, and `reserve-one-core`. The search
+uses approximately 8 to 12 unique candidates, not a full Cartesian product.
 
-- Qwen2.5-7B-Instruct-GGUF Q4_K_M
-- pinned model SHA-256
-- pinned llama.cpp source commit
-- pinned llama-server binary digest for each build profile
-- temperature `0`
-- deterministic seed
-- prompt-contract digest
-- tuning-suite digest
-- schema digest
-- normalization-policy version
-- context size
-- predict-token limit
+The measurement protocol uses warm-up exclusion, deterministic randomized
+order, paired baseline insertion, repeated measured runs, confirmation runs,
+cooldown, and the configured noise-band classifier. A recommendation can be
+made only when the selected candidate is supported by measured Linux Arm64
+provenance, matching model/target/protocol digests, valid build evidence,
+successful execution and parsing, cleanup, sufficient samples, and a
+difference outside the configured noise band.
 
-Performance comparison uses only candidates that pass the tuning quality gate.
-Faster candidates with corrupted output are `rejected_quality`. Recommendation
-claims must use bounded wording:
+`llama-server` is secondary runtime evidence. It measures request completion,
+nonempty output, stream parsing, TTFT, end-to-end latency, cleanup, and port
+release. Phase 9 does not require BootTrace semantic correctness for default
+candidate eligibility.
+
+BootTrace quality suites and results remain preserved as optional experimental
+capability workloads. They are not deleted or rewritten, but they do not block
+the default Phase 9 performance-tuning flow.
+
+Recommendation claims must use bounded wording:
 
 > Best observed eligible configuration under the tested Arm target, model,
-> server workload, and deterministic tuning quality protocol.
+> inference workload, and measurement protocol.
 
-## Phase 6 Qualified Profile Comparison
+## Phase 6 Optional Experimental Qualified Profile Comparison
 
 Phase 6 treats model suitability as a hard precondition for measured profile
-comparison. A model/profile must pass quality calibration before any build
-profile is compared for performance.
+comparison only in the optional experimental BootTrace qualification path. It
+is not the Phase 9 default build/runtime tuning gate.
 
 Qualification uses:
 
@@ -658,10 +660,10 @@ stage, missing evidence, invented evidence, malformed JSON, or missing fields.
 If qualification fails, ArmTune records the actual failure categories and
 stops before build-profile comparison and Performance Passport generation.
 
-If qualification succeeds, every candidate build profile must be calibrated
+If optional qualification succeeds, every candidate build profile must be calibrated
 with the same model digest, suite digest, prompt-contract digest,
 normalization policy, generation settings, context size, output limit, target
-allocation, and CPU affinity policy. Only quality-passing profiles enter
+allocation, and CPU affinity policy. Only quality-passing profiles enter this optional
 paired comparison. Profiles with differing quality outcomes or protocol
 digests are not comparable.
 
