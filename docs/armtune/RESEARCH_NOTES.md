@@ -582,12 +582,51 @@ Access date for all entries: 2026-07-13.
   no residual `llama-server`, controller process exited, and the benchmark
   loopback port was released.
 - Relevant conclusion:
-  Gemma 3 12B QAT Q4_0 is unsuitable under the unchanged Phase 7 frozen
-  held-out BootTrace qualification contract. The rejection is a strict quality
-  gate result, not an SSH, digest, cleanup, artifact, or request-execution
-  failure.
+  the strict Gemma 3 12B QAT Q4_0 run failed the unchanged Phase 7 frozen
+  raw-JSON protocol because every output used a Markdown fence. This is not the
+  same failure shape as the Qwen2.5 raw-valid semantic failures, and it is not
+  an SSH, digest, cleanup, artifact, or request-execution failure.
 - Claim boundary:
   this is model qualification and quality-rejection evidence. It is not
   quality-preserving performance improvement, build-profile comparison,
   Performance Passport eligibility, KleidiAI execution, Performix evidence, or
   final competition benchmark evidence.
+
+## Phase 8-R Gemma 3 12B Post-Hoc Normalization Diagnostic
+
+- Evidence file:
+  `docs/armtune/results/PHASE_8_GEMMA12B_NORMALIZATION_DIAGNOSTIC.md`
+- Reproducibility sidecar:
+  `docs/armtune/results/phase8_gemma12b_normalization_diagnostic.json`
+- Source run:
+  `20260719_183725_010839`.
+- Diagnostic label:
+  `post_hoc_normalization_diagnostic`.
+- Execution boundary:
+  no AWS instance was started, no inference was rerun, and the original strict
+  result remains failed.
+- Normalization policy:
+  `boottrace-normalization-v1`, enabled, non-strict,
+  `allow_markdown_fence: true`, `allow_prose_outside_fence: false`.
+- Validator boundary:
+  held-out canonical answers, validators, prompt contract, fixtures, evidence
+  IDs, and model output semantic values were unchanged.
+- Result:
+  5/5 normalized-valid JSON outputs, 1/5 required cases passed, 6 critical
+  failures, zero invented evidence failures, `quality_gate_status: failed`.
+- Passing case:
+  `boot_retry_recovered`.
+- Failing cases:
+  `boot_success` failed latency range; `boot_config_missing` missed the
+  required configuration substring; `boot_device_timeout` failed latency,
+  substring, and regex checks; `boot_firmware_component_failure` failed the
+  required regex.
+- Interpretation:
+  Gemma 3 12B is not merely format-limited for the current five-case held-out
+  BootTrace protocol. Exact single-fence extraction makes the JSON parseable,
+  but unchanged semantic validators still reject 4/5 required cases.
+- Decision:
+  a fresh held-out v2 Gemma evaluation is not justified from this diagnostic.
+  Stop the current model ladder and treat the existing held-out suite as a
+  capability benchmark while defining a separate deterministic CPU-inference
+  tuning workload.

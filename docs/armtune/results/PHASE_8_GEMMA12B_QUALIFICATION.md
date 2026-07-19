@@ -6,6 +6,11 @@ This document records a bounded Phase 8 real-model qualification run for
 Gemma 3 12B QAT Q4_0 on the user-provisioned C7g / Graviton3 Linux Arm64
 target.
 
+The strict qualification failed before semantic validation because every
+output used a Markdown JSON fence while the frozen contract required raw JSON.
+A later offline diagnostic is recorded separately in
+`docs/armtune/results/PHASE_8_GEMMA12B_NORMALIZATION_DIAGNOSTIC.md`.
+
 No benchmark infrastructure was added. No held-out validators, canonical
 answers, prompt contracts, normalization policy, llama.cpp build, seed, or
 temperature settings were changed.
@@ -142,8 +147,32 @@ Interpretation:
   frozen Phase 7 qualification contract required strict disabled
   normalization.
 - The validators and canonical answers were not changed to make Gemma pass.
-- The result is a model/profile quality rejection, not an SSH, cleanup,
+- The strict result is a raw-output protocol rejection, not an SSH, cleanup,
   digest, artifact, or request-execution failure.
+
+## Post-Hoc Normalization Diagnostic
+
+An offline diagnostic was run after the strict result using only the existing
+`boottrace-normalization-v1` single-fence policy:
+
+```text
+diagnostic_label: post_hoc_normalization_diagnostic
+sidecar: docs/armtune/results/phase8_gemma12b_normalization_diagnostic.json
+normalized_json_valid_count: 5/5
+required_cases_passed: 1/5
+critical_failure_count: 6
+invented_evidence_failures: 0
+quality_gate_status: failed
+```
+
+That diagnostic did not rerun inference, start AWS, change canonical answers,
+modify validators, tune prompts, repair malformed JSON, or alter model outputs.
+It preserved the original raw outputs and SHA-256 values in the JSON sidecar.
+
+The diagnostic shows that Gemma 3 12B is not the same failure shape as the
+Qwen2.5 runs. Qwen2.5-7B and Qwen2.5-14B produced raw-valid JSON with semantic
+failures. Gemma first failed the strict raw-JSON protocol, then still passed
+only 1/5 required cases after exact single-fence extraction.
 
 ## Artifact And Cleanup Validation
 
@@ -180,15 +209,19 @@ remote_root_free_after_run: approximately 8.4 GiB
 
 ## Decision
 
-Gemma 3 12B QAT Q4_0 is unsuitable under the unchanged Phase 7 frozen
-held-out BootTrace qualification contract.
+The original Gemma 3 12B QAT Q4_0 strict qualification remains failed and
+`unsuitable` under the unchanged Phase 7 frozen held-out BootTrace contract.
+The post-hoc diagnostic does not override that result. It shows that Gemma's
+preserved outputs are valid JSON after exact single-fence extraction, but still
+fail 4/5 required cases under unchanged validators.
 
-Because Qwen2.5-7B, Qwen2.5-14B, and Gemma 3 12B are all unsuitable under the
-current held-out contract, ArmTune must stop the model ladder here. It should
-not proceed to build-profile comparison, runtime tuning, Performance Passport
-generation, KleidiAI claims, Performix evidence, or final performance claims
-without first defining a new deterministic workload strategy or qualifying a
-model/profile under a separately justified protocol.
+Because normalization did not produce a 5/5 semantic pass, a fresh held-out v2
+Gemma evaluation is not justified from this diagnostic. ArmTune should stop the
+current model ladder here. It should not proceed to build-profile comparison,
+runtime tuning, Performance Passport generation, KleidiAI claims, Performix
+evidence, or final performance claims without first defining a new
+deterministic workload strategy or qualifying a model/profile under a
+separately justified protocol.
 
 ## Claim Boundary
 
@@ -197,7 +230,7 @@ This result supports:
 > ArmTune executed a measured Gemma 3 12B QAT Q4_0 held-out BootTrace
 > qualification on a real Linux Arm64 C7g target, preserved artifacts,
 > revalidated manifests after download, cleaned up `llama-server`, and
-> correctly rejected the model/profile when strict quality validation failed.
+> correctly rejected the strict run when the frozen raw-JSON protocol failed.
 
 This result does not show:
 

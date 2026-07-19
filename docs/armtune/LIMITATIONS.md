@@ -304,13 +304,20 @@ should be labeled unverified.
   passed, and `model_profile_suitability: unsuitable`.
 - Gemma emitted Markdown-fenced JSON for every held-out case. Strict
   normalization remained disabled, so those outputs were intentionally rejected
-  instead of being normalized into a pass.
+  instead of being normalized into a pass. This strict result is a raw-JSON
+  protocol failure and must not be conflated with Qwen2.5 raw-valid semantic
+  failures.
+- A later offline post-hoc diagnostic used only the existing
+  `boottrace-normalization-v1` single-fence policy on preserved Gemma
+  artifacts. It produced 5/5 normalized-valid JSON outputs, but only 1/5
+  required cases passed, with 6 critical failures and zero invented evidence
+  failures. This diagnostic does not override the strict failed qualification.
 - AWS lifecycle remains user-controlled for Phase 8. ArmTune must not
   automatically start, stop, provision, resize, or replace cloud resources.
 - Runtime tuning, build-profile comparison, Performance Passport generation,
   KleidiAI claims, Performix evidence, and final competition conclusions remain
   blocked until an unchanged held-out qualification run reaches `suitable`.
-- After Qwen2.5-7B, Qwen2.5-14B, and Gemma 3 12B all remained unsuitable,
-  ArmTune should stop the current model ladder and decide whether to keep the
-  five held-out cases as a capability benchmark while defining a separate
-  deterministic CPU-inference tuning workload.
+- After Qwen2.5-7B, Qwen2.5-14B, and normalized Gemma 3 12B artifacts all
+  failed the current held-out semantic gate, ArmTune should stop the current
+  model ladder and keep the five held-out cases as a capability benchmark while
+  defining a separate deterministic CPU-inference tuning workload.

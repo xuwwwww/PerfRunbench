@@ -1579,9 +1579,11 @@ Phase 7 real-target result boundary:
 
 ## Phase 8 Plan: Final Model Qualification And Conditional Arm Tuning
 
-Status: real Gemma 3 12B held-out qualification completed and rejected as
-`unsuitable`. Phase 8 did not add benchmark infrastructure or weaken the
-held-out quality gate.
+Status: real Gemma 3 12B held-out qualification completed and the strict run
+was rejected as `unsuitable`. A later offline post-hoc diagnostic extracted the
+preserved single-fenced JSON outputs with the existing versioned policy and
+still passed only 1/5 required cases. Phase 8 did not add benchmark
+infrastructure or weaken the held-out quality gate.
 
 Phase 8 starts from the frozen Phase 7 contract:
 
@@ -1627,6 +1629,10 @@ Phase 8 real Gemma qualification:
 
 - Evidence file:
   `docs/armtune/results/PHASE_8_GEMMA12B_QUALIFICATION.md`.
+- Post-hoc diagnostic evidence file:
+  `docs/armtune/results/PHASE_8_GEMMA12B_NORMALIZATION_DIAGNOSTIC.md`.
+- Post-hoc diagnostic sidecar:
+  `docs/armtune/results/phase8_gemma12b_normalization_diagnostic.json`.
 - Official gated-file access was later granted outside the repository without
   printing, storing, or committing any credential value.
 - Windows controller and remote target `hf download --dry-run` both reported
@@ -1651,6 +1657,14 @@ Phase 8 real Gemma qualification:
 - The model emitted Markdown-fenced JSON for every held-out case. Strict
   normalization remained disabled by the frozen Phase 7 contract, so the
   fenced outputs were intentionally rejected.
+- Offline post-hoc single-fence diagnostic for the preserved outputs:
+  5/5 normalized-valid JSON, 1/5 required cases passed, 6 critical failures,
+  zero invented evidence failures, `quality_gate_status: failed`.
+- Diagnostic interpretation:
+  Gemma's strict run is a raw-JSON protocol failure first, not the same failure
+  shape as the Qwen2.5 raw-valid semantic failures. After exact single-fence
+  extraction, Gemma still fails 4/5 required held-out cases, so it is not merely
+  format-limited for the current five-case protocol.
 - Independent post-download artifact revalidation passed for the outer
   quality-calibration manifest (`42` checked artifacts) and nested benchmark
   manifest (`32` checked artifacts).
@@ -1681,7 +1695,9 @@ Phase 8-R decision:
 - Do not proceed to build-profile comparison, runtime tuning, Performance
   Passport generation, KleidiAI claims, Performix evidence, or final
   performance claims from this unsuitable model/profile.
-- The next technical decision is whether to keep the current five held-out
-  cases as a capability benchmark and define a separate deterministic workload
-  better matched to CPU inference tuning, or qualify a different model/profile
-  under a separately justified protocol.
+- A fresh held-out v2 Gemma evaluation is not justified from the diagnostic
+  because normalization did not produce a 5/5 semantic pass.
+- The next technical decision is to keep the current five held-out cases as a
+  capability benchmark and define a separate deterministic workload better
+  matched to CPU inference tuning, or qualify a different model/profile under a
+  separately justified protocol.

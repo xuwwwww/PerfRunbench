@@ -167,13 +167,24 @@ Gemma emitted Markdown-fenced JSON for every held-out case. Strict
 normalization remained disabled by the frozen Phase 7 qualification contract,
 so the fenced outputs were rejected rather than normalized into a pass.
 
+An offline post-hoc diagnostic is recorded in:
+
+```text
+docs/armtune/results/PHASE_8_GEMMA12B_NORMALIZATION_DIAGNOSTIC.md
+```
+
+That diagnostic did not rerun inference or change validators. It extracted the
+preserved single-fenced JSON outputs with the existing versioned policy and
+found 5/5 normalized-valid JSON outputs, but only 1/5 required cases passed.
+
 ## Claim Boundary
 
 This preflight supports:
 
-> ArmTune's Qwen2.5 held-out failures are cross-model semantic gate failures
-> under a frozen prompt contract, and Gemma 3 12B qualification is blocked by
-> file access until official GGUF access is available.
+> ArmTune's Qwen2.5 held-out failures are cross-model raw-valid semantic gate
+> failures under a frozen prompt contract, and Gemma 3 12B required separate
+> strict-protocol and post-hoc normalization interpretation after file access
+> was granted.
 
 This preflight does not show:
 
