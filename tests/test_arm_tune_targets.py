@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from autotune.arm_tune.config import parse_target_spec
@@ -161,6 +163,31 @@ class ArmTuneTargetsTest(unittest.TestCase):
         serialized = json.dumps(written_payloads, sort_keys=True)
         self.assertNotIn("id_ed25519", serialized)
         self.assertNotIn(".ssh", serialized)
+
+    def test_ssh_prepare_server_prompt_suite_uploads_to_versioned_run_directory(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            prompt_suite = Path(temp_dir) / "prompt_suite_snapshot.json"
+            prompt_suite.write_text('{"schema_version":"1.0","prompts":[]}', encoding="utf-8")
+            runner = FakeRunner("", stdout_call=99)
+            spec = parse_target_spec(
+                {
+                    "schema_version": "1.0",
+                    "target": {
+                        "type": "ssh",
+                        "host": "arm-host",
+                        "remote_workdir": "/tmp/armtune-runs",
+                    },
+                }
+            )
+            target = SshArmTarget(spec, runner=runner)
+
+            remote_path = target.prepare_server_prompt_suite(prompt_suite, run_id="run-123")
+
+            self.assertEqual(remote_path, "/tmp/armtune-runs/run-123/armtune/quality_calibration/prompt_suite_snapshot.json")
+            self.assertEqual(runner.commands[0][-4:], ["arm-host", "mkdir", "-p", "/tmp/armtune-runs/run-123/armtune/quality_calibration"])
+            self.assertIn("scp", runner.commands[1][0])
+            self.assertIn(str(prompt_suite), runner.commands[1])
+            self.assertIn("arm-host:/tmp/armtune-runs/run-123/armtune/quality_calibration/prompt_suite_snapshot.json", runner.commands[1])
 
 
 def _inspection(*, valid: bool = True, system: str = "Linux", machine: str = "aarch64") -> HostInspectionResult:

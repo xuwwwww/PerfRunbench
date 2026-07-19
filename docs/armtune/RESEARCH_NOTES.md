@@ -407,3 +407,28 @@ Access date for all entries: 2026-07-13.
   quality-preserving recommendation, final optimization, stable production
   performance, KleidiAI, build-profile improvement, Performix, Performance
   Passport output, or formal competition benchmark results.
+
+## Phase 7-L BootTrace Contract Calibration Foundation
+
+- Evidence file:
+  `docs/armtune/results/PHASE_7_BOOTTRACE_CONTRACT_CALIBRATION.md`
+- Held-out evaluation suite:
+  `configs/armtune/quality/boottrace_suite.json`
+- Development calibration suite:
+  `configs/armtune/quality/boottrace_calibration_suite.json`
+- Held-out case audit:
+  `configs/armtune/quality/boottrace_case_audit.json`
+- Prompt contract versions:
+  `current-zero-shot`, `taxonomy-and-decision-rules`, and
+  `taxonomy-rules-and-disjoint-few-shot`.
+- Implementation boundary: local code/tests and public documentation only.
+  No paid cloud resource was started and no real Qwen2.5 Phase 7 rerun was
+  executed in this foundation step.
+- Validation: local focused tests covered audit coverage, calibration suite
+  disjointness, prompt contract digest stability, distinct rendered prompts,
+  prompt-contract artifact recording, request JSON preservation, and SSH
+  prompt-suite upload command shape.
+- Claim boundary: this validates prompt-contract infrastructure and evidence
+  recording. It does not validate Qwen2.5 suitability, a stronger model,
+  profile comparison, Performance Passport output, Arm performance
+  improvement, KleidiAI, Performix, or formal competition benchmark results.

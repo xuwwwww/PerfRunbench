@@ -623,6 +623,43 @@ artifact-manifest digest, claim eligibility, limitations, and redacted
 reproducibility commands. Verification rejects schema, digest, artifact, or
 claim consistency problems.
 
+## Phase 7 BootTrace Contract Calibration
+
+Phase 7 adds prompt-contract versioning without changing the core quality gate
+semantics. The held-out evaluation suite remains
+`configs/armtune/quality/boottrace_suite.json`; the separate public
+development calibration suite is
+`configs/armtune/quality/boottrace_calibration_suite.json`. Development cases
+may guide prompt contracts, but they are never counted as final held-out
+qualification passes.
+
+The controller supports these BootTrace prompt contracts:
+
+- `current-zero-shot`
+- `taxonomy-and-decision-rules`
+- `taxonomy-rules-and-disjoint-few-shot`
+
+The selected contract is configured through
+`quality_gate.prompt_contract_version`. The controller renders the prompts,
+writes `prompt_contract.json` and `prompt_suite_snapshot.json`, records prompt
+digests, expected schema digest, taxonomy version, generation settings, and
+normalization policy, then executes the existing allowlisted
+`benchmark.llama_server` worker operation.
+
+For SSH targets, the controller uploads only the rendered
+`prompt_suite_snapshot.json` into the versioned remote run directory and
+updates the worker job to reference that uploaded file. This ensures the
+remote request artifacts prove which prompt contract was actually sent to
+`llama-server` while preserving the fixed worker command and avoiding arbitrary
+remote shell strings.
+
+The held-out case audit in
+`configs/armtune/quality/boottrace_case_audit.json` records trace sufficiency,
+unique expected classification, taxonomy clarity, required evidence-line
+necessity, ambiguity, and unknown-policy applicability for every evaluation
+case. Canonical answers may change only with written rationale that the fixture
+or answer is demonstrably incorrect or ambiguous.
+
 Phase 5 must preserve the Phase 4 result boundary: a real run with no eligible
 candidate remains valid quality-rejection evidence but is not an optimization
 success.

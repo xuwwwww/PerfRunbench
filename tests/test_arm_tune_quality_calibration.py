@@ -27,6 +27,7 @@ from autotune.cli import main
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_SCRIPT = Path(__file__).parent / "fixtures" / "arm_tune" / "fake_llama_server.py"
 QUALITY_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_suite.json"
+CALIBRATION_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_calibration_suite.json"
 
 
 class ArmTuneQualityCalibrationTest(unittest.TestCase):
@@ -101,10 +102,59 @@ class ArmTuneQualityCalibrationTest(unittest.TestCase):
             self.assertEqual(payload["structured_capability"]["temperature"], "supported")
             self.assertIn("model_profile_suitability: suitable", output.getvalue())
 
+    def test_prompt_contract_version_is_recorded_and_used_for_requests(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = _write_config(
+                root,
+                _calibration_config(
+                    root,
+                    normalization={"enabled": False, "strict": True},
+                    quality_gate={
+                        "prompt_contract_version": "taxonomy-rules-and-disjoint-few-shot",
+                        "calibration_suite_path": str(CALIBRATION_SUITE),
+                    },
+                ),
+            )
 
-def _calibration_config(root: Path, *, normalization: dict) -> dict:
+            with _cwd(root), patch.object(LocalArmTarget, "inspect", return_value=_inspection()):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "FAKE_LLAMA_SERVER_QUALITY_MODE": "boottrace_success",
+                        "FAKE_LLAMA_SERVER_EVENT_DELAY": "0.001",
+                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "5",
+                    },
+                ):
+                    exit_code = main(["arm", "quality-calibrate", "--config", str(config_path)])
+
+            result_dir = next((root / ".autotuneai" / "runs").glob("*/armtune/quality_calibration"))
+            prompt_contract = json.loads((result_dir / "prompt_contract.json").read_text(encoding="utf-8"))
+            prompt_suite = json.loads((result_dir / "prompt_suite_snapshot.json").read_text(encoding="utf-8"))
+            effective_config = json.loads((result_dir / "effective_config.json").read_text(encoding="utf-8"))
+            request = json.loads(
+                next((result_dir / "benchmark" / "requests").glob("boot_success/measured/0001/request.json")).read_text(encoding="utf-8")
+            )
+            rendered_prompt = request["request"]["messages"][0]["content"]
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(prompt_contract["contract_version"], "taxonomy-rules-and-disjoint-few-shot")
+            self.assertEqual(prompt_suite["prompt_contract_version"], "taxonomy-rules-and-disjoint-few-shot")
+            self.assertEqual(effective_config["quality_gate"]["prompt_contract_version"], "taxonomy-rules-and-disjoint-few-shot")
+            self.assertIn("Disjoint calibration examples", rendered_prompt)
+            self.assertIn("dev_no_boot_device_failure", rendered_prompt)
+            self.assertTrue((result_dir / "calibration_suite_manifest.json").exists())
+
+
+def _calibration_config(root: Path, *, normalization: dict, quality_gate: dict | None = None) -> dict:
     prompt_suite = root / "unused_prompt_suite.json"
     prompt_suite.write_text(json.dumps({"schema_version": "1.0", "prompts": [{"prompt_id": "unused", "prompt": "unused"}]}), encoding="utf-8")
+    quality_gate_payload = {
+        "enabled": True,
+        "suite_path": str(QUALITY_SUITE),
+    }
+    if quality_gate:
+        quality_gate_payload.update(quality_gate)
     return {
         "schema_version": "1.0",
         "result_origin": "test_fixture",
@@ -134,10 +184,7 @@ def _calibration_config(root: Path, *, normalization: dict) -> dict:
             "streaming": True,
             "cooldown_seconds": 0.0,
         },
-        "quality_gate": {
-            "enabled": True,
-            "suite_path": str(QUALITY_SUITE),
-        },
+        "quality_gate": quality_gate_payload,
         "normalization": normalization,
         "artifacts": {
             "preserve_server_stdout": True,

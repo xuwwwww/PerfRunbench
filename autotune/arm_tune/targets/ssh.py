@@ -144,6 +144,16 @@ class SshArmTarget(ArmTuneTarget):
         validated = apply_server_artifact_validation(benchmark_result, validation, local_dir)
         return finalize_server_result_artifacts(local_dir, validated)
 
+    def prepare_server_prompt_suite(self, local_prompt_suite_path: str | Path, *, run_id: str) -> str:
+        remote_run_dir = safe_remote_path(f"{self.spec.remote_workdir.rstrip('/')}/{run_id}/armtune/quality_calibration")
+        remote_path = safe_remote_path(f"{remote_run_dir}/prompt_suite_snapshot.json")
+        self._run_checked(self.build_ssh_command(["mkdir", "-p", remote_run_dir]), timeout_seconds=self.spec.connect_timeout_seconds)
+        self._run_checked(
+            self.build_scp_upload_command(local_prompt_suite_path, remote_path),
+            timeout_seconds=self.spec.connect_timeout_seconds,
+        )
+        return remote_path
+
     def check_prerequisites(self) -> RemotePrerequisiteResult:
         self._run_checked(self.build_python_version_command(), timeout_seconds=self.spec.connect_timeout_seconds)
         with tempfile.TemporaryDirectory(prefix="armtune-ssh-") as temp_dir:

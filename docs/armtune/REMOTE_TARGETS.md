@@ -218,10 +218,17 @@ manifest, quality-suite snapshot, normalization policy, prompt contract,
 structured capability summary, quality calibration result, artifact manifest,
 and artifact validation.
 
-For SSH targets, `workload.prompt_suite_path` remains an absolute path on the
-target. The controller writes a local `prompt_suite_snapshot.json` for
-auditability, but it does not silently upload or substitute model, prompt, or
-private workload files outside the versioned worker protocol.
+For SSH targets, the input config still carries an absolute
+`workload.prompt_suite_path` for schema compatibility, but Phase 7
+`quality-calibrate` renders the selected BootTrace prompt contract on the
+controller, writes a local `prompt_suite_snapshot.json`, uploads that exact
+versioned prompt suite into the remote run directory, and substitutes only that
+remote prompt-suite path in the allowlisted worker job. It does not upload
+models, credentials, arbitrary workload files, or private shell commands.
+
+The downloaded request artifacts preserve the final JSON request body sent to
+`llama-server`, so reviewers can verify that the selected prompt contract,
+seed, temperature, and output token bound were applied.
 
 `autotuneai arm build-plan` does not execute remote work. `build-profile` and
 `inspect-build` record configured source and binary evidence and must not

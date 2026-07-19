@@ -260,3 +260,23 @@ should be labeled unverified.
 - Phase 6 does not validate private firmware logs, customer data,
   source-level llama.cpp optimizations, Performix evidence, stable production
   SLOs, or final competition benchmark conclusions.
+
+## Phase 7 Planned Limitations
+
+- Phase 7 prompt-contract calibration does not weaken the held-out BootTrace
+  evaluation validators or canonical answers.
+- The development calibration suite is not final qualification evidence and
+  must not be mixed into the held-out 5/5 pass count.
+- Versioned prompt contracts can reduce prompt ambiguity, but they do not prove
+  model capability until a real model/profile passes the held-out evaluation
+  suite with artifact validation and cleanup evidence.
+- SSH quality calibration uploads only the rendered prompt suite into the
+  versioned remote run directory. It does not upload model weights,
+  credentials, private logs, or arbitrary workload files.
+- Qwen2.5-7B must be re-run against the three Phase 7 contract variants before
+  deciding whether to move up the model ladder. That real-target rerun requires
+  target availability and explicit cost approval if a paid cloud instance must
+  be started.
+- Build-profile comparison, Performance Passport generation, Performix
+  evidence, KleidiAI claims, and final competition conclusions remain blocked
+  until a model/profile is `suitable`.

@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "synthetic_boottrace_calibration_v1",
+  "description": "Public synthetic BootTrace development suite for prompt-contract calibration. These cases are disjoint from the held-out evaluation suite and must not be reported as final qualification cases.",
+  "cases": [
+    {
+      "case_id": "dev_os_handoff_success",
+      "category": "boottrace_success",
+      "prompt": "CASE_ID=dev_os_handoff_success\nYou are validating this synthetic BootTrace excerpt.\nD001 Boot ROM completed BL1\nD002 BL2 verified kernel image\nD003 Kernel transferred control to init\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 96,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "dev_os_handoff_success",
+        "status": "success",
+        "required_evidence_line_ids": ["D001", "D002", "D003"],
+        "allowed_evidence_line_ids": ["D001", "D002", "D003"],
+        "example_response": {
+          "case_id": "dev_os_handoff_success",
+          "status": "success",
+          "event_sequence_valid": true,
+          "latency_ms": 64,
+          "summary": "Boot completed successfully after kernel transferred control to init.",
+          "evidence_line_ids": ["D001", "D002", "D003"]
+        }
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "event_sequence_valid", "latency_ms", "summary", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "event_sequence_valid": {"type": "boolean"},
+              "latency_ms": {"type": "number"},
+              "summary": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "dev_os_handoff_success"},
+        {"type": "allowed_values", "field": "status", "expected": ["success"]},
+        {"type": "exact_field", "field": "event_sequence_valid", "expected": true},
+        {"type": "numeric_range", "field": "latency_ms", "expected": {"min": 0, "max": 120}},
+        {"type": "required_substrings", "field": "summary", "expected": ["Boot completed"]},
+        {"type": "forbidden_substrings", "field": "summary", "expected": ["invented", "hallucinated", "unknown line"]},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["D001", "D002", "D003"],
+            "required": ["D001", "D002", "D003"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "dev_usb_retry_warning",
+      "category": "boottrace_retry",
+      "prompt": "CASE_ID=dev_usb_retry_warning\nYou are validating this synthetic BootTrace excerpt.\nD010 USB storage probe failed once\nD011 Retry scheduled after 20 ms\nD012 USB storage probe succeeded\nD013 Kernel mounted root filesystem\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 96,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "dev_usb_retry_warning",
+        "status": "warning",
+        "required_evidence_line_ids": ["D010", "D011", "D012", "D013"],
+        "allowed_evidence_line_ids": ["D010", "D011", "D012", "D013"],
+        "example_response": {
+          "case_id": "dev_usb_retry_warning",
+          "status": "warning",
+          "event_sequence_valid": true,
+          "latency_ms": 74,
+          "summary": "Boot completed after one retry when USB storage probe succeeded.",
+          "evidence_line_ids": ["D010", "D011", "D012", "D013"]
+        }
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "event_sequence_valid", "latency_ms", "summary", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "event_sequence_valid": {"type": "boolean"},
+              "latency_ms": {"type": "number"},
+              "summary": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "dev_usb_retry_warning"},
+        {"type": "allowed_values", "field": "status", "expected": ["warning"]},
+        {"type": "exact_field", "field": "event_sequence_valid", "expected": true},
+        {"type": "numeric_range", "field": "latency_ms", "expected": {"min": 20, "max": 180}},
+        {"type": "required_substrings", "field": "summary", "expected": ["one retry"]},
+        {"type": "forbidden_substrings", "field": "summary", "expected": ["invented", "hallucinated", "unknown line"]},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["D010", "D011", "D012", "D013"],
+            "required": ["D010", "D011", "D012", "D013"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "dev_no_boot_device_failure",
+      "category": "boottrace_failure",
+      "prompt": "CASE_ID=dev_no_boot_device_failure\nYou are validating this synthetic BootTrace excerpt.\nD020 Boot manager enumerated devices\nD021 No bootable device found\nD022 Boot process halted\nReturn raw compact JSON only; do not wrap it in Markdown fences. Use status exactly as success, warning, failure, or unknown. Include case_id, status, event_sequence_valid, latency_ms, summary, and evidence_line_ids.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 96,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "dev_no_boot_device_failure",
+        "status": "failure",
+        "required_evidence_line_ids": ["D020", "D021", "D022"],
+        "allowed_evidence_line_ids": ["D020", "D021", "D022"],
+        "example_response": {
+          "case_id": "dev_no_boot_device_failure",
+          "status": "failure",
+          "event_sequence_valid": true,
+          "latency_ms": 208,
+          "summary": "Boot failed because No bootable device found and boot process halted.",
+          "evidence_line_ids": ["D020", "D021", "D022"]
+        }
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "event_sequence_valid", "latency_ms", "summary", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "event_sequence_valid": {"type": "boolean"},
+              "latency_ms": {"type": "number"},
+              "summary": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "dev_no_boot_device_failure"},
+        {"type": "allowed_values", "field": "status", "expected": ["failure"]},
+        {"type": "exact_field", "field": "event_sequence_valid", "expected": true},
+        {"type": "numeric_range", "field": "latency_ms", "expected": {"min": 0, "max": 5000}},
+        {"type": "required_substrings", "field": "summary", "expected": ["No bootable device found"]},
+        {"type": "forbidden_substrings", "field": "summary", "expected": ["invented", "hallucinated", "unknown line"]},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["D020", "D021", "D022"],
+            "required": ["D020", "D021", "D022"]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -39,3 +39,6 @@ class ArmTuneTarget(ABC):
 
     def run_server_benchmark(self, job: LlamaServerJobSpec, local_artifact_dir: str | Path) -> LlamaServerBenchmarkResult:
         raise NotImplementedError
+
+    def prepare_server_prompt_suite(self, local_prompt_suite_path: str | Path, *, run_id: str) -> str:
+        return str(Path(local_prompt_suite_path).resolve())

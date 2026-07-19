@@ -440,6 +440,34 @@ JSON validity, required-case pass count, critical failure count,
 failure-category histogram, `quality_gate_status`, and model/profile
 suitability.
 
+Phase 7 separates BootTrace prompt-contract development from final
+qualification:
+
+- `configs/armtune/quality/boottrace_suite.json` is the held-out evaluation
+  suite. Its five required cases define the 5/5 qualification gate.
+- `configs/armtune/quality/boottrace_calibration_suite.json` is a public
+  synthetic development suite. It may be used only for prompt-contract
+  calibration and disjoint few-shot examples.
+- `configs/armtune/quality/boottrace_case_audit.json` records the human audit
+  rationale for every held-out evaluation case.
+
+Development calibration cases must not be counted as final qualification
+passes. Held-out canonical answers and validators must not be weakened merely
+because a model failed.
+
+Prompt contracts are versioned through
+`quality_gate.prompt_contract_version`:
+
+- `current-zero-shot`
+- `taxonomy-and-decision-rules`
+- `taxonomy-rules-and-disjoint-few-shot`
+
+Every quality-calibration artifact records the selected contract version,
+rendered prompt text, rendered prompt digest, expected schema digest,
+generation settings, and normalization policy. The few-shot contract records
+only disjoint development example digests; the five held-out evaluation cases
+are never reused as few-shot examples.
+
 Suitability states are:
 
 - `suitable`

@@ -1433,3 +1433,104 @@ Phase 6 result document:
   comparison blocked, or a suitable model with completed profile comparison.
 - Do not include private paths, public IP addresses, SSH keys, credentials, or
   model contents.
+
+## Phase 7 Plan: BootTrace Contract Calibration And Conditional Model Ladder
+
+Status: foundation implemented; real model reruns are pending explicit target
+availability and cost approval. Phase 7 does not weaken held-out validators or
+change canonical answers merely because Qwen3-4B and Qwen2.5-7B failed.
+
+Phase 7 separates four concerns:
+
+- held-out evaluation suite:
+  `configs/armtune/quality/boottrace_suite.json`
+- public development calibration suite:
+  `configs/armtune/quality/boottrace_calibration_suite.json`
+- held-out case audit:
+  `configs/armtune/quality/boottrace_case_audit.json`
+- prompt-contract version selected by
+  `quality_gate.prompt_contract_version`
+
+Held-out case audit:
+
+- Each of the five evaluation cases records trace sufficiency, unique expected
+  classification, expected status, root-cause taxonomy, failure stage,
+  required evidence lines, distractor status, unknown-policy applicability,
+  ambiguity, and whether a canonical answer change is required.
+- The Phase 7 audit records no canonical answer changes. The
+  `boot_config_missing` case notes a low ambiguity between the absent storage
+  UUID trace and the legacy canonical summary phrase; the answer remains
+  unchanged and the contract clarifies taxonomy instead.
+- Canonical answers may change only when the fixture or answer is
+  demonstrably incorrect or ambiguous, with written rationale. They must not
+  change merely because a model failed.
+
+Development calibration suite:
+
+- The development suite is public and synthetic.
+- It is disjoint from the held-out evaluation suite by case ID and evidence
+  line IDs.
+- It may provide few-shot examples for prompt-contract calibration.
+- It must not be reported as final qualification evidence or included in the
+  5/5 held-out pass count.
+
+Versioned prompt contracts:
+
+- `current-zero-shot`: preserves the existing evaluation prompts.
+- `taxonomy-and-decision-rules`: prepends explicit status decision order,
+  unknown policy, and root-cause taxonomy while keeping the same output schema.
+- `taxonomy-rules-and-disjoint-few-shot`: adds disjoint development examples
+  from the public calibration suite. The five held-out evaluation cases are not
+  reused as examples.
+
+Prompt contract artifacts record:
+
+- contract version
+- taxonomy version
+- rendered prompt text and prompt digest for every held-out case
+- expected response schema and digest
+- generation settings
+- normalization policy
+- development example digests when the few-shot contract is used
+
+SSH quality calibration now uploads the controller-rendered
+`prompt_suite_snapshot.json` into the versioned remote run directory before
+invoking the fixed worker command. This ensures the remote `llama-server`
+requests actually use the selected prompt contract. Request JSON artifacts
+still preserve the final message content sent to the server.
+
+Phase 7 real-target order:
+
+1. Verify free memory and disk on the existing target.
+2. Re-run Qwen2.5-7B Q4_K_M with:
+   `current-zero-shot`, `taxonomy-and-decision-rules`, and
+   `taxonomy-rules-and-disjoint-few-shot`.
+3. Keep model digest, evaluation suite digest, validators, generation seed,
+   temperature, context size, output token bound, and normalization policy
+   fixed across the three contract variants.
+4. Qualify only if the held-out evaluation result has 5/5 required cases, zero
+   critical failures, zero invented evidence IDs, zero request failures,
+   cleanup passed, artifact validation passed, and
+   `model_profile_suitability: suitable`.
+5. If Qwen2.5-7B remains unsuitable, conditionally evaluate a stronger model
+   ladder after checking memory, disk, license access, repository revision,
+   file digests, chat-template behavior, and structured-output support.
+
+Conditional model ladder:
+
+- `Qwen/Qwen2.5-14B-Instruct-GGUF` with a suitable 4-bit quantization.
+- `google/gemma-3-12b-it-qat-q4_0-gguf` only after confirming license access.
+- `Qwen/Qwen3-8B-GGUF` remains lower priority because prior Qwen3 runs showed
+  thinking/final-content integration risk.
+
+Stop conditions before model comparison:
+
+- OOM or memory pressure that would require swap to manufacture success
+- unsupported or ambiguous chat template
+- parser ambiguity
+- cleanup failure
+- digest mismatch
+- artifact-validation failure
+- model/profile suitability other than `suitable`
+
+Profile comparison remains blocked for unsuitable models.

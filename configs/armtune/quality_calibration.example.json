@@ -43,7 +43,9 @@
   },
   "quality_gate": {
     "enabled": true,
-    "suite_path": "configs/armtune/quality/boottrace_suite.json"
+    "suite_path": "configs/armtune/quality/boottrace_suite.json",
+    "prompt_contract_version": "current-zero-shot",
+    "calibration_suite_path": "configs/armtune/quality/boottrace_calibration_suite.json"
   },
   "normalization": {
     "schema_version": "1.0",

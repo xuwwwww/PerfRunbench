@@ -182,8 +182,8 @@ def _prompt_from_request(body: bytes) -> str:
 
 
 def _case_id_from_prompt(prompt: str) -> str:
-    match = re.search(r"CASE_ID=([A-Za-z0-9_.-]+)", prompt)
-    return match.group(1) if match else "unknown"
+    matches = re.findall(r"CASE_ID=([A-Za-z0-9_.-]+)", prompt)
+    return matches[-1] if matches else "unknown"
 
 
 def _status_for_case(case_id: str) -> str:

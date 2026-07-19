@@ -12,10 +12,16 @@ from autotune.arm_tune.benchmark.artifacts import artifact_record, write_artifac
 from autotune.arm_tune.config import parse_benchmark_config
 from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.quality.aggregation import aggregate_quality_results
-from autotune.arm_tune.quality.boottrace import boottrace_prompt_contract
+from autotune.arm_tune.quality.boottrace import (
+    BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES_FEW_SHOT,
+    boottrace_prompt_contract,
+    load_boottrace_calibration_cases,
+    normalize_boottrace_prompt_contract_version,
+    prompt_suite_from_boottrace_cases,
+)
 from autotune.arm_tune.quality.normalization import NormalizationPolicy, normalization_policy_from_payload
 from autotune.arm_tune.quality.schemas import CandidateQualityResult, QualityAggregateResult, QualityCase, QualityCaseResult, QualitySuiteManifest
-from autotune.arm_tune.quality.suite import load_quality_suite, prompt_suite_from_quality_cases, suite_snapshot_payload
+from autotune.arm_tune.quality.suite import load_quality_suite
 from autotune.arm_tune.quality.validators import validate_quality_case
 from autotune.arm_tune.schemas import BenchmarkArtifactManifest, LlamaServerBenchmarkResult, LlamaServerJobSpec, TargetSpec, to_plain, utc_now
 from autotune.arm_tune.targets.base import ArmTuneTarget
@@ -25,7 +31,7 @@ from autotune.utils.config import load_config
 
 QUALITY_CALIBRATION_OPERATION = "quality_calibrate.llama_server"
 CALIBRATION_EXTRA_KEYS = {"quality_gate", "normalization"}
-QUALITY_GATE_KEYS = {"enabled", "suite_path"}
+QUALITY_GATE_KEYS = {"enabled", "suite_path", "prompt_contract_version", "calibration_suite_path"}
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,10 @@ class QualityCalibrationConfig:
     quality_manifest: QualitySuiteManifest
     quality_suite_payload: dict[str, Any]
     normalization_policy: NormalizationPolicy
+    prompt_contract_version: str
+    calibration_cases: list[QualityCase]
+    calibration_manifest: QualitySuiteManifest | None
+    calibration_suite_payload: dict[str, Any] | None
     raw_payload: dict[str, Any]
     schema_version: str = SCHEMA_VERSION
 
@@ -120,6 +130,17 @@ def load_quality_calibration_config(path: str | Path) -> QualityCalibrationConfi
     if not isinstance(suite_path, str) or not suite_path.strip():
         raise ArmTuneConfigError("quality_gate.suite_path is required for quality calibration")
     try:
+        prompt_contract_version = normalize_boottrace_prompt_contract_version(quality_gate.get("prompt_contract_version"))
+    except ValueError as exc:
+        raise ArmTuneConfigError(str(exc)) from exc
+    calibration_cases: list[QualityCase] = []
+    calibration_manifest: QualitySuiteManifest | None = None
+    calibration_suite_payload: dict[str, Any] | None = None
+    if prompt_contract_version == BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES_FEW_SHOT:
+        calibration_path = quality_gate.get("calibration_suite_path")
+        calibration_suite_path = str(calibration_path).strip() if isinstance(calibration_path, str) and calibration_path.strip() else None
+        calibration_manifest, calibration_cases, calibration_suite_payload = load_boottrace_calibration_cases(calibration_suite_path)
+    try:
         normalization_policy = normalization_policy_from_payload(payload.get("normalization"))
     except ValueError as exc:
         raise ArmTuneConfigError(str(exc)) from exc
@@ -135,6 +156,10 @@ def load_quality_calibration_config(path: str | Path) -> QualityCalibrationConfi
         quality_manifest=manifest,
         quality_suite_payload=suite_payload,
         normalization_policy=normalization_policy,
+        prompt_contract_version=prompt_contract_version,
+        calibration_cases=calibration_cases,
+        calibration_manifest=calibration_manifest,
+        calibration_suite_payload=calibration_suite_payload,
         raw_payload=dict(payload),
     )
 
@@ -152,15 +177,27 @@ def run_quality_calibration(
     atomic_write_json(root / "effective_config.json", _effective_config_payload(target, config))
     atomic_write_json(root / "quality_suite_manifest.json", config.quality_manifest.to_dict())
     atomic_write_json(root / "quality_suite_snapshot.json", config.quality_suite_payload)
+    if config.calibration_manifest is not None and config.calibration_suite_payload is not None:
+        atomic_write_json(root / "calibration_suite_manifest.json", config.calibration_manifest.to_dict())
+        atomic_write_json(root / "calibration_suite_snapshot.json", config.calibration_suite_payload)
     atomic_write_json(root / "normalization_policy.json", config.normalization_policy.to_dict())
     contract = boottrace_prompt_contract(
         suite_manifest=config.quality_manifest,
         cases=config.quality_cases,
         generation_settings=config.job.server.to_dict(),
         normalization_policy=config.normalization_policy.to_dict(),
+        prompt_contract_version=config.prompt_contract_version,
+        calibration_cases=config.calibration_cases,
     )
     atomic_write_json(root / "prompt_contract.json", contract)
-    prompt_suite_path = _write_prompt_suite_snapshot(root, target, config.quality_cases)
+    prompt_suite_path = _write_prompt_suite_snapshot(
+        root,
+        target,
+        config.quality_cases,
+        prompt_contract_version=config.prompt_contract_version,
+        calibration_cases=config.calibration_cases,
+    )
+    prepared_prompt_suite_path = target.prepare_server_prompt_suite(prompt_suite_path, run_id=run_id) if prompt_suite_path is not None else None
     job = replace(
         config.job,
         run_id=run_id,
@@ -168,8 +205,8 @@ def run_quality_calibration(
         remote_module=target.spec.remote_module,
         target_run_directory=str(root),
         workload=(
-            replace(config.job.workload, prompt_suite_path=str(prompt_suite_path))
-            if target.spec.type == "local" and prompt_suite_path is not None
+            replace(config.job.workload, prompt_suite_path=str(prepared_prompt_suite_path))
+            if prepared_prompt_suite_path is not None
             else config.job.workload
         ),
     )
@@ -370,10 +407,21 @@ def _required_case_counts(cases: list[QualityCaseResult], manifest: QualitySuite
     return passed, manifest.required_case_count
 
 
-def _write_prompt_suite_snapshot(root: Path, target: ArmTuneTarget, cases: list[QualityCase]) -> Path | None:
+def _write_prompt_suite_snapshot(
+    root: Path,
+    target: ArmTuneTarget,
+    cases: list[QualityCase],
+    *,
+    prompt_contract_version: str,
+    calibration_cases: list[QualityCase],
+) -> Path | None:
     if not cases:
         return None
-    prompt_suite = prompt_suite_from_quality_cases(cases)
+    prompt_suite = prompt_suite_from_boottrace_cases(
+        cases,
+        prompt_contract_version=prompt_contract_version,
+        calibration_cases=calibration_cases,
+    )
     path = root / "prompt_suite_snapshot.json"
     atomic_write_json(path, prompt_suite)
     return path.resolve() if target.spec.type == "local" else path
@@ -402,6 +450,8 @@ def _effective_config_payload(target: ArmTuneTarget, config: QualityCalibrationC
             "schema_version": SCHEMA_VERSION,
             "enabled": True,
             "suite_path": config.quality_manifest.source_path,
+            "prompt_contract_version": config.prompt_contract_version,
+            "calibration_suite_path": config.calibration_manifest.source_path if config.calibration_manifest else "",
         },
         "normalization": config.normalization_policy.to_dict(),
     }

@@ -6,7 +6,15 @@ import unittest.mock
 from pathlib import Path
 
 from autotune.arm_tune.errors import ArmTuneConfigError
-from autotune.arm_tune.quality.boottrace import boottrace_prompt_contract
+from autotune.arm_tune.quality.boottrace import (
+    BOOTTRACE_PROMPT_CONTRACT_CURRENT_ZERO_SHOT,
+    BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES,
+    BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES_FEW_SHOT,
+    boottrace_prompt_contract,
+    load_boottrace_calibration_cases,
+    normalize_boottrace_prompt_contract_version,
+    render_boottrace_prompt,
+)
 from autotune.arm_tune.quality.aggregation import aggregate_quality_results
 from autotune.arm_tune.quality.normalization import NormalizationPolicy
 from autotune.arm_tune.quality.suite import load_quality_suite
@@ -15,6 +23,8 @@ from autotune.arm_tune.quality.validators import validate_quality_case
 
 ROOT = Path(__file__).resolve().parents[1]
 QUALITY_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_suite.json"
+CALIBRATION_SUITE = ROOT / "configs" / "armtune" / "quality" / "boottrace_calibration_suite.json"
+CASE_AUDIT = ROOT / "configs" / "armtune" / "quality" / "boottrace_case_audit.json"
 FIXTURES = Path(__file__).parent / "fixtures" / "arm_tune" / "boottrace"
 
 
@@ -37,6 +47,41 @@ class ArmTuneQualityTest(unittest.TestCase):
                 "boot_firmware_component_failure",
             ],
         )
+
+    def test_boottrace_case_audit_covers_held_out_suite_without_answer_changes(self) -> None:
+        _, cases, _, _ = load_quality_suite(QUALITY_SUITE)
+        audit = json.loads(CASE_AUDIT.read_text(encoding="utf-8"))
+        audited = {item["case_id"]: item for item in audit["cases"]}
+
+        self.assertEqual(set(audited), {case.case_id for case in cases})
+        self.assertEqual(audit["schema_version"], "1.0")
+        self.assertIn("insufficient_evidence", audit["allowed_root_cause_category_values"])
+        for case in cases:
+            with self.subTest(case_id=case.case_id):
+                item = audited[case.case_id]
+                self.assertFalse(item["canonical_answer_change_required"])
+                self.assertEqual(item["expected_status"], case.expected["status"])
+                self.assertEqual(item["required_evidence_line_ids"], case.expected["required_evidence_line_ids"])
+
+    def test_boottrace_calibration_suite_is_disjoint_from_held_out_evaluation(self) -> None:
+        _, held_out_cases, _, _ = load_quality_suite(QUALITY_SUITE)
+        manifest, calibration_cases, payload = load_boottrace_calibration_cases(CALIBRATION_SUITE)
+
+        self.assertEqual(manifest.suite_id, "synthetic_boottrace_calibration_v1")
+        self.assertEqual(payload["schema_version"], "1.0")
+        self.assertFalse({case.case_id for case in held_out_cases} & {case.case_id for case in calibration_cases})
+        held_out_evidence = {
+            line_id
+            for case in held_out_cases
+            for line_id in case.expected["allowed_evidence_line_ids"]
+        }
+        calibration_evidence = {
+            line_id
+            for case in calibration_cases
+            for line_id in case.expected["allowed_evidence_line_ids"]
+        }
+        self.assertFalse(held_out_evidence & calibration_evidence)
+        self.assertTrue(all(isinstance(case.expected.get("example_response"), dict) for case in calibration_cases))
 
     def test_valid_response_passes_all_validators(self) -> None:
         _, cases, _, _ = load_quality_suite(QUALITY_SUITE)
@@ -176,6 +221,54 @@ class ArmTuneQualityTest(unittest.TestCase):
 
         self.assertEqual(first["prompt_contract_sha256"], second["prompt_contract_sha256"])
         self.assertEqual(len(first["expected_response_schema_sha256"]), 64)
+
+    def test_boottrace_prompt_contract_versions_render_distinct_prompts(self) -> None:
+        _, cases, manifest, _ = load_quality_suite(QUALITY_SUITE)
+        _, calibration_cases, _ = load_boottrace_calibration_cases(CALIBRATION_SUITE)
+        policy = NormalizationPolicy().to_dict()
+
+        current_prompt = render_boottrace_prompt(cases[0], prompt_contract_version=BOOTTRACE_PROMPT_CONTRACT_CURRENT_ZERO_SHOT)
+        rules_prompt = render_boottrace_prompt(cases[0], prompt_contract_version=BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES)
+        few_shot_prompt = render_boottrace_prompt(
+            cases[0],
+            prompt_contract_version=BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES_FEW_SHOT,
+            calibration_cases=calibration_cases,
+        )
+        current_contract = boottrace_prompt_contract(
+            suite_manifest=manifest,
+            cases=cases,
+            generation_settings={"temperature": 0.0, "seed": 42},
+            normalization_policy=policy,
+            prompt_contract_version=BOOTTRACE_PROMPT_CONTRACT_CURRENT_ZERO_SHOT,
+        )
+        rules_contract = boottrace_prompt_contract(
+            suite_manifest=manifest,
+            cases=cases,
+            generation_settings={"temperature": 0.0, "seed": 42},
+            normalization_policy=policy,
+            prompt_contract_version=BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES,
+        )
+        few_shot_contract = boottrace_prompt_contract(
+            suite_manifest=manifest,
+            cases=cases,
+            generation_settings={"temperature": 0.0, "seed": 42},
+            normalization_policy=policy,
+            prompt_contract_version=BOOTTRACE_PROMPT_CONTRACT_TAXONOMY_RULES_FEW_SHOT,
+            calibration_cases=calibration_cases,
+        )
+
+        self.assertEqual(current_prompt, cases[0].prompt)
+        self.assertIn("Decision order", rules_prompt)
+        self.assertNotIn("Disjoint calibration examples", rules_prompt)
+        self.assertIn("Disjoint calibration examples", few_shot_prompt)
+        self.assertIn("dev_no_boot_device_failure", few_shot_prompt)
+        self.assertNotEqual(current_contract["prompt_contract_sha256"], rules_contract["prompt_contract_sha256"])
+        self.assertNotEqual(rules_contract["prompt_contract_sha256"], few_shot_contract["prompt_contract_sha256"])
+        self.assertEqual(len(few_shot_contract["calibration_examples"]), 3)
+
+    def test_unknown_boottrace_prompt_contract_version_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unsupported BootTrace prompt contract version"):
+            normalize_boottrace_prompt_contract_version("made-up-contract")
 
     def test_suite_rejects_duplicate_case_id(self) -> None:
         payload = json.loads(QUALITY_SUITE.read_text(encoding="utf-8"))
