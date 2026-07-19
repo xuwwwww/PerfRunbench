@@ -220,10 +220,16 @@ should be labeled unverified.
 - `arm-optimized` remains `requested_but_unverified` unless compile, link,
   runtime, or binary evidence supports an optimized path. A requested
   `LLAMA_KLEIDIAI=ON` setting alone is not evidence that KleidiAI executed.
-- No Phase 5 bounded real Arm validation has been recorded yet. Until that
-  evidence exists, there is no measured quality-preserving profile
-  recommendation and no eligible preliminary Performance Passport for a real
-  Arm target.
+- Phase 5-R recorded a bounded measured quality-calibration run on a
+  user-provisioned AWS T4g / Graviton2 Linux Arm64 development target. The
+  evidence is recorded in
+  `docs/armtune/results/PHASE_5_COMPETITION_EVIDENCE.md`.
+- Phase 5-R validated real SSH `llama-server` execution, strict BootTrace
+  quality calibration, cleanup, structured capability inspection, and artifact
+  digest validation, but the model/profile remained `unsuitable` with
+  `quality_gate_status: failed`.
+- Phase 5-R therefore did not run measured profile comparison and did not
+  produce an eligible preliminary Performance Passport for a real Arm target.
 - Phase 5 does not add Performix profiling, concurrency/load testing, model
   download or substitution, cloud provisioning, automatic EC2 control,
   quality-suite expansion beyond the public synthetic BootTrace suite, or final

@@ -57,7 +57,9 @@ another developer can reproduce the same experiment.
 
 ArmTune has bounded real Arm pipeline evidence for `llama-bench`,
 `llama-server`, streaming request timing, quality-aware rejection, cleanup, and
-artifact digest validation. These runs are not final competition benchmark
+artifact digest validation. Phase 5 also has a bounded measured quality
+calibration run showing that an unsuitable real model/profile is rejected
+before profile comparison. These runs are not final competition benchmark
 results and do not prove KleidiAI usage or an optimized profile.
 
 Phase 5 fixture passports are pipeline-validation artifacts only. They must not

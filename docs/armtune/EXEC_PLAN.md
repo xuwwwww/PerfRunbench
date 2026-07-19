@@ -1151,8 +1151,9 @@ quality gate.
 
 ## Phase 5 Plan: Competition Evidence MVP
 
-Status: local MVP implemented; bounded real validation is pending. Phase 5
-turns the Phase 4 quality-rejection result into a competition-evidence
+Status: local MVP implemented; bounded real quality calibration recorded in
+`docs/armtune/results/PHASE_5_COMPETITION_EVIDENCE.md`. Phase 5 turns the
+Phase 4 quality-rejection result into a competition-evidence
 pipeline. It recovers the model/profile quality contract through auditable
 diagnostics and optional normalization without weakening canonical BootTrace
 expected answers, adds reproducible Arm build-profile evidence, compares only
@@ -1298,3 +1299,9 @@ Phase 5 fake E2E coverage validates command wiring, fixture build evidence,
 quality-preserving profile comparison, quality rejection, Performance Passport
 generation, and digest tamper detection. Fixture measurements remain
 `result_origin: test_fixture` and must not be used as Arm performance results.
+
+Phase 5-R run `20260719_132056_332743` followed this boundary on an existing
+Linux Arm64 target. The fixed profile completed measured server requests and
+artifact validation passed, but strict BootTrace quality calibration failed
+with `required_quality_cases_passed: 0/5`, so measured profile comparison and
+measured Performance Passport generation were intentionally not executed.
