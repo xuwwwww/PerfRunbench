@@ -285,3 +285,23 @@ should be labeled unverified.
 - Build-profile comparison, Performance Passport generation, Performix
   evidence, KleidiAI claims, and final competition conclusions remain blocked
   until a model/profile is `suitable`.
+
+## Phase 8 Planned Limitations
+
+- Phase 8 preflight did not start AWS and did not execute a new model
+  qualification run.
+- The Qwen2.5-7B and Qwen2.5-14B held-out failure matrix is diagnostic
+  evidence only. It must not be used to weaken validators, rewrite canonical
+  answers, or tune prompts against the held-out cases.
+- Both Qwen2.5 models failed the same three held-out cases despite 5/5 request
+  completion, 5/5 raw-valid JSON output, zero invented evidence, cleanup
+  success, and artifact-validation success. This leaves model/profile
+  suitability blocked.
+- Gemma 3 12B QAT Q4_0 remains unevaluated. The current controller
+  environment could see repository metadata but received HTTP `401` when
+  resolving the GGUF file, and no Hugging Face token was present.
+- AWS lifecycle remains user-controlled for Phase 8. ArmTune must not
+  automatically start, stop, provision, resize, or replace cloud resources.
+- Runtime tuning, build-profile comparison, Performance Passport generation,
+  KleidiAI claims, Performix evidence, and final competition conclusions remain
+  blocked until an unchanged held-out qualification run reaches `suitable`.

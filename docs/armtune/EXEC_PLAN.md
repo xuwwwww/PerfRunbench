@@ -1576,3 +1576,65 @@ Phase 7 real-target result boundary:
   processes, and loopback ports were released.
 - Build-profile comparison and Performance Passport generation remain blocked
   because no model/profile is `suitable`.
+
+## Phase 8 Plan: Final Model Qualification And Conditional Arm Tuning
+
+Status: preflight blocked on Gemma 3 12B GGUF file access. Phase 8 must not add
+benchmark infrastructure or weaken the held-out quality gate.
+
+Phase 8 starts from the frozen Phase 7 contract:
+
+```text
+prompt_contract_version: taxonomy-rules-and-disjoint-few-shot
+held_out_suite: configs/armtune/quality/boottrace_suite.json
+normalization: strict disabled
+temperature: 0.0
+seed: 42
+```
+
+Phase 8 preflight evidence:
+
+- Evidence file:
+  `docs/armtune/results/PHASE_8_MODEL_QUALIFICATION_PREFLIGHT.md`.
+- Existing Qwen2.5-7B and Qwen2.5-14B held-out artifacts were compared
+  case-by-case without rerunning AWS.
+- Both models passed `boot_success` and `boot_retry_recovered`.
+- Both models failed `boot_config_missing`, `boot_device_timeout`, and
+  `boot_firmware_component_failure`.
+- Both models produced 5/5 completed requests and 5/5 raw-valid JSON outputs
+  with zero invented evidence, passed cleanup, and passed artifact validation.
+- The overlapping failed categories were `model_capability_failure` and
+  `wrong_root_cause`.
+- The shared failure shape shows a cross-model held-out semantic gate failure,
+  not an SSH, parser, cleanup, artifact, or JSON-generation infrastructure
+  failure.
+
+Gemma 3 12B access preflight:
+
+- Planned candidate:
+  `google/gemma-3-12b-it-qat-q4_0-gguf`,
+  `gemma-3-12b-it-q4_0.gguf`.
+- Controller environment did not expose `HF_TOKEN` or
+  `HUGGINGFACE_HUB_TOKEN`.
+- The official Hugging Face model API returned HTTP `200`.
+- The GGUF file resolve URL returned HTTP `401` for both the pinned revision
+  path and `main`.
+- No AWS instance was started, no Gemma file was downloaded, and no Gemma
+  qualification run was attempted.
+
+Phase 8 execution gate:
+
+1. Confirm official Gemma GGUF file access before starting AWS.
+2. Use the frozen Phase 7 contract and unchanged held-out suite.
+3. Run one bounded Gemma 3 12B held-out qualification.
+4. Independently validate artifacts, cleanup, port release, and process exit.
+5. If Gemma is unsuitable or inaccessible, stop and record evidence.
+6. If Gemma is suitable, continue without changing the quality gate:
+   build profiles, verify build and optimization evidence, quality-calibrate
+   every profile, compare only quality-eligible profiles, run bounded runtime
+   tuning, generate and verify the Performance Passport, and revalidate
+   artifacts.
+
+Do not claim KleidiAI unless build and runtime evidence satisfy the existing
+two-evidence policy. Do not run additional model ladder candidates
+automatically after Gemma failure or access blockage.

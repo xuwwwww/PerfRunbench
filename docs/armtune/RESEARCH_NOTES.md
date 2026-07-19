@@ -491,3 +491,40 @@ Access date for all entries: 2026-07-13.
   not quality-preserving performance improvement, build-profile comparison,
   Performance Passport eligibility, KleidiAI execution, Performix evidence, or
   final competition benchmark evidence.
+
+## Phase 8-P Model Qualification Preflight
+
+- Evidence file:
+  `docs/armtune/results/PHASE_8_MODEL_QUALIFICATION_PREFLIGHT.md`
+- Input artifacts:
+  Qwen2.5-7B held-out run `20260719_162659_750315` and Qwen2.5-14B held-out
+  run `20260719_164004_988884`.
+- Frozen contract:
+  `taxonomy-rules-and-disjoint-few-shot`.
+- Held-out suite digest:
+  `42a784ba1da5c624f14dfb9d2d89917768650c8e60ad0918f98c2e4da96d1169`.
+- Cross-model matrix result:
+  both models passed `boot_success` and `boot_retry_recovered`; both models
+  failed `boot_config_missing`, `boot_device_timeout`, and
+  `boot_firmware_component_failure`.
+- Overlapping failure categories:
+  `model_capability_failure` and `wrong_root_cause`.
+- Infrastructure boundary:
+  both models produced 5/5 completed requests, 5/5 raw-valid JSON outputs,
+  zero invented evidence, passed cleanup, and passed artifact validation.
+- Gemma 3 12B preflight:
+  `google/gemma-3-12b-it-qat-q4_0-gguf` model metadata returned HTTP `200`,
+  but `gemma-3-12b-it-q4_0.gguf` resolve requests returned HTTP `401` for
+  both the pinned revision path and `main`.
+- Credential boundary:
+  `HF_TOKEN` and `HUGGINGFACE_HUB_TOKEN` were not set in the controller
+  environment, and no credential value was printed or stored.
+- AWS boundary:
+  no AWS instance was started and no Gemma file was downloaded.
+- Relevant conclusion:
+  the next measured Phase 8 run is blocked until official Gemma GGUF file
+  access is available.
+- Claim boundary:
+  this preflight does not validate Gemma quality, build-profile comparison,
+  runtime tuning, Performance Passport eligibility, KleidiAI, Performix, or
+  final competition evidence.
