@@ -234,3 +234,23 @@ should be labeled unverified.
   download or substitution, cloud provisioning, automatic EC2 control,
   quality-suite expansion beyond the public synthetic BootTrace suite, or final
   competition benchmark conclusions.
+
+## Phase 6 Planned Limitations
+
+- Phase 6 uses the existing Phase 5 pipeline and should not add framework
+  features merely to make one model pass.
+- Phase 6 model qualification is model/profile-specific. An unsuitable model
+  is not evidence that the ArmTune pipeline failed, and a suitable model is
+  not evidence of global model quality.
+- Qwen3-4B was unsuitable under the tested Phase 6A contracts, including a
+  private `/no_think` prompt-contract variant. Validators and canonical
+  expected answers must not be weakened in response.
+- Qwen2.5-7B qualification must pass before build-profile comparison,
+  performance recommendation, or measured Performance Passport generation.
+- C7g and T4g measurements are not comparable. Any C7g result needs its own
+  baseline and must not be compared to earlier T4g evidence.
+- Phase 6 does not automatically provision, resize, start, stop, or alter
+  cloud resources beyond explicitly approved operations.
+- Phase 6 does not validate private firmware logs, customer data,
+  source-level llama.cpp optimizations, Performix evidence, stable production
+  SLOs, or final competition benchmark conclusions.

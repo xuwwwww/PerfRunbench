@@ -1305,3 +1305,111 @@ Linux Arm64 target. The fixed profile completed measured server requests and
 artifact validation passed, but strict BootTrace quality calibration failed
 with `required_quality_cases_passed: 0/5`, so measured profile comparison and
 measured Performance Passport generation were intentionally not executed.
+
+## Phase 6 Plan: Qualified Model And Arm Profile Comparison
+
+Status: planned. Phase 6 uses the Phase 5 evidence pipeline without adding
+framework functionality. The first objective is to qualify a stronger model
+under the public synthetic BootTrace suite. Arm build-profile comparison,
+paired measurement, and Performance Passport generation are conditional on
+model/profile suitability.
+
+Phase 6A result boundary:
+
+- Qwen3-4B Q4_K_M was evaluated on a manually provided C7g target.
+- Default Qwen3 behavior produced `reasoning_content` without final
+  `content`, so request parsing failed before semantic validation.
+- A private Qwen3 `/no_think` prompt-contract variant produced raw JSON, but
+  the semantic BootTrace validators still failed.
+- Qwen3-4B is therefore unsuitable for measured profile comparison under the
+  tested contracts. Validators and canonical expected answers must not be
+  weakened to force it through the gate.
+
+Phase 6B qualification target:
+
+- Model repository: `Qwen/Qwen2.5-7B-Instruct-GGUF`.
+- Quantization target: `Q4_K_M`.
+- Expected split files:
+  `qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf` and
+  `qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf`.
+- Merge target:
+  `qwen2.5-7b-instruct-q4_k_m.gguf`.
+- Use the unchanged public BootTrace suite, canonical expected answers, and
+  validator thresholds.
+- Do not carry Qwen3-specific `/think`, `/no_think`, `enable_thinking`, or
+  `reasoning_content` assumptions into Qwen2.5 qualification.
+
+Phase 6B target and storage checks:
+
+- Use an existing manually started Linux Arm64 C7g target only.
+- Verify Linux `aarch64`, Neoverse-V1, 8 logical CPUs, approximately
+  15 GiB usable memory, and `production_benchmark_ready: true`.
+- Verify remote PerfRunbench commit
+  `ff6a31531db48f423915ae37875afa90c949a0c4`.
+- Keep the existing llama.cpp source commit unchanged.
+- Require enough free disk for split files, merged GGUF, artifacts, and logs
+  before downloading. If disk is insufficient, stop before running
+  qualification rather than resizing storage automatically.
+
+Phase 6B model acquisition evidence:
+
+- Record model repository, revision when available, split file names, split
+  sizes, split SHA-256 digests, merged file size, merged SHA-256 digest,
+  download command shape, merge command shape, and disk space before and after.
+- Use `llama-gguf-split --merge` for split GGUF merging. If the utility is
+  absent, build only that target from the unchanged llama.cpp source tree.
+- Do not commit model files or private paths.
+
+Phase 6B quality gate:
+
+- First run strict output calibration.
+- Run the existing versioned single-fence normalization only when the sole
+  remaining failure is exactly one auditable Markdown JSON fence.
+- Normalization must not repair `wrong_status`, `wrong_root_cause`,
+  `wrong_failure_stage`, `missing_required_evidence`, `invented_evidence`, or
+  malformed semantic values.
+- Qualification success requires `result_origin: measured`, 5/5 request
+  success, 5/5 required cases passed, zero critical validator failures, zero
+  invented evidence IDs, passed cleanup, passed artifact validation, and
+  `model_profile_suitability: suitable`.
+
+Conditional Phase 6C profile comparison:
+
+- Proceed only when Qwen2.5-7B qualification is suitable.
+- Generate and inspect build plans for `portable-baseline`, `arm-native`, and
+  `arm-optimized`.
+- Record source commit, source dirty state, compiler and CMake versions,
+  requested definitions, effective CMake cache, compile evidence, binary
+  SHA-256, binary size, linked-library evidence, build output, and optimization
+  evidence status.
+- Do not claim KleidiAI or another optimized path unless build and runtime
+  evidence support it.
+- Re-run identical quality calibration for each successfully built profile.
+- Compare only quality-passing profiles that share the same model digest,
+  quality-suite digest, prompt-contract digest, normalization policy,
+  generation seed, temperature, context size, output limit, target allocation,
+  and CPU affinity policy.
+- Use TTFT as the primary metric and end-to-end latency as a secondary metric.
+  Retain failed trials separately and do not aggregate failures as zero.
+- Recommendation wording remains bounded:
+
+> Best observed eligible build profile under the tested Arm target, model,
+> server workload, and deterministic quality protocol.
+
+Phase 6 Passport boundary:
+
+- Generate and verify `performance_passport.json` and
+  `performance_passport.md` only when at least one profile is eligible.
+- Valid preliminary claim states include `eligible_preliminary`,
+  `ineligible_statistics`, `ineligible_provenance`, `ineligible_cleanup`, and
+  `ineligible_quality`.
+- Do not force `eligible_preliminary`.
+
+Phase 6 result document:
+
+- Record final evidence in
+  `docs/armtune/results/PHASE_6_QWEN25_PROFILE_COMPARISON.md`.
+- The document must truthfully report either an unsuitable model with
+  comparison blocked, or a suitable model with completed profile comparison.
+- Do not include private paths, public IP addresses, SSH keys, credentials, or
+  model contents.

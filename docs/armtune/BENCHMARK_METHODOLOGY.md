@@ -536,3 +536,43 @@ fixture build-profile evidence, optimized-profile evidence rejection, fixture
 profile comparison, Performance Passport generation, and passport tamper
 detection. These tests validate the evidence pipeline and claim gates; they do
 not provide measured Arm performance.
+
+## Phase 6 Qualified Profile Comparison
+
+Phase 6 treats model suitability as a hard precondition for measured profile
+comparison. A model/profile must pass quality calibration before any build
+profile is compared for performance.
+
+Qualification uses:
+
+- the public synthetic BootTrace suite
+- unchanged canonical expected answers
+- unchanged validator thresholds
+- fixed generation seed
+- temperature `0`
+- sequential requests
+- preserved raw generated output
+- artifact-manifest validation
+- cleanup and residual-process checks
+
+Strict output is evaluated first. The existing versioned single-fence
+normalization may be used only when the remaining issue is exactly one
+auditable Markdown JSON fence. Normalization is not a semantic repair
+mechanism and cannot correct wrong status, wrong root cause, wrong failure
+stage, missing evidence, invented evidence, malformed JSON, or missing fields.
+
+If qualification fails, ArmTune records the actual failure categories and
+stops before build-profile comparison and Performance Passport generation.
+
+If qualification succeeds, every candidate build profile must be calibrated
+with the same model digest, suite digest, prompt-contract digest,
+normalization policy, generation settings, context size, output limit, target
+allocation, and CPU affinity policy. Only quality-passing profiles enter
+paired comparison. Profiles with differing quality outcomes or protocol
+digests are not comparable.
+
+Profile comparison uses target-local sequential requests, warmup exclusion,
+paired baseline insertion, repeated measurements, confirmation repetitions
+when practical, TTFT as the primary metric, end-to-end latency as a secondary
+metric, and a configured noise band. Failed trials are preserved separately
+and are never converted into zero-valued latency metrics.
