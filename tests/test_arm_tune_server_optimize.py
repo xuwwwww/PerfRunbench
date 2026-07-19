@@ -48,7 +48,34 @@ class ArmTuneServerOptimizeTest(unittest.TestCase):
         self.assertIsNotNone(search.quality_normalization_policy)
         self.assertTrue(search.quality_normalization_policy["allow_markdown_fence"])
 
-    def test_public_fake_server_quality_aware_optimize_e2e(self) -> None:
+    def test_public_fake_server_default_optimize_does_not_require_quality_gate(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_path = _write_config(root, _optimize_config(root, quality_enabled=False))
+            output = io.StringIO()
+            with _cwd(root), patch.object(LocalArmTarget, "inspect", return_value=_inspection()):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "FAKE_LLAMA_SERVER_EVENT_DELAY": "0.001",
+                        "FAKE_LLAMA_SERVER_EXIT_AFTER_REQUESTS": "1",
+                    },
+                ):
+                    with redirect_stdout(output):
+                        exit_code = main(["arm", "optimize", "--config", str(config_path)])
+
+            result_path = next((root / ".autotuneai" / "runs").glob("*/armtune/server_optimize/server_optimize_result.json"))
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["quality_gate_status"], "not_evaluated")
+            self.assertEqual(payload["quality_suite_manifest"]["suite_id"], "not_evaluated")
+            self.assertGreaterEqual(payload["eligible_candidate_count"], 1)
+            self.assertIn(payload["recommendation"]["status"], {"recommended", "inconclusive"})
+            self.assertTrue(all(item["quality_result"]["aggregate"]["quality_gate_status"] == "not_evaluated" for item in payload["candidates"]))
+            self.assertIn("quality_suite_id: not_evaluated", output.getvalue())
+            self.assertTrue(_candidate_ports_released(payload, root))
+
+    def test_public_fake_server_optional_quality_gate_optimize_e2e(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             config_path = _write_config(root, _optimize_config(root))
@@ -179,7 +206,7 @@ class ArmTuneServerOptimizeTest(unittest.TestCase):
             self.assertIn("recommendation_state: no_eligible_candidate", output.getvalue())
 
 
-def _optimize_config(root: Path, *, max_candidates: int = 3, suite_path: Path = QUALITY_SUITE) -> dict:
+def _optimize_config(root: Path, *, max_candidates: int = 3, suite_path: Path = QUALITY_SUITE, quality_enabled: bool = True) -> dict:
     prompt_suite = root / "unused_prompt_suite.json"
     prompt_suite.write_text(json.dumps({"schema_version": "1.0", "prompts": [{"prompt_id": "unused", "prompt": "unused"}]}), encoding="utf-8")
     return {
@@ -223,7 +250,7 @@ def _optimize_config(root: Path, *, max_candidates: int = 3, suite_path: Path = 
             "affinity_modes": ["scheduler-default", "compact", "compact"],
         },
         "quality_gate": {
-            "enabled": True,
+            "enabled": quality_enabled,
             "suite_path": str(suite_path),
         },
         "normalization": {

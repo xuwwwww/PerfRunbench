@@ -50,7 +50,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="autotuneai arm", description="ArmTune target inspection and validation.")
+    parser = argparse.ArgumentParser(
+        prog="autotuneai arm",
+        description="ArmTune Arm platform inspection, reproducible benchmarking, runtime tuning, and Performance Passport generation.",
+    )
     subparsers = parser.add_subparsers(dest="arm_command")
 
     doctor = subparsers.add_parser("doctor", help="Validate ArmTune controller and target configuration.")
@@ -66,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--config", required=True)
     benchmark.set_defaults(handler=_cmd_benchmark)
 
-    optimize = subparsers.add_parser("optimize", help="Run repeated ArmTune performance search.")
+    optimize = subparsers.add_parser("optimize", help="Run bounded ArmTune runtime performance search.")
     optimize.add_argument("--config", required=True)
     optimize.add_argument("--warmup-runs", type=int)
     optimize.add_argument("--search-runs", type=int)
@@ -79,7 +82,10 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--affinity-modes", help="Comma-separated affinity modes to include in search.")
     optimize.set_defaults(handler=_cmd_optimize)
 
-    quality_calibrate = subparsers.add_parser("quality-calibrate", help="Calibrate deterministic quality suitability for a fixed llama-server profile.")
+    quality_calibrate = subparsers.add_parser(
+        "quality-calibrate",
+        help="Run optional experimental deterministic quality calibration for a fixed llama-server profile.",
+    )
     quality_calibrate.add_argument("--config", required=True)
     quality_calibrate.set_defaults(handler=_cmd_quality_calibrate)
 
@@ -95,7 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_build_cmd.add_argument("--config", required=True)
     inspect_build_cmd.set_defaults(handler=_cmd_inspect_build)
 
-    profile_compare = subparsers.add_parser("profile-compare", help="Compare quality-passing build profiles using artifact-backed measurements.")
+    profile_compare = subparsers.add_parser("profile-compare", help="Compare build profiles using artifact-backed measurements.")
     profile_compare.add_argument("--config", required=True)
     profile_compare.set_defaults(handler=_cmd_profile_compare)
 

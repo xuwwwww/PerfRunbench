@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "measured",
+  "target": {
+    "type": "ssh",
+    "host": "arm-target.example",
+    "user": "ubuntu",
+    "port": 22,
+    "identity_file": "~/.ssh/id_ed25519",
+    "remote_python": "python3",
+    "remote_module": "autotune.cli",
+    "remote_workdir": "~/armtune-runs",
+    "strict_host_key_checking": true
+  },
+  "executable": {
+    "path": "/opt/llama.cpp/build/bin/llama-bench",
+    "expected_sha256": null
+  },
+  "model": {
+    "path": "/models/qwen2.5-7b-instruct-q4_k_m.gguf",
+    "expected_sha256": null
+  },
+  "benchmark": {
+    "threads": 8,
+    "prompt_tokens": 512,
+    "generation_tokens": 128,
+    "repetitions": 1,
+    "timeout_seconds": 300,
+    "additional_supported_options": {}
+  },
+  "search": {
+    "warmup_runs": 1,
+    "search_runs": 3,
+    "confirmation_runs": 5,
+    "cooldown_seconds": 2.0,
+    "random_seed": 42,
+    "insert_paired_baseline_every": 2,
+    "noise_band_percent": 2.0,
+    "max_candidates": 12,
+    "affinity_modes": ["scheduler-default", "compact", "spread", "reserve-one-core"]
+  },
+  "artifacts": {
+    "preserve_raw_stdout": true,
+    "preserve_raw_stderr": true
+  }
+}

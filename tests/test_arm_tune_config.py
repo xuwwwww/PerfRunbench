@@ -6,6 +6,10 @@ from tempfile import TemporaryDirectory
 
 from autotune.arm_tune.config import load_target_spec, parse_optimize_config, parse_target_spec
 from autotune.arm_tune.errors import ArmTuneConfigError
+from autotune.utils.config import load_config
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ArmTuneConfigTest(unittest.TestCase):
@@ -110,6 +114,22 @@ class ArmTuneConfigTest(unittest.TestCase):
 
         with self.assertRaises(ArmTuneConfigError):
             parse_optimize_config(_optimize_config(search={"affinity_modes": ["compact", "shell"]}))
+
+    def test_public_phase9_optimize_examples_parse(self) -> None:
+        _, bench_job, bench_search = parse_optimize_config(
+            load_config(ROOT / "configs" / "armtune" / "llama_bench_optimize.example.json")
+        )
+        _, server_job, server_search = parse_optimize_config(
+            load_config(ROOT / "configs" / "armtune" / "llama_server_optimize.example.json")
+        )
+
+        self.assertEqual(bench_job.executable.path, "/opt/llama.cpp/build/bin/llama-bench")
+        self.assertEqual(bench_search.max_candidates, 12)
+        self.assertEqual(bench_search.affinity_modes, ["scheduler-default", "compact", "spread", "reserve-one-core"])
+        self.assertEqual(server_job.workload.prompt_suite_path, "/absolute/path/to/prompt_suite.json")
+        self.assertFalse(server_search.quality_gate_enabled)
+        self.assertIsNone(server_search.quality_suite_path)
+        self.assertIsNone(server_search.quality_normalization_policy)
 
 
 def _optimize_config(*, search: dict | None = None) -> dict:

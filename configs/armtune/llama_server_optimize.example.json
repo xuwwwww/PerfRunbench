@@ -13,11 +13,11 @@
   },
   "executable": {
     "path": "/absolute/path/to/llama-server",
-    "expected_sha256": "<optional-64-character-sha256>"
+    "expected_sha256": null
   },
   "model": {
     "path": "/absolute/path/to/model.gguf",
-    "expected_sha256": "<optional-64-character-sha256>"
+    "expected_sha256": null
   },
   "server": {
     "host": "127.0.0.1",
@@ -34,7 +34,7 @@
   },
   "workload": {
     "mode": "server",
-    "prompt_suite_path": "/absolute/path/to/uploaded_boottrace_tuning_prompt_suite.json",
+    "prompt_suite_path": "/absolute/path/to/prompt_suite.json",
     "predict_tokens": 128,
     "repetitions": 1,
     "warmup_requests": 0,
@@ -53,16 +53,7 @@
     "affinity_modes": ["scheduler-default", "compact"]
   },
   "quality_gate": {
-    "enabled": true,
-    "suite_path": "configs/armtune/quality/boottrace_tuning_suite.json"
-  },
-  "normalization": {
-    "schema_version": "1.0",
-    "enabled": true,
-    "strict": false,
-    "allow_markdown_fence": true,
-    "allow_prose_outside_fence": false,
-    "policy_version": "boottrace-normalization-v1"
+    "enabled": false
   },
   "artifacts": {
     "preserve_server_stdout": true,

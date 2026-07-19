@@ -19,7 +19,7 @@ from autotune.arm_tune.targets.protocol import atomic_write_json, read_json
 from autotune.utils.config import load_config
 
 
-PROFILE_COMPARISON_OPERATION = "profile_comparison.quality_aware"
+PROFILE_COMPARISON_OPERATION = "profile_comparison.arm_build_runtime"
 PRIMARY_METRIC = "ttft_ms"
 SECONDARY_METRIC = "end_to_end_latency_ms"
 PROFILE_COMPARISON_KEYS = {
@@ -93,6 +93,7 @@ def _entry_from_payload(payload: dict[str, Any], config: dict[str, Any]) -> Prof
     build_status = str(payload.get("build_status") or profile_build.get("build_status") or "unknown")
     kleidiai_status = str(payload.get("kleidiai_status") or profile_build.get("kleidiai_status") or "unavailable")
     quality_status = str(payload.get("quality_gate_status") or quality.get("quality_gate_status") or "not_evaluated")
+    quality_required = bool(payload.get("quality_required", False))
     measurements = _measurements(payload)
     failed = sum(1 for item in measurements if item.get("failed"))
     ttft_values = [float(item[PRIMARY_METRIC]) for item in measurements if PRIMARY_METRIC in item and not item.get("failed")]
@@ -102,7 +103,7 @@ def _entry_from_payload(payload: dict[str, Any], config: dict[str, Any]) -> Prof
         reasons.append(f"build_status={build_status}")
     if profile_id == "arm-optimized" and kleidiai_status == "requested_but_unverified":
         reasons.append("KleidiAI was requested but not evidenced")
-    if quality_status != "passed":
+    if quality_required and quality_status != "passed":
         reasons.append(f"quality_gate_status={quality_status}")
     if not ttft_values:
         reasons.append("median TTFT evidence is missing")
@@ -110,7 +111,7 @@ def _entry_from_payload(payload: dict[str, Any], config: dict[str, Any]) -> Prof
     if not eligible:
         if build_status != "completed" or "KleidiAI" in " ".join(reasons):
             eligibility = "rejected_build_evidence"
-        elif quality_status != "passed":
+        elif quality_required and quality_status != "passed":
             eligibility = "rejected_quality"
         else:
             eligibility = "insufficient_evidence"
@@ -148,7 +149,7 @@ def _recommendation(
         return ProfileComparisonRecommendation(
             status="no_eligible_profile",
             profile_id=None,
-            message="No profile is eligible because build, execution, or quality evidence is incomplete.",
+            message="No profile is eligible because build or measurement evidence is incomplete.",
         )
     best = min(eligible, key=lambda item: float(item.ttft_ms.median))
     decision = _classify_latency_noise_band(baseline=baseline.ttft_ms, candidate=best.ttft_ms, noise_band_percent=noise_band_percent)
@@ -156,20 +157,20 @@ def _recommendation(
         return ProfileComparisonRecommendation(
             status="inconclusive",
             profile_id=best.profile_id,
-            message=f"Best observed quality-passing profile among {len(entries)} tested profiles is the baseline.",
+            message=f"Best observed evidence-valid profile among {len(entries)} tested profiles is the baseline.",
             noise_band_decision=decision,
         )
     if decision.classification == "improved":
         return ProfileComparisonRecommendation(
             status="recommended",
             profile_id=best.profile_id,
-            message=f"Best observed quality-passing profile among {len(entries)} tested profiles.",
+            message=f"Best observed evidence-valid profile among {len(entries)} tested profiles.",
             noise_band_decision=decision,
         )
     return ProfileComparisonRecommendation(
         status="inconclusive",
         profile_id=best.profile_id,
-        message="Best observed quality-passing profile did not exceed the configured TTFT noise band.",
+        message="Best observed evidence-valid profile did not exceed the configured TTFT noise band.",
         noise_band_decision=decision,
     )
 

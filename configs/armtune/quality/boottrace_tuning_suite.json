@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "suite_id": "synthetic_boottrace_tuning_v1",
-  "description": "Public deterministic BootTrace tuning quality gate. These cases are direct key-value extraction checks for quality-preserving performance tuning, not the harder capability benchmark.",
+  "description": "Public deterministic BootTrace optional experimental capability suite. These cases are direct key-value extraction checks and are not part of default ArmTune build/runtime tuning eligibility.",
   "cases": [
     {
       "case_id": "tuning_successful_boot",

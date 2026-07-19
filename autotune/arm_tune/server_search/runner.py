@@ -614,10 +614,11 @@ def _eligibility(
             reasons.append(f"{result.run_id}: artifact validation failed")
     if reasons:
         return False, "rejected_execution", sorted(set(reasons))
-    if not quality_enabled or quality.aggregate.quality_gate_status == "not_evaluated":
-        return False, "insufficient_evidence", ["quality gate was not evaluated"]
-    if quality.aggregate.quality_gate_status != "passed":
-        return False, "rejected_quality", quality.aggregate.failure_reasons or ["quality gate failed"]
+    if quality_enabled:
+        if quality.aggregate.quality_gate_status == "not_evaluated":
+            return False, "insufficient_evidence", ["quality gate was not evaluated"]
+        if quality.aggregate.quality_gate_status != "passed":
+            return False, "rejected_quality", quality.aggregate.failure_reasons or ["quality gate failed"]
     if _performance_distributions(results)[PRIMARY_METRIC].median is None:
         return False, "insufficient_evidence", ["median TTFT is not available"]
     return True, "eligible", []
@@ -662,7 +663,7 @@ def _recommendation(
         return ServerSearchRecommendation(
             status="no_eligible_candidate",
             candidate_id=None,
-            message="No candidate is eligible because execution evidence or the quality gate failed.",
+            message="No candidate is eligible because execution or measurement evidence failed.",
         )
     if selected is None:
         return ServerSearchRecommendation(
@@ -686,14 +687,17 @@ def _recommendation(
         return ServerSearchRecommendation(
             status="recommended",
             candidate_id=selected.candidate.candidate_id,
-            message=f"Best observed quality-passing performance candidate among {candidate_count} tested configurations.",
+            message=(
+                f"Best observed eligible configuration among {candidate_count} tested configurations "
+                "under the tested Arm target, model, server workload, and measurement protocol."
+            ),
             noise_band_decision=decision,
         )
     return ServerSearchRecommendation(
         status="inconclusive",
         candidate_id=selected.candidate.candidate_id,
         message=(
-            f"Best observed quality-passing candidate among {candidate_count} tested configurations is not recommended "
+            f"Best observed eligible configuration among {candidate_count} tested configurations is not recommended "
             "as an improvement because median TTFT is not outside the configured noise band."
         ),
         noise_band_decision=decision,

@@ -51,11 +51,10 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
             optimized_profile = next(profile for profile in result.profiles if profile.profile_id == "arm-optimized")
             self.assertEqual(optimized_profile.kleidiai_status, "enabled_and_evidenced")
 
-    def test_profile_comparison_recommends_faster_quality_passing_profile_and_rejects_bad_evidence(self) -> None:
+    def test_profile_comparison_recommends_faster_evidence_valid_profile_and_rejects_bad_build_evidence(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             build_path = _build_result(root, optimized_kleidiai_evidence=False)
-            suitable_quality = _quality_result(root, "suitable", "passed")
             config_path = root / "profile_comparison.json"
             atomic_write_json(
                 config_path,
@@ -68,19 +67,16 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
                         {
                             "profile_id": "portable-baseline",
                             "build_result_path": str(build_path),
-                            "quality_calibration_result_path": str(suitable_quality),
                             "measurements": [{"ttft_ms": 100.0, "end_to_end_latency_ms": 190.0}],
                         },
                         {
                             "profile_id": "arm-native",
                             "build_result_path": str(build_path),
-                            "quality_calibration_result_path": str(suitable_quality),
                             "measurements": [{"ttft_ms": 90.0, "end_to_end_latency_ms": 175.0}],
                         },
                         {
                             "profile_id": "arm-optimized",
                             "build_result_path": str(build_path),
-                            "quality_calibration_result_path": str(suitable_quality),
                             "measurements": [{"ttft_ms": 80.0, "end_to_end_latency_ms": 170.0}],
                         },
                     ],
@@ -92,9 +88,48 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
             self.assertEqual(comparison.result_origin, "test_fixture")
             self.assertEqual(comparison.recommendation.status, "recommended")
             self.assertEqual(comparison.recommendation.profile_id, "arm-native")
+            self.assertTrue(comparison.recommendation.message.startswith("Best observed evidence-valid profile"))
+            self.assertEqual(comparison.profiles[0].quality_gate_status, "not_evaluated")
             self.assertEqual(comparison.artifact_validation.validation_status, "passed")
             rejected = {item["profile_id"]: item for item in comparison.rejected_profiles}
             self.assertEqual(rejected["arm-optimized"]["eligibility_status"], "rejected_build_evidence")
+
+    def test_profile_comparison_can_opt_in_to_quality_required_rejection(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            build_path = _build_result(root, optimized_kleidiai_evidence=True)
+            failed_quality = _quality_result(root, "unsuitable", "failed")
+            config_path = root / "profile_comparison.json"
+            atomic_write_json(
+                config_path,
+                {
+                    "schema_version": "1.0",
+                    "result_origin": "test_fixture",
+                    "baseline_profile_id": "portable-baseline",
+                    "noise_band_percent": 2.0,
+                    "profiles": [
+                        {
+                            "profile_id": "portable-baseline",
+                            "build_result_path": str(build_path),
+                            "quality_calibration_result_path": str(failed_quality),
+                            "quality_required": True,
+                            "measurements": [{"ttft_ms": 100.0, "end_to_end_latency_ms": 190.0}],
+                        },
+                        {
+                            "profile_id": "arm-native",
+                            "build_result_path": str(build_path),
+                            "quality_calibration_result_path": str(failed_quality),
+                            "quality_required": True,
+                            "measurements": [{"ttft_ms": 90.0, "end_to_end_latency_ms": 175.0}],
+                        },
+                    ],
+                },
+            )
+
+            comparison = run_profile_comparison(config_path=config_path, run_id="compare-run", output_dir=root / "comparison")
+
+            self.assertEqual(comparison.recommendation.status, "no_eligible_profile")
+            self.assertEqual({item["eligibility_status"] for item in comparison.rejected_profiles}, {"rejected_quality"})
 
     def test_passport_generation_verification_and_tamper_detection(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -129,7 +164,6 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
                 optimized=_binary(root, "optimized"),
                 optimized_kleidiai_evidence=False,
             )
-            suitable_quality = _quality_result(root, "suitable", "passed")
 
             with _cwd(root):
                 with redirect_stdout(io.StringIO()):
@@ -146,19 +180,16 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
                         {
                             "profile_id": "portable-baseline",
                             "build_result_path": str(build_result),
-                            "quality_calibration_result_path": str(suitable_quality),
                             "measurements": [{"ttft_ms": 100.0, "end_to_end_latency_ms": 190.0}],
                         },
                         {
                             "profile_id": "arm-native",
                             "build_result_path": str(build_result),
-                            "quality_calibration_result_path": str(suitable_quality),
                             "measurements": [{"ttft_ms": 90.0, "end_to_end_latency_ms": 175.0}],
                         },
                         {
                             "profile_id": "arm-optimized",
                             "build_result_path": str(build_result),
-                            "quality_calibration_result_path": str(suitable_quality),
                             "measurements": [{"ttft_ms": 80.0, "end_to_end_latency_ms": 170.0}],
                         },
                     ],
@@ -263,7 +294,7 @@ def _comparison_result(root: Path) -> Path:
         {
             "schema_version": "1.0",
             "run_id": "compare-run",
-            "operation": "profile_comparison.quality_aware",
+            "operation": "profile_comparison.arm_build_runtime",
             "result_origin": "test_fixture",
             "baseline_profile_id": "portable-baseline",
             "primary_metric": "ttft_ms",

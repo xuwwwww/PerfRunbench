@@ -72,7 +72,7 @@ def _claim_summary(comparison: dict[str, Any], state: str) -> str:
     if state == "fixture_only":
         return "Fixture-only profile comparison; not a measured Arm performance claim."
     if state == "eligible_preliminary":
-        return f"Preliminary quality-preserving Arm profile comparison; selected profile: {profile or 'none'}."
+        return f"Preliminary evidence-backed Arm build/runtime comparison; selected profile: {profile or 'none'}."
     return "Performance claim is not eligible because required evidence is incomplete or failed."
 
 
