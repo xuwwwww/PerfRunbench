@@ -281,8 +281,9 @@ def _required_text(payload: dict[str, Any], key: str) -> str:
 
 def _finalize_artifacts(root: Path) -> dict[str, dict[str, Any]]:
     artifacts: dict[str, dict[str, Any]] = {}
+    skipped = {"artifact_manifest.json", "artifact_validation.json", "profile_comparison_result.json"}
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.name == "artifact_manifest.json":
+        if not path.is_file() or path.name in skipped:
             continue
         label = path.relative_to(root).as_posix().replace("/", "__")
         artifacts[label] = artifact_record(path, label=label, root=root)

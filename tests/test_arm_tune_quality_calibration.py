@@ -53,6 +53,7 @@ class ArmTuneQualityCalibrationTest(unittest.TestCase):
             self.assertEqual(exit_code, 1)
             self.assertEqual(payload["suitability_state"], "unsuitable")
             self.assertEqual(payload["quality_gate_status"], "failed")
+            self.assertEqual(payload["artifact_validation"]["validation_status"], "passed")
             self.assertIn("markdown_fence_present", payload["failure_category_histogram"])
             self.assertIn("model_profile_suitability: unsuitable", output.getvalue())
 
@@ -92,6 +93,7 @@ class ArmTuneQualityCalibrationTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(payload["suitability_state"], "suitable")
             self.assertEqual(payload["quality_gate_status"], "passed")
+            self.assertEqual(payload["artifact_validation"]["validation_status"], "passed")
             self.assertEqual(payload["required_quality_cases_passed"], 5)
             self.assertEqual(case["validation_input"], "normalized")
             self.assertTrue(case["normalization_applied"])

@@ -31,6 +31,7 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
             self.assertFalse(plan.execute_build)
             self.assertEqual([profile.profile_id for profile in plan.profiles], ["portable-baseline", "arm-native", "arm-optimized"])
             self.assertTrue(all(profile.build_status == "completed" for profile in result.profiles))
+            self.assertEqual(result.artifact_validation.validation_status, "passed")
             optimized_profile = next(profile for profile in result.profiles if profile.profile_id == "arm-optimized")
             self.assertEqual(optimized_profile.kleidiai_status, "requested_but_unverified")
 
@@ -91,6 +92,7 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
             self.assertEqual(comparison.result_origin, "test_fixture")
             self.assertEqual(comparison.recommendation.status, "recommended")
             self.assertEqual(comparison.recommendation.profile_id, "arm-native")
+            self.assertEqual(comparison.artifact_validation.validation_status, "passed")
             rejected = {item["profile_id"]: item for item in comparison.rejected_profiles}
             self.assertEqual(rejected["arm-optimized"]["eligibility_status"], "rejected_build_evidence")
 
