@@ -358,3 +358,174 @@ example:
 
 Phase 4 results are still not final competition benchmark conclusions and do
 not prove KleidiAI or any optimized Arm execution path.
+
+## Phase 5 Competition Evidence Method
+
+Phase 5 treats the Phase 4 real `no_eligible_candidate` result as useful
+evidence: the real target, server lifecycle, streaming parser, cleanup, and
+artifact validation worked, while deterministic quality validation rejected
+unsuitable generated output. Phase 5 must recover quality through an auditable
+contract and evidence pipeline, not by weakening canonical expected answers.
+
+### Quality Diagnostics
+
+Every quality case records final failure categories, including:
+
+- `response_format_violation`
+- `markdown_fence_present`
+- `invalid_json`
+- `missing_required_field`
+- `wrong_status`
+- `wrong_failure_stage`
+- `wrong_root_cause`
+- `missing_required_evidence`
+- `invented_evidence`
+- `truncated_output`
+- `request_failure`
+- `stream_parse_failure`
+- `unsupported_structured_output`
+- `model_capability_failure`
+
+These categories are diagnostic labels. They do not replace the existing
+validator evidence, parser status, raw output, or normalized output.
+
+### Output Normalization
+
+Normalization is optional and versioned. The initial safe operations are:
+
+- trim leading and trailing whitespace
+- remove a UTF-8 BOM
+- normalize line endings
+- extract exactly one complete Markdown fenced JSON block when the policy
+  permits it
+- reject multiple fenced blocks
+- reject prose outside a fenced block unless the policy explicitly permits it
+
+Normalization must not repair malformed JSON, add missing fields, change
+values, infer evidence IDs, change semantic classification, or replace invalid
+answers with canonical answers.
+
+Quality artifacts must record:
+
+- normalization policy version
+- whether normalization was applied
+- normalization steps
+- raw output SHA-256
+- normalized output SHA-256 when applicable
+- whether validation used raw or normalized output
+
+Strict mode disables normalization and validates only raw output.
+
+### Structured Generation
+
+Structured generation options are used only when support is evidenced by the
+inspected binary help output or by a bounded probe. Capability states are:
+
+- `supported`
+- `unsupported`
+- `unverified`
+- `probe_failed`
+
+ArmTune must not rely on source documentation alone. It must not accept
+arbitrary grammar text. Any schema or grammar used for BootTrace output is
+derived from the validated public quality-suite schema and recorded with a
+digest.
+
+### Quality Calibration
+
+`autotuneai arm quality-calibrate --config <path>` runs one fixed
+runtime/profile against the quality suite before performance search. It
+reports suite case count, request success count, raw JSON validity, normalized
+JSON validity, required-case pass count, critical failure count,
+failure-category histogram, `quality_gate_status`, and model/profile
+suitability.
+
+Suitability states are:
+
+- `suitable`
+- `unsuitable`
+- `inconclusive`
+- `execution_failed`
+
+Output normalization alone does not make a model/profile suitable. The
+semantic validators must still pass.
+
+### Build Profiles
+
+Build profiles are evidence records, not assumptions. The initial profile IDs
+are:
+
+- `portable-baseline`
+- `arm-native`
+- `arm-optimized`
+
+Each profile records source commit, dirty-state status, compiler and CMake
+versions, requested and effective CMake definitions, target architecture,
+binary digests, binary size, linked-library evidence, build logs, build status,
+and evidence completeness.
+
+`arm-optimized` may report KleidiAI only with build and runtime evidence.
+Requested build flags without runtime or binary evidence remain
+`requested_but_unverified`.
+
+### Profile Comparison
+
+Profile comparison runs only after quality calibration. Eligible profiles must
+share the same model, prompt suite, normalization policy, generation settings,
+target, and CPU allocation.
+
+Primary metric:
+
+```text
+median client-observed TTFT
+```
+
+Secondary metrics include median end-to-end latency, p95 TTFT, p95
+end-to-end latency, runtime-reported timing when available, failure rate, and
+variability. Metrics are not combined into an undocumented score, and failed
+trials are never aggregated as zero.
+
+Recommendation states are:
+
+- `recommended`
+- `inconclusive`
+- `rejected_quality`
+- `rejected_build_evidence`
+- `rejected_execution`
+- `insufficient_evidence`
+- `no_eligible_profile`
+
+Recommended wording must remain bounded:
+
+> Best observed eligible build profile under the tested Arm target, model,
+> server workload, and deterministic quality protocol.
+
+### Performance Passport
+
+The Performance Passport binds evidence into:
+
+```text
+performance_passport.json
+performance_passport.md
+```
+
+The passport includes repository commit, target fingerprint, source commit,
+build evidence, compiler and CMake versions, binary/model digests, quality
+suite, prompt, and normalization digests, benchmark protocol, profile results,
+quality results, rejected results, selected result, statistical distributions,
+noise-band decision, artifact-manifest digest, claim eligibility, limitations,
+and redacted reproducibility commands.
+
+Claim eligibility states are:
+
+- `eligible_preliminary`
+- `ineligible_quality`
+- `ineligible_provenance`
+- `ineligible_statistics`
+- `ineligible_cleanup`
+- `fixture_only`
+
+Passport verification checks schema, internal digest references, artifact
+manifest binding, and claim consistency. It must never upgrade fixture,
+quality-failing, provenance-incomplete, statistics-incomplete, or cleanup-
+incomplete evidence into a public performance claim.

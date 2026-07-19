@@ -1148,3 +1148,113 @@ metrics, deterministic quality evaluation, quality-aware rejection, cleanup,
 and artifact validation. It does not validate a quality-preserving
 recommendation because every measured candidate failed the canonical BootTrace
 quality gate.
+
+## Phase 5 Plan: Competition Evidence MVP
+
+Status: planned. Phase 5 turns the Phase 4 quality-rejection result into a
+competition-evidence pipeline. It must recover the real-model quality contract
+without weakening canonical BootTrace expected answers, add reproducible Arm
+build-profile evidence, compare only quality-preserving profiles, and generate
+a verifiable Performance Passport.
+
+Allowed scope:
+
+- Structured quality failure diagnostics for real and fixture generated
+  outputs.
+- Optional, versioned, auditable output normalization.
+- Strict quality mode where no normalization is permitted.
+- Structured-generation capability inspection based on the inspected
+  `llama-server` binary and bounded probes, not assumptions.
+- A versioned BootTrace prompt contract with rendered prompts and digests.
+- `autotuneai arm quality-calibrate --config <path>` for fixed-profile model
+  suitability checks before performance search.
+- Declarative Arm build-profile plans for `portable-baseline`, `arm-native`,
+  and `arm-optimized`.
+- Build and runtime provenance sufficient to distinguish requested Arm
+  optimization from evidenced Arm optimization.
+- Quality-aware build/profile comparison that rejects quality-failing,
+  execution-failing, or evidence-incomplete profiles.
+- Performance Passport JSON and Markdown generation plus verification.
+- Public fake E2Es for unsuitable model calibration, suitable normalized or
+  structured-output calibration, build-profile evidence, profile comparison,
+  and passport verification.
+- Bounded real validation only on an existing manually started Arm target.
+
+Out of scope:
+
+- llama.cpp source-level kernel modification.
+- Model fine-tuning.
+- Quantization conversion.
+- Distributed inference.
+- Concurrency or load benchmarking.
+- Automatic cloud provisioning or cloud instance control.
+- Proprietary BootTrace input.
+- Formal production certification.
+
+Phase 5 quality recovery rules:
+
+- The existing Phase 4 real result
+  `20260719_035956_457526` is valid evidence that the quality gate rejected
+  unsuitable generated output.
+- Validators must not be weakened to force that model/profile to pass.
+- Normalization may trim whitespace, remove UTF-8 BOMs, normalize line
+  endings, and extract exactly one complete Markdown fenced JSON block when
+  the selected policy permits it.
+- Normalization must not repair malformed JSON, invent missing fields, change
+  values, infer evidence IDs, or replace invalid answers with canonical
+  answers.
+- Every case result must preserve raw output, optional normalized output,
+  normalization steps, parser status, validator results, final failure
+  categories, raw SHA-256, and normalized SHA-256 when applicable.
+
+Phase 5 build-profile rules:
+
+- `build-plan` produces an auditable plan without executing a build.
+- `build-profile` may execute only against an explicitly configured existing
+  target and must not provision cloud resources.
+- Build execution must use allowlisted source/build paths and argument lists,
+  not arbitrary shell command fields.
+- `arm-optimized` may report KleidiAI only with build and runtime evidence.
+  A requested CMake flag alone is not sufficient.
+
+Phase 5 comparison rules:
+
+- A profile is comparison-eligible only when build evidence, binary/model
+  digests, server lifecycle, quality calibration, cleanup, and artifact
+  validation pass.
+- The same model, prompt suite, normalization policy, generation settings,
+  target, and CPU allocation must be used across compared profiles.
+- The primary metric is median client-observed TTFT; median end-to-end latency,
+  p95 TTFT, p95 end-to-end latency, runtime timing, failure rate, and
+  variability are secondary metrics.
+- Failed trials are not aggregated as zero.
+- Recommendation wording must be bounded:
+
+> Best observed eligible build profile under the tested Arm target, model,
+> server workload, and deterministic quality protocol.
+
+Phase 5 Performance Passport rules:
+
+- Generate `performance_passport.json` and `performance_passport.md`.
+- Include repository commit, target fingerprint, source commit, build evidence,
+  compiler/CMake versions, binary/model digests, quality suite/prompt/
+  normalization digests, benchmark protocol, provenance, profile results,
+  quality results, rejected results, selected result, statistics,
+  artifact-manifest digest, claim eligibility, limitations, and redacted
+  reproducibility command shapes.
+- Claim eligibility states are `eligible_preliminary`, `ineligible_quality`,
+  `ineligible_provenance`, `ineligible_statistics`, `ineligible_cleanup`, and
+  `fixture_only`.
+- Passport verification must reject schema, digest, artifact-manifest, or claim
+  consistency failures.
+
+Phase 5 real-validation boundary:
+
+- First inspect structured-output capability.
+- Then run quality calibration for the existing model/profile.
+- If the model/profile remains unsuitable, stop performance comparison and
+  record ineligible evidence.
+- If suitable, build or inspect profiles, calibrate every profile, compare only
+  eligible profiles, generate and verify a passport, revalidate artifact
+  manifests, and verify cleanup.
+- Do not automatically download or substitute a model.

@@ -524,3 +524,92 @@ The Phase 4 MVP does not compare build profiles, verify KleidiAI, change the
 llama.cpp source commit, perform quantization search, run concurrency/load
 tests, integrate Performix, generate a complete Performance Passport, or
 produce final competition benchmark claims.
+
+## Phase 5 Competition Evidence Architecture
+
+Phase 5 adds a competition-evidence layer without changing the controller and
+target trust boundary. The controller still validates configuration,
+constructs versioned job specifications, invokes allowlisted target work, and
+validates downloaded artifacts. The target still executes only validated
+operations against local files and loopback-only server endpoints.
+
+New Phase 5 packages:
+
+```text
+autotune/arm_tune/build_profiles/
+  __init__.py
+  schemas.py
+  definitions.py
+  builder.py
+  inspection.py
+  evidence.py
+  comparison.py
+
+autotune/arm_tune/passport/
+  __init__.py
+  schemas.py
+  generator.py
+  markdown.py
+  verification.py
+```
+
+The existing `autotune/arm_tune/quality/` package is extended with:
+
+- response failure categorization
+- auditable output normalization
+- structured-generation capability evidence
+- BootTrace prompt-contract rendering and digesting
+- fixed-profile quality calibration
+
+Quality calibration is separate from performance optimization. A model/profile
+must be suitable before it can participate in quality-aware performance
+comparison. Suitability requires request execution, stream parsing, cleanup,
+deterministic quality validation, zero critical failures, and no invented
+evidence IDs. A normalized output may pass only if normalization is enabled by
+a versioned policy and all semantic validators still pass.
+
+Structured-generation support must be evidence-based. The inspected binary
+help output and optional bounded probes determine whether grammar, JSON schema,
+OpenAI-compatible `response_format`, seed, temperature, and deterministic
+sampling controls are `supported`, `unsupported`, `unverified`, or
+`probe_failed`. ArmTune must not accept arbitrary user grammar text in the
+worker protocol; generated schema or grammar material must come only from a
+validated public quality-suite schema.
+
+Build profiles are declarative and versioned. The initial profiles are:
+
+- `portable-baseline`
+- `arm-native`
+- `arm-optimized`
+
+Each profile records source repository identity, source commit, dirty-state
+status, compiler and CMake evidence, requested CMake definitions, effective
+CMake cache entries, compile-command evidence when available, target
+architecture, binary paths, binary digests, binary sizes, linked-library
+evidence, build stdout/stderr, build status, and evidence completeness.
+
+`arm-optimized` can report KleidiAI only when evidence supports it. A requested
+flag alone is `requested_but_unverified`; stronger states require additional
+evidence such as CMake cache or compile definitions, linked symbols or
+libraries, runtime logs, or build output.
+
+Profile comparison reuses the server benchmark and quality layers. It compares
+only profiles with compatible model, prompt suite, normalization policy,
+generation settings, target fingerprint, CPU allocation, binary/model digests,
+and quality-suite digest. The primary metric is median target-local
+client-observed TTFT, with median end-to-end latency and p95 values as
+secondary metrics. Failed requests remain failures and are never converted to
+zero-valued latency samples.
+
+The Performance Passport is a generated evidence artifact, not a marketing
+claim. It binds repository commit, target fingerprint, source commit, build
+evidence, compiler/CMake versions, binary/model digests, quality suite and
+prompt digests, normalization policy digest, benchmark protocol, profile
+results, quality results, rejected profiles, statistical distributions,
+artifact-manifest digest, claim eligibility, limitations, and redacted
+reproducibility commands. Verification rejects schema, digest, artifact, or
+claim consistency problems.
+
+Phase 5 must preserve the Phase 4 result boundary: a real run with no eligible
+candidate remains valid quality-rejection evidence but is not an optimization
+success.
