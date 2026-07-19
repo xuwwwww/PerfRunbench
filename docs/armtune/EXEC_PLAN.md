@@ -1879,3 +1879,65 @@ Claim boundary:
 - It does not claim global optimality, BootTrace semantic correctness,
   Performix evidence, cross-instance portability, or final competition-wide
   performance.
+
+## Phase 10 Plan: Generic Recommendation Safety And Apply
+
+Status: local implementation and fake validation only. Do not start, stop,
+provision, resize, or otherwise manage AWS resources from this phase.
+
+Phase 10 moves the Phase 9 verified optimization result toward safe reuse
+through generic PerfRunbench recommendation infrastructure:
+
+```text
+Performance Passport
+-> RecommendationBundle
+-> environment validation
+-> guard evaluation
+-> dry-run apply
+-> process-scoped canary
+-> lease
+-> promote or rollback
+```
+
+This phase is intentionally not Arm-specific. ArmTune supplies the first real
+source evidence, but the safety model must work for generic command workloads,
+`llama-bench`, `llama-server`, and future adapters.
+
+Default candidate eligibility does not depend on BootTrace semantic quality.
+BootTrace quality features remain preserved as optional experimental capability
+workloads and must not block default performance tuning or recommendation
+application.
+
+Phase 10 implementation boundaries:
+
+- Add a versioned `RecommendationBundle` schema with complete executable
+  selected configuration, source Passport digest, baseline configuration,
+  environment/workload fingerprints, constraints, statistical evidence, apply
+  scope, rollback configuration, timestamps, expiry, and guard results.
+- Add staged guard results for `preflight`, `candidate`, `trial`,
+  `recommendation`, `apply`, and `post_apply`.
+- Add environment fingerprint drift comparison with hard mismatch producing
+  `stale_environment` and `retune_required: true`.
+- Add allowlisted adapter correctness contracts only; arbitrary validation shell
+  commands remain unsupported.
+- Require confirmation samples separate from search samples before an
+  applyable recommendation can be generated.
+- Preserve trial contamination evidence without converting unavailable data to
+  zero.
+- Implement process-scoped apply as the default and reuse existing
+  PerfRunbench restore mechanisms for system-scoped state.
+- Add ownership locks, dry-run apply, canary, lease, promote, rollback, status,
+  and validation commands under `autotuneai recommendation`.
+
+Expected local completion signal:
+
+```text
+ready_for_real_apply_validation: true
+```
+
+Real validation after this phase must wait for explicit confirmation that the
+existing C7g target has been manually started. The first real apply validation
+is limited to loading the Phase 9 preliminary Passport, generating a bundle,
+showing it, validating it, dry-run apply, one process-scoped short canary, a
+short lease, rollback, process cleanup verification, and artifact validation.
+No permanent system-scoped apply is allowed in the first real validation.
