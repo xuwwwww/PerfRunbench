@@ -1,19 +1,22 @@
 # ArmTune Documentation Index
 
-ArmTune is the Arm-first AI inference autotuning subsystem planned inside
-PerfRunbench. These documents define the current Phase 0 audit, target
-architecture, benchmark integrity rules, and phased implementation plan.
+ArmTune is the Arm AI inference benchmarking and autotuning subsystem inside
+PerfRunbench. These documents define the architecture, benchmark integrity
+rules, evidence records, release packaging, and phase history.
 
-No document in this directory contains measured Arm performance results yet.
-Any examples, templates, or future-result placeholders are labeled as such.
+Measured Arm results, examples, fixtures, synthetic outputs, and planned work
+must remain clearly labeled. Public examples are placeholders and must not
+include private target configuration, credentials, model weights, or endpoint
+details.
 
 ## Documents
 
-- `EXEC_PLAN.md`: Phase 0 audit record, repository findings, command log, and
+- `EXEC_PLAN.md`: Phase audit record, repository findings, command log, and
   phase-by-phase execution plan.
 - `IMPLEMENTATION_PLAN.md`: Reviewable implementation phases and expected code
   surfaces.
-- `ARCHITECTURE.md`: Controller/target design and package boundary proposal.
+- `ARCHITECTURE.md`: Controller/target design, release architecture, and
+  package boundaries.
 - `REUSE_MAP.md`: Exact existing PerfRunbench symbols planned for ArmTune
   reuse, including required modifications, risks, and tests.
 - `ARM_SPECIFICITY.md`: Why ArmTune is Arm-specific and what evidence is
@@ -26,16 +29,31 @@ Any examples, templates, or future-result placeholders are labeled as such.
 - `BEFORE_AFTER.md`: Pre-challenge baseline, reused infrastructure, and
   challenge-period change tracking.
 - `RISK_REGISTER.md`: Known risks, mitigations, and ownership.
-- `LIMITATIONS.md`: Current unsupported features and integrity constraints.
+- `LIMITATIONS.md`: Current unsupported features, release limitations, and
+  integrity constraints.
 - `RESEARCH_NOTES.md`: Source-tracked research notes for competition,
   llama.cpp, KleidiAI, and Arm Performix decisions.
 - `RESULTS_TEMPLATE.md`: Placeholder format for future measured, synthetic,
   fixture, and unverified results.
-- `DEVPOST_DRAFT.md`: Early English submission narrative skeleton.
-- `DEMO_SCRIPT.md`: Three-minute demo outline and required evidence checklist.
+- `DEVPOST_DRAFT.md`: Competition submission narrative draft.
+- `DEMO_SCRIPT.md`: Demo outline and required evidence checklist.
+- `results/PHASE_9_FIRST_REAL_ARM_TUNING.md`: First preliminary measured Arm
+  build/runtime tuning result.
+- `results/PHASE_10_GUARDED_APPLY_VALIDATION.md`: Sanitized guarded
+  recommendation apply validation.
 
-## Phase Boundary
+## Public Placeholder Examples
 
-Phase 0 creates planning and audit artifacts only. Product code, SSH execution,
-llama.cpp adapters, benchmarking, search, passport generation, and Performix
-integration start in later phases after explicit approval.
+```text
+configs/armtune/target_ssh.example.json
+configs/armtune/llama_bench.example.json
+configs/armtune/build_profiles.example.json
+configs/armtune/llama_bench_optimize.example.json
+configs/armtune/recommendation_apply.example.md
+```
+
+## Release Boundary
+
+Phase 11 packages the current release. It does not add models, benchmark
+backends, search algorithms, cloud automation, BootTrace prompt research, or
+system-scoped apply.

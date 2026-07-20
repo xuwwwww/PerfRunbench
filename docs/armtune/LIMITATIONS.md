@@ -344,3 +344,40 @@ should be labeled unverified.
   Linux Arm64 provenance, matching model/target/protocol digests, valid build
   evidence, successful execution and parsing, cleanup, sufficient samples,
   artifact validation, and a difference outside the configured noise band.
+
+## Phase 10 Limitations
+
+- Phase 10 validates guarded recommendation apply, not a new performance
+  comparison.
+- The real validation used a process-scoped canary and rollback. Permanent
+  system-scoped apply remains out of scope for the first release package.
+- Canary metrics are apply-safety evidence only and must not replace the Phase
+  9 repeated benchmark distributions.
+- RecommendationBundle apply is valid only when the current environment,
+  workload runtime, source Passport digest, selected launch configuration,
+  correctness contract, and guard constraints match the bundle.
+- A stale environment, incompatible source Passport, failed correctness guard,
+  failed metric guard, expired lease, lock conflict, or cleanup failure must
+  block or roll back application.
+
+## Phase 11 Release Limitations
+
+- The public release result is preliminary and single-target. It covers one
+  Linux Arm64 C7g / Neoverse-V1 target, one Qwen2.5-7B Q4_K_M model, one
+  pinned llama.cpp source revision, and the documented benchmark protocols.
+- `llama-bench` build-profile throughput, `llama-bench` runtime-search
+  throughput, and `llama-server` TTFT are separate protocols. Their
+  improvements must not be combined into one aggregate result.
+- The Performance Passport state is `eligible_preliminary`, not a final
+  production SLO or cross-instance guarantee.
+- BootTrace remains optional experimental capability evidence. It is preserved
+  for auditability but does not participate in default candidate eligibility.
+- The first release does not add new models, new benchmark backends, new search
+  algorithms, cloud automation, system-scoped tuning apply, or automatic AWS
+  lifecycle management.
+- Public examples are placeholders only. Real target configs, endpoint
+  details, identity files, model weights, and private artifacts must stay
+  outside git.
+- KleidiAI or any other optimized path can be claimed only when the recorded
+  build/runtime evidence supports that state. Requested flags alone are not
+  sufficient.

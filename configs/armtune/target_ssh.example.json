@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "target": {
+    "type": "ssh",
+    "host": "<arm-linux-hostname>",
+    "user": "<ssh-user>",
+    "port": 22,
+    "identity_file": "<ssh-identity-file-path-outside-repo>",
+    "ssh_executable": "ssh",
+    "scp_executable": "scp",
+    "remote_python": "python3",
+    "remote_module": "autotune.cli",
+    "remote_workdir": "<remote-armtune-workdir>",
+    "connect_timeout_seconds": 30,
+    "command_timeout_seconds": 300,
+    "keep_remote_artifacts": false,
+    "strict_host_key_checking": true
+  }
+}

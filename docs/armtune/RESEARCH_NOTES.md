@@ -720,3 +720,39 @@ Access date for all entries: 2026-07-13.
   configuration under the tested Arm target, model, inference workload, and
   measurement protocol." It is not a global optimum, BootTrace quality pass,
   Performix result, or final competition-wide claim.
+
+## Phase 10 Guarded Recommendation Apply Validation
+
+- Evidence file:
+  `docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md`.
+- RecommendationBundle ID:
+  `92b0eb69b189a06baae62f15`.
+- Validation:
+  environment validation passed, dry-run apply returned `dry_run_passed`,
+  process-scoped canary returned `passed`, lease state became active, rollback
+  returned `rolled_back`, cleanup passed, and artifact manifest revalidation
+  checked 26 manifests with 0 failures both before and after download.
+- Boundary:
+  this validates guarded apply safety for the Phase 9 Passport-derived bundle.
+  It is not a new performance comparison and does not replace the repeated
+  Phase 9 distributions.
+
+## Phase 11 Release Packaging
+
+- Product framing:
+  PerfRunbench is the reproducible AI benchmarking and tuning toolkit; ArmTune
+  is the Arm AI inference benchmarking and autotuning subsystem.
+- Default flow:
+  inspect Arm target, inspect workload runtime, benchmark portable baseline,
+  build Arm profiles, search runtime candidates, confirm selected candidate,
+  generate Performance Passport, and validate or guarded-apply the
+  recommendation.
+- BootTrace boundary:
+  BootTrace prompt research, qualification results, validators, normalization
+  diagnostics, and fixtures are preserved as optional experimental capability
+  workload evidence. They do not participate in default candidate eligibility.
+- Release validation:
+  public repository packaging must pass ArmTune tests, the fast suite,
+  compileall, public fake E2Es, RecommendationBundle apply/rollback E2E,
+  Passport generation and verification, public safety audit, and
+  `git diff --check`.

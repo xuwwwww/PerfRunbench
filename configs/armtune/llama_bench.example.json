@@ -3,21 +3,21 @@
   "result_origin": "measured",
   "target": {
     "type": "ssh",
-    "host": "arm-target.example",
-    "user": "ubuntu",
+    "host": "<arm-linux-hostname>",
+    "user": "<ssh-user>",
     "port": 22,
-    "identity_file": "~/.ssh/id_ed25519",
+    "identity_file": "<ssh-identity-file-path-outside-repo>",
     "remote_python": "python3",
     "remote_module": "autotune.cli",
-    "remote_workdir": "~/armtune-runs",
+    "remote_workdir": "<remote-armtune-workdir>",
     "strict_host_key_checking": true
   },
   "executable": {
-    "path": "/opt/llama.cpp/build/bin/llama-bench",
+    "path": "/<remote-llama-bench-binary>",
     "expected_sha256": null
   },
   "model": {
-    "path": "/models/placeholder-model.gguf",
+    "path": "/<remote-gguf-model-file>",
     "expected_sha256": null
   },
   "benchmark": {

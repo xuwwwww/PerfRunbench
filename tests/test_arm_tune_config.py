@@ -123,10 +123,10 @@ class ArmTuneConfigTest(unittest.TestCase):
             load_config(ROOT / "configs" / "armtune" / "llama_server_optimize.example.json")
         )
 
-        self.assertEqual(bench_job.executable.path, "/opt/llama.cpp/build/bin/llama-bench")
+        self.assertEqual(bench_job.executable.path, "/<remote-llama-bench-binary>")
         self.assertEqual(bench_search.max_candidates, 12)
         self.assertEqual(bench_search.affinity_modes, ["scheduler-default", "compact", "spread", "reserve-one-core"])
-        self.assertEqual(server_job.workload.prompt_suite_path, "/absolute/path/to/prompt_suite.json")
+        self.assertEqual(server_job.workload.prompt_suite_path, "/<remote-prompt-suite-json>")
         self.assertFalse(server_search.quality_gate_enabled)
         self.assertIsNone(server_search.quality_suite_path)
         self.assertIsNone(server_search.quality_normalization_policy)

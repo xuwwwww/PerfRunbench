@@ -62,7 +62,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="autotuneai", description="PerfRunbench resource and tuning toolkit.")
+    parser = argparse.ArgumentParser(
+        prog="autotuneai",
+        description="PerfRunbench reproducible benchmarking, autotuning, comparison, and guarded recommendation toolkit.",
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     inspect_parser = subparsers.add_parser("inspect", help="Inspect hardware, runtime, limits, and recommendations.")
@@ -76,7 +79,11 @@ def build_parser() -> argparse.ArgumentParser:
     executors.add_argument("--check-sudo-cache", action="store_true")
     executors.set_defaults(handler=_cmd_executors)
 
-    arm = subparsers.add_parser("arm", help="Run ArmTune target inspection and validation commands.", add_help=False)
+    arm = subparsers.add_parser(
+        "arm",
+        help="Run ArmTune Arm inspection, AI benchmarking, build/runtime tuning, and Passport commands.",
+        add_help=False,
+    )
     arm.add_argument("--help", action="store_true", dest="arm_help")
     arm.add_argument("arm_args", nargs=argparse.REMAINDER)
     arm.set_defaults(handler=_cmd_arm)

@@ -120,8 +120,8 @@ The following terminal commands were executed during Phase 0:
 
 ```powershell
 Get-Content -LiteralPath AGENTS.md
-Get-Content -LiteralPath D:\CodexHome\attachments\b0b17aaa-ed18-4a0c-a475-318e6f83cab8\pasted-text.txt
-Select-String -LiteralPath D:\CodexHome\memories\MEMORY.md -Pattern 'AutoTuneAI|ArmTune|PerfRunbench|optimize-performance|launch-performance' -Context 2,3
+Get-Content -LiteralPath <local-attachment-path>\pasted-text.txt
+Select-String -LiteralPath <local-memory-path>\MEMORY.md -Pattern 'AutoTuneAI|ArmTune|PerfRunbench|optimize-performance|launch-performance' -Context 2,3
 git status --short --branch
 git rev-parse HEAD
 git branch --show-current
@@ -1941,3 +1941,76 @@ is limited to loading the Phase 9 preliminary Passport, generating a bundle,
 showing it, validating it, dry-run apply, one process-scoped short canary, a
 short lease, rollback, process cleanup verification, and artifact validation.
 No permanent system-scoped apply is allowed in the first real validation.
+
+## Phase 10 Result: Guarded Recommendation Apply Validation
+
+Status: completed real guarded apply validation. Do not extend this phase with
+new models, new benchmark backends, cloud automation, or system-scoped apply.
+
+Evidence file:
+
+```text
+docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md
+```
+
+Sanitized result summary:
+
+```text
+RecommendationBundle ID: 92b0eb69b189a06baae62f15
+environment_validation: pass
+retune_required: false
+dry_run_status: dry_run_passed
+canary_status: passed
+lease_state_after_apply: active
+rollback_state: rolled_back
+remote_manifest_revalidation: 26 checked / 0 failed
+downloaded_manifest_revalidation: 26 checked / 0 failed
+cleanup_status: passed
+```
+
+This result validates guarded recommendation apply. It is not a new formal
+performance comparison and must not replace the Phase 9 benchmark
+distributions.
+
+## Phase 11 Plan: Release And Competition Packaging
+
+Status: documentation and public release validation only. Do not push. Do not
+control AWS. Do not add feature scope.
+
+Phase 11 packages PerfRunbench with ArmTune as the Arm AI inference
+benchmarking and autotuning subsystem:
+
+```text
+inspect Arm target
+-> inspect workload runtime
+-> benchmark portable baseline
+-> build Arm profiles
+-> search runtime candidates
+-> confirm selected candidate
+-> generate Performance Passport
+-> validate and guarded-apply recommendation
+```
+
+Required outputs:
+
+- Public README centered on inspection, reproducible benchmarking,
+  build/runtime autotuning, statistical confirmation, Performance Passport,
+  and guarded recommendation apply.
+- Public placeholder examples for SSH target configuration, fixed
+  `llama-bench`, build profiles, bounded runtime optimization, and
+  recommendation show/validate/dry-run apply.
+- Finalized Devpost draft, demo script, before/after summary, architecture,
+  limitations, and sanitized Phase 10 evidence.
+- Public safety audit for endpoints, credentials, key paths, private config
+  paths, model files, private absolute paths, and dependencies on ignored
+  private artifacts.
+- ArmTune tests, complete fast suite, compileall, public fake benchmark E2E,
+  public fake optimize E2E, recommendation apply/rollback E2E, Passport
+  generation/verification, and `git diff --check`.
+
+Commits:
+
+```text
+docs: package PerfRunbench ArmTune release
+test: validate PerfRunbench public release workflow
+```

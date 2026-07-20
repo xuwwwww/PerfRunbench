@@ -113,7 +113,7 @@ class ArmTuneCliTest(unittest.TestCase):
             code = main([])
 
         self.assertEqual(code, 2)
-        self.assertIn("PerfRunbench resource and tuning toolkit", output.getvalue())
+        self.assertIn("PerfRunbench reproducible benchmarking", output.getvalue())
 
     def test_phase5_arm_commands_are_registered(self) -> None:
         output = io.StringIO()

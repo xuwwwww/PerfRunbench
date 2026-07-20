@@ -251,10 +251,10 @@ uname -m
 lscpu
 free -h
 df -h /
-git -C /home/ubuntu/PerfRunbench fetch origin
-git -C /home/ubuntu/PerfRunbench pull --ff-only
-git -C /home/ubuntu/PerfRunbench rev-parse HEAD
-git -C /home/ubuntu/llama.cpp rev-parse HEAD
+git -C <remote-perfrunbench-dir> fetch origin
+git -C <remote-perfrunbench-dir> pull --ff-only
+git -C <remote-perfrunbench-dir> rev-parse HEAD
+git -C <remote-llama-cpp-dir> rev-parse HEAD
 sha256sum <llama-server> <model-file>
 pgrep -af llama-server
 pgrep -af autotune.cli

@@ -3,20 +3,20 @@
   "result_origin": "measured",
   "target": {
     "type": "ssh",
-    "host": "<arm64-hostname>",
+    "host": "<arm-linux-hostname>",
     "user": "<ssh-user>",
-    "remote_workdir": "~/armtune-runs",
+    "remote_workdir": "<remote-armtune-workdir>",
     "strict_host_key_checking": true
   },
   "runtime": {
     "adapter": "llama_server"
   },
   "executable": {
-    "path": "/absolute/path/to/llama-server",
+    "path": "/<remote-llama-server-binary>",
     "expected_sha256": "<optional-64-character-sha256>"
   },
   "model": {
-    "path": "/absolute/path/to/model.gguf",
+    "path": "/<remote-gguf-model-file>",
     "expected_sha256": "<optional-64-character-sha256>"
   },
   "server": {
@@ -33,7 +33,7 @@
   },
   "workload": {
     "mode": "server",
-    "prompt_suite_path": "/absolute/path/to/public_prompt_suite.json",
+    "prompt_suite_path": "/<remote-public-prompt-suite-json>",
     "predict_tokens": 64,
     "repetitions": 3,
     "warmup_requests": 1,

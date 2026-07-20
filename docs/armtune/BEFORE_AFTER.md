@@ -177,7 +177,67 @@ tests/test_runtime_env.py
 
 ## Significant Update Statement Draft
 
-ArmTune will be a significant challenge-period update only after implementation
-phases add new Arm-specific target validation, host inspection, runtime
-evidence, benchmark execution, search, quality validation, passport generation,
-and real Arm validation on top of the existing PerfRunbench infrastructure.
+ArmTune is now a significant challenge-period update on top of the
+pre-challenge PerfRunbench infrastructure. The challenge-period work added Arm
+target validation, SSH worker execution, Arm host inspection, llama.cpp
+workload adapters, benchmark artifact validation, build-profile evidence,
+bounded runtime search, optional experimental BootTrace capability workloads,
+Performance Passport generation and verification, and guarded
+RecommendationBundle apply.
+
+## Phase 11 Release Evidence Summary
+
+The public release package should describe the product as PerfRunbench with
+ArmTune as its Arm AI inference benchmarking and autotuning subsystem.
+
+Default product flow:
+
+```text
+inspect Arm target
+-> inspect workload runtime
+-> benchmark portable baseline
+-> build Arm profiles
+-> search runtime candidates
+-> confirm selected candidate
+-> generate Performance Passport
+-> validate and guarded-apply recommendation
+```
+
+Measured Phase 9 results, recorded in
+`docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md`, are preliminary and
+protocol-specific:
+
+| protocol | before | after | result |
+| --- | ---: | ---: | ---: |
+| `llama-bench` build-profile decode median, `portable-baseline` to `arm-native` | `10.825 tok/s` | `17.530 tok/s` | profile comparison only |
+| `llama-bench` runtime-search decode median | `13.630 tok/s` | `17.480 tok/s` | `+28.246515%` |
+| `llama-server` TTFT median, `portable-baseline` to `arm-native` | `97.260 ms` | `62.826 ms` | server timing only |
+
+These results must not be combined into one aggregate improvement.
+
+Phase 9 generated a Performance Passport with:
+
+```text
+claim_eligibility_state: eligible_preliminary
+verification_status: passed
+```
+
+Phase 10 validated guarded recommendation apply, recorded in
+`docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md`:
+
+```text
+RecommendationBundle ID: 92b0eb69b189a06baae62f15
+dry_run_status: dry_run_passed
+canary_status: passed
+rollback_state: rolled_back
+artifact_revalidation: passed
+cleanup_status: passed
+```
+
+Public claim wording:
+
+> Best observed eligible configuration under the tested Arm target, model,
+> inference workload, and measurement protocol.
+
+BootTrace remains preserved only as an optional experimental capability
+workload and does not participate in default candidate eligibility.

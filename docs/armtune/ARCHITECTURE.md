@@ -710,3 +710,82 @@ The bounded Phase 9 recommendation wording is:
 
 > Best observed eligible configuration under the tested Arm target, model,
 > inference workload, and measurement protocol.
+
+## Phase 10 Recommendation Safety Architecture
+
+Phase 10 connects an eligible preliminary Performance Passport to generic
+PerfRunbench recommendation safety:
+
+```text
+Performance Passport
+-> RecommendationBundle
+-> environment validation
+-> guard evaluation
+-> dry-run apply
+-> process-scoped canary
+-> lease
+-> promote or rollback
+```
+
+The `RecommendationBundle` is intentionally generic. It stores the selected
+launch configuration, baseline configuration, source Passport digest,
+environment/workload fingerprints, objective metric, statistical evidence,
+correctness contract, apply scope, rollback configuration, expiration, and
+staged guard results.
+
+Default apply scope is process-scoped. System-scoped tuning requires explicit
+operator intent and uses the existing PerfRunbench reversible restore
+mechanisms. A dry run must validate the bundle and guard inputs without
+starting workload canaries. Canary apply must preserve raw stdout/stderr,
+evaluate allowlisted correctness and metric guards, create a lease, and provide
+rollback/status commands.
+
+## Phase 11 Release Architecture
+
+The public release architecture is:
+
+```mermaid
+flowchart LR
+    controller[Controller]
+    target[Target inspection]
+    adapter[Workload adapter]
+    builds[Build profiles]
+    search[Search engine]
+    guard[Statistical guard]
+    passport[Performance Passport]
+    safety[Recommendation safety/apply]
+
+    controller --> target
+    target --> adapter
+    adapter --> builds
+    builds --> search
+    search --> guard
+    guard --> passport
+    passport --> safety
+```
+
+Responsibilities:
+
+- Controller validates configuration, creates versioned job specs, downloads
+  result manifests, validates schemas/digests, compares results, and generates
+  public reports.
+- Target inspection proves Linux Arm64 production readiness and records CPU
+  identity, topology, host capabilities, and environment evidence.
+- Workload adapters provide allowlisted operations. The first adapter is
+  `llama.cpp`, using `llama-bench` for primary throughput and `llama-server`
+  for secondary latency evidence.
+- Build profiles preserve source, toolchain, CMake, compile/link, binary, and
+  optimized-path evidence.
+- Search engine evaluates a bounded deterministic candidate plan, inserts
+  paired baselines, confirms the selected candidate, and preserves failed
+  trials.
+- Statistical guard prevents within-noise results from becoming optimization
+  claims.
+- Performance Passport binds the result to compatible target, model, runtime,
+  protocol, artifact, and limitation digests.
+- Recommendation safety validates an eligible Passport-derived
+  RecommendationBundle before dry-run or canary apply.
+
+BootTrace remains an optional experimental capability workload. Its code,
+fixtures, validators, and historical evidence are preserved, but it is not part
+of the default performance-tuning eligibility path.

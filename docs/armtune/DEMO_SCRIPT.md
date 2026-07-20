@@ -1,105 +1,143 @@
-# ArmTune Demo Script
+# PerfRunbench ArmTune Demo Script
 
-This is a three-minute demo outline. Existing measured Arm runs are bounded
-pipeline-validation evidence, not final competition performance results.
+This demo shows the default release workflow. BootTrace quality artifacts may
+be mentioned as optional experimental evidence, but they do not block or drive
+the default build/runtime tuning recommendation.
 
 ## Pre-Demo Requirements
 
-- A real Linux Arm64 target is available locally or over SSH.
-- llama.cpp binaries or source are present on the target.
-- A compatible user-supplied GGUF model is present on the target.
-- No model weights are committed to the repository.
-- The target config does not contain credentials.
+- PerfRunbench is installed in an isolated Python environment.
+- Public placeholder configs are visible under `configs/armtune/`.
+- Any real target config, SSH identity, model path, and raw private run
+  artifacts remain outside git.
+- The presenter uses measured Phase 9 and Phase 10 documentation for result
+  claims, not live fixture numbers.
 
 ## Storyboard
 
-### 0:00-0:30 - Product Setup
+### 0:00-0:25 - Product Identity
 
-Show:
+Show `README.md`.
+
+Say:
 
 ```text
-autotuneai arm doctor --target-config configs/armtune/targets/demo.json
+PerfRunbench is the reproducible benchmarking and tuning toolkit. ArmTune is
+its Arm AI inference subsystem. The workflow is inspect, benchmark, build,
+search, confirm, passport, and guarded apply.
 ```
 
-Explain that the controller can run on x86, but production benchmark
-execution is validated on a real Linux Arm64 target.
-
-### 0:30-1:00 - Arm Evidence
+### 0:25-0:55 - Arm Target Inspection
 
 Show:
 
-```text
-autotuneai arm inspect-host --target-config configs/armtune/targets/demo.json
+```bash
+autotuneai arm doctor --target-config configs/armtune/target_ssh.example.json --require-production
+autotuneai arm inspect-host --target-config configs/armtune/target_ssh.example.json
 ```
 
-Highlight CPU identity, topology, host capabilities, and the label that host
-capability is not the same as workload execution evidence.
+Highlight:
 
-### 1:00-1:30 - Baseline Benchmark
+- Controller may be x86.
+- Production benchmark execution must validate as Linux Arm64.
+- Host capability evidence is separate from workload execution evidence.
+
+### 0:55-1:25 - Reproducible Baseline
 
 Show:
 
-```text
+```bash
 autotuneai arm benchmark --config configs/armtune/llama_bench.example.json
 ```
 
-Highlight that `llama-bench` is the primary throughput workload, raw stdout and
-stderr are preserved, missing metrics are not converted to zero, and fixture
-runs remain separate from measured Arm results.
+Highlight:
 
-### 1:30-2:10 - Build Profiles and Comparison
+- Raw stdout and stderr are preserved.
+- Parser failures remain failures, not zero metrics.
+- Model, binary, target, and protocol digests are compatibility boundaries.
+
+### 1:25-1:55 - Build Profiles
 
 Show:
 
-```text
+```bash
 autotuneai arm build-plan --config configs/armtune/build_profiles.example.json
 autotuneai arm build-profile --config configs/armtune/build_profiles.example.json
-autotuneai arm optimize --config configs/armtune/llama_bench_optimize.example.json
-autotuneai arm profile-compare --config configs/armtune/profile_comparison.example.json
 ```
 
-Highlight that `build-plan` does not execute a build, `build-profile` records
-existing build evidence, `arm-optimized` stays `requested_but_unverified`
-without real KleidiAI evidence, runtime search uses bounded staged candidates,
-and profile comparison rejects incomplete build or measurement evidence.
+Highlight:
 
-### 2:10-2:40 - Passport and Report
+- Profiles are `portable-baseline`, `arm-native`, and `arm-optimized`.
+- `arm-optimized` needs build/runtime evidence before optimized-path claims.
+- The measured Phase 9 fixed `llama-bench` profile comparison was:
+
+```text
+portable-baseline decode median: 10.825 tok/s
+arm-native decode median: 17.530 tok/s
+arm-optimized decode median: 17.380 tok/s
+```
+
+### 1:55-2:20 - Runtime Search
 
 Show:
 
+```bash
+autotuneai arm optimize \
+  --config configs/armtune/llama_bench_optimize.example.json \
+  --max-candidates 12 \
+  --affinity-modes scheduler-default,compact,spread,reserve-one-core
+```
+
+Highlight:
+
 ```text
+runtime-search baseline decode: 13.630 tok/s
+selected decode: 17.480 tok/s
+observed runtime-search improvement: 28.246515%
+```
+
+This is a separate `llama-bench` staged-search protocol and must not be
+combined with build-profile or server latency deltas.
+
+### 2:20-2:40 - Secondary Server Timing
+
+Show the Phase 9 evidence summary:
+
+```text
+portable llama-server TTFT median: 97.260 ms
+arm-native llama-server TTFT median: 62.826 ms
+```
+
+Highlight request completion, nonempty output, streaming parse, TTFT, E2E
+latency, cleanup, and port release. BootTrace semantic correctness is not part
+of default candidate eligibility.
+
+### 2:40-3:10 - Passport And Guarded Apply
+
+Show:
+
+```bash
 autotuneai arm passport --comparison-result .autotuneai/runs/<run_id>/armtune/profile_comparison/profile_comparison_result.json
 autotuneai arm verify-passport --passport .autotuneai/runs/<run_id>/armtune/passport/performance_passport.json
+autotuneai recommendation show --bundle .autotuneai/recommendations/<bundle_id>.json
+autotuneai recommendation validate --bundle .autotuneai/recommendations/<bundle_id>.json
+autotuneai recommendation apply --bundle .autotuneai/recommendations/<bundle_id>.json --scope process --dry-run
+autotuneai recommendation rollback --bundle .autotuneai/recommendations/<bundle_id>.json
 ```
 
-Open:
+Highlight:
 
 ```text
-.autotuneai/runs/<run_id>/armtune/passport/performance_passport.md
+Performance Passport: eligible_preliminary / verification passed
+guarded apply validation: passed
 ```
-
-Highlight claim eligibility, limitations, result origin, comparison-result
-digest, and artifact-manifest digest.
-
-Optional experimental BootTrace capability workloads may be shown separately
-only as model-capability evidence. They are not part of the default tuning
-eligibility path.
-
-### 2:40-3:00 - CI Gate
-
-Show:
-
-```text
-autotuneai arm ci-check --baseline passports/reference.json --candidate passports/current.json
-```
-
-Explain pass, regression, invalid/incomparable, and runtime-error exit codes.
 
 ## Demo Integrity Checklist
 
-- Do not show fixture or synthetic values as measured results.
-- Do not claim KleidiAI, SVE, I8MM, BF16, SME, or Performix usage without
-  explicit evidence.
-- Do not hide failed candidates.
-- Do not compare incompatible model, prompt, runtime, or target configurations.
-- Do not present a tuning-gate pass as a capability-benchmark pass.
+- Do not show placeholder configs as private target details.
+- Do not combine improvements from different protocols.
+- Do not claim global optimality.
+- Do not claim KleidiAI from a requested flag alone.
+- Do not present BootTrace as the default performance gate.
+- Do not reveal endpoint details, identity-file paths, tokens, model weights,
+  or private artifact locations.
