@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "synthetic_boottrace_quality_v1_case_audit",
+  "evaluation_suite": "configs/armtune/quality/boottrace_suite.json",
+  "taxonomy_version": "boottrace-taxonomy-v1",
+  "allowed_status_values": ["success", "warning", "failure", "unknown"],
+  "allowed_root_cause_category_values": [
+    "none",
+    "device_initialization_timeout",
+    "boot_device_missing",
+    "firmware_component_failure",
+    "recoverable_device_warning",
+    "insufficient_evidence"
+  ],
+  "decision_order": [
+    "If the trace explicitly reaches OS handoff, status is success.",
+    "If a recoverable issue occurs but boot continues, status is warning.",
+    "If boot stops or cannot select a boot device, status is failure.",
+    "If evidence is incomplete or contradictory, status is unknown."
+  ],
+  "canonical_answer_change_policy": "Canonical answers may change only when the fixture or answer is demonstrably incorrect or ambiguous, with written human rationale. Never change an answer merely because a model failed it.",
+  "cases": [
+    {
+      "case_id": "boot_success",
+      "trace_sufficiency": "sufficient",
+      "unique_expected_classification": true,
+      "expected_status": "success",
+      "root_cause_category": "none",
+      "failure_stage": "none",
+      "required_evidence_line_ids": ["L001", "L002", "L003"],
+      "distractors": "none",
+      "unknown_policy_correctness": "not_applicable_trace_is_sufficient",
+      "ambiguity": "none",
+      "canonical_answer_change_required": false,
+      "human_rationale": "The trace reaches userspace after BL1 and BL2 handoff, so success is the only supported status. All three lines are needed to prove the ordered boot path."
+    },
+    {
+      "case_id": "boot_retry_recovered",
+      "trace_sufficiency": "sufficient",
+      "unique_expected_classification": true,
+      "expected_status": "warning",
+      "root_cause_category": "recoverable_device_warning",
+      "failure_stage": "device_firmware_initialization",
+      "required_evidence_line_ids": ["L010", "L011", "L012", "L013"],
+      "distractors": "none",
+      "unknown_policy_correctness": "not_applicable_trace_is_sufficient",
+      "ambiguity": "none",
+      "canonical_answer_change_required": false,
+      "human_rationale": "The NIC firmware fails once, a retry is scheduled, initialization succeeds, and boot continues to network mount. The recoverable fault makes warning more precise than success or failure."
+    },
+    {
+      "case_id": "boot_config_missing",
+      "trace_sufficiency": "sufficient",
+      "unique_expected_classification": true,
+      "expected_status": "failure",
+      "root_cause_category": "boot_device_missing",
+      "failure_stage": "storage_discovery",
+      "required_evidence_line_ids": ["L020", "L021"],
+      "distractors": "none",
+      "unknown_policy_correctness": "not_applicable_trace_is_sufficient",
+      "ambiguity": "low_the_fixture_uses_absent_storage_uuid_and_the_legacy_summary_validator_uses_required_configuration_line_missing",
+      "canonical_answer_change_required": false,
+      "human_rationale": "The requested storage UUID is absent from discovered devices, so failure is supported. The existing canonical summary wording is strict but not demonstrably incorrect; Phase 7 should clarify the taxonomy in prompts rather than change held-out answers."
+    },
+    {
+      "case_id": "boot_device_timeout",
+      "trace_sufficiency": "sufficient",
+      "unique_expected_classification": true,
+      "expected_status": "failure",
+      "root_cause_category": "device_initialization_timeout",
+      "failure_stage": "pcie_nvme_initialization",
+      "required_evidence_line_ids": ["L030", "L031", "L032"],
+      "distractors": "none",
+      "unknown_policy_correctness": "not_applicable_trace_is_sufficient",
+      "ambiguity": "none",
+      "canonical_answer_change_required": false,
+      "human_rationale": "The trace states that the NVMe controller did not become ready before timeout and recovery shell was entered. The only supported status is failure."
+    },
+    {
+      "case_id": "boot_firmware_component_failure",
+      "trace_sufficiency": "sufficient",
+      "unique_expected_classification": true,
+      "expected_status": "failure",
+      "root_cause_category": "firmware_component_failure",
+      "failure_stage": "firmware_verification",
+      "required_evidence_line_ids": ["L040", "L041", "L042", "L043"],
+      "distractors": "none",
+      "unknown_policy_correctness": "not_applicable_trace_is_sufficient",
+      "ambiguity": "none",
+      "canonical_answer_change_required": false,
+      "human_rationale": "The BMC mailbox reports a firmware component checksum failure, rollback completes, and boot is blocked pending service action. Failure is uniquely supported."
+    }
+  ]
+}

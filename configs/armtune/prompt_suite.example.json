@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "description": "Public synthetic ArmTune Phase 3B.1 prompt suite. These prompts are for execution and latency validation only; they are not a semantic quality gate.",
+  "prompts": [
+    {
+      "prompt_id": "short_completion",
+      "prompt": "Complete this sentence in one short clause: ArmTune measures",
+      "expected_response_mode": "text",
+      "max_predict_tokens": 32,
+      "deterministic_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      }
+    },
+    {
+      "prompt_id": "structured_json",
+      "prompt": "Return a small JSON object with keys status and note. The note should be one short phrase.",
+      "expected_response_mode": "json_requested_not_scored",
+      "max_predict_tokens": 64,
+      "deterministic_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      }
+    },
+    {
+      "prompt_id": "short_summary",
+      "prompt": "Summarize this synthetic log line in one sentence: startup completed, request stream parsed, cleanup passed.",
+      "expected_response_mode": "summary_not_scored",
+      "max_predict_tokens": 64,
+      "deterministic_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      }
+    }
+  ]
+}

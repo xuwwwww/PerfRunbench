@@ -1,0 +1,6 @@
+warning: fixture warning before table
+warning: another unrelated line
+| model | threads | test | t/s |
+| --- | --- | --- | --- |
+| fake | 4 | pp128 | 321.50 |
+| fake | 4 | tg64 | 87.25 |

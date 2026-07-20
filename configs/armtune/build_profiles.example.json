@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "unverified",
+  "source_repo": "/<remote-llama-cpp-source-dir>",
+  "build_root": "/<remote-llama-cpp-build-root>",
+  "target_architecture": "aarch64",
+  "toolchain": {
+    "compiler_id": "gcc",
+    "compiler_version": "unknown",
+    "cmake_version": "unknown",
+    "generator": "Ninja",
+    "build_type": "Release"
+  },
+  "profiles": [
+    "portable-baseline",
+    "arm-native",
+    {
+      "profile_id": "arm-optimized",
+      "effective_cmake_cache": {
+        "LLAMA_KLEIDIAI": "ON"
+      },
+      "compile_command_evidence": []
+    }
+  ],
+  "binaries": {
+    "portable-baseline": {
+      "path": "/<remote-portable-llama-server-binary>"
+    },
+    "arm-native": {
+      "path": "/<remote-arm-native-llama-server-binary>"
+    },
+    "arm-optimized": {
+      "path": "/<remote-arm-optimized-llama-server-binary>"
+    }
+  },
+  "build": {
+    "effective_cmake_cache": {
+      "CMAKE_BUILD_TYPE": "Release"
+    }
+  },
+  "linked_libraries": []
+}

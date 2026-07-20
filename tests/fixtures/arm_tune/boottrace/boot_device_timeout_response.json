@@ -1,0 +1,8 @@
+{
+  "case_id": "boot_device_timeout",
+  "status": "failure",
+  "event_sequence_valid": true,
+  "latency_ms": 842.0,
+  "summary": "Boot failed because the NVMe controller timed out before recovery shell entry.",
+  "evidence_line_ids": ["L030", "L031", "L032"]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "measured",
+  "target": {
+    "type": "ssh",
+    "host": "<arm-linux-hostname>",
+    "user": "<ssh-user>",
+    "remote_workdir": "<remote-armtune-workdir>",
+    "strict_host_key_checking": true
+  },
+  "runtime": {
+    "adapter": "llama_server"
+  },
+  "executable": {
+    "path": "/<remote-llama-server-binary>",
+    "expected_sha256": "<optional-64-character-sha256>"
+  },
+  "model": {
+    "path": "/<remote-gguf-model-file>",
+    "expected_sha256": "<optional-64-character-sha256>"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": "auto",
+    "startup_timeout_seconds": 30,
+    "request_timeout_seconds": 30,
+    "shutdown_timeout_seconds": 5,
+    "threads": 2,
+    "context_size": 512,
+    "batch_size": 128,
+    "seed": 42,
+    "temperature": 0.0
+  },
+  "workload": {
+    "mode": "server",
+    "prompt_suite_path": "/<remote-public-prompt-suite-json>",
+    "predict_tokens": 64,
+    "repetitions": 3,
+    "warmup_requests": 1,
+    "streaming": true,
+    "cooldown_seconds": 0
+  },
+  "artifacts": {
+    "preserve_server_stdout": true,
+    "preserve_server_stderr": true,
+    "preserve_request_stream": true,
+    "preserve_generated_output": true
+  }
+}

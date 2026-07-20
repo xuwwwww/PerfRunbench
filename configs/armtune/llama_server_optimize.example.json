@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "result_origin": "measured",
+  "target": {
+    "type": "ssh",
+    "host": "<arm-linux-hostname>",
+    "user": "<ssh-user>",
+    "remote_workdir": "<remote-armtune-workdir>",
+    "strict_host_key_checking": true
+  },
+  "runtime": {
+    "adapter": "llama_server"
+  },
+  "executable": {
+    "path": "/<remote-llama-server-binary>",
+    "expected_sha256": null
+  },
+  "model": {
+    "path": "/<remote-gguf-model-file>",
+    "expected_sha256": null
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": "auto",
+    "startup_timeout_seconds": 30,
+    "request_timeout_seconds": 30,
+    "shutdown_timeout_seconds": 5,
+    "threads": 2,
+    "context_size": 512,
+    "batch_size": 128,
+    "ubatch_size": 128,
+    "seed": 42,
+    "temperature": 0.0
+  },
+  "workload": {
+    "mode": "server",
+    "prompt_suite_path": "/<remote-prompt-suite-json>",
+    "predict_tokens": 128,
+    "repetitions": 1,
+    "warmup_requests": 0,
+    "streaming": true,
+    "cooldown_seconds": 0
+  },
+  "search": {
+    "warmup_runs": 1,
+    "search_runs": 2,
+    "confirmation_runs": 2,
+    "cooldown_seconds": 0,
+    "random_seed": 42,
+    "insert_paired_baseline_every": 0,
+    "noise_band_percent": 2.0,
+    "max_candidates": 3,
+    "affinity_modes": ["scheduler-default", "compact"]
+  },
+  "quality_gate": {
+    "enabled": false
+  },
+  "artifacts": {
+    "preserve_server_stdout": true,
+    "preserve_server_stderr": true,
+    "preserve_request_stream": true,
+    "preserve_generated_output": true
+  }
+}

@@ -62,7 +62,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="autotuneai", description="PerfRunbench resource and tuning toolkit.")
+    parser = argparse.ArgumentParser(
+        prog="autotuneai",
+        description="PerfRunbench reproducible benchmarking, autotuning, comparison, and guarded recommendation toolkit.",
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     inspect_parser = subparsers.add_parser("inspect", help="Inspect hardware, runtime, limits, and recommendations.")
@@ -75,6 +78,20 @@ def build_parser() -> argparse.ArgumentParser:
     executors.add_argument("--probe-systemd", action="store_true")
     executors.add_argument("--check-sudo-cache", action="store_true")
     executors.set_defaults(handler=_cmd_executors)
+
+    arm = subparsers.add_parser(
+        "arm",
+        help="Run ArmTune Arm inspection, AI benchmarking, build/runtime tuning, and Passport commands.",
+        add_help=False,
+    )
+    arm.add_argument("--help", action="store_true", dest="arm_help")
+    arm.add_argument("arm_args", nargs=argparse.REMAINDER)
+    arm.set_defaults(handler=_cmd_arm)
+
+    recommendation = subparsers.add_parser("recommendation", help="Validate and apply guarded PerfRunbench recommendations.", add_help=False)
+    recommendation.add_argument("--help", action="store_true", dest="recommendation_help")
+    recommendation.add_argument("recommendation_args", nargs=argparse.REMAINDER)
+    recommendation.set_defaults(handler=_cmd_recommendation)
 
     run = subparsers.add_parser("run", help="Run a command with resource monitoring and optional limits.")
     _add_budget_args(run)
@@ -353,6 +370,34 @@ def _cmd_executors(args: argparse.Namespace) -> int:
     )
     print(json.dumps(capabilities, indent=2, sort_keys=True))
     return 0
+
+
+def _cmd_arm(args: argparse.Namespace) -> int:
+    from autotune.arm_tune.cli import main as arm_main
+
+    arm_args = list(args.arm_args)
+    if getattr(args, "arm_help", False):
+        arm_args.insert(0, "--help")
+    try:
+        return arm_main(arm_args)
+    except SystemExit as exc:
+        if isinstance(exc.code, int):
+            return exc.code
+        return 0
+
+
+def _cmd_recommendation(args: argparse.Namespace) -> int:
+    from autotune.recommendation.cli import main as recommendation_main
+
+    recommendation_args = list(args.recommendation_args)
+    if getattr(args, "recommendation_help", False):
+        recommendation_args.insert(0, "--help")
+    try:
+        return recommendation_main(recommendation_args)
+    except SystemExit as exc:
+        if isinstance(exc.code, int):
+            return exc.code
+        return 0
 
 
 def _cmd_run(args: argparse.Namespace) -> int:

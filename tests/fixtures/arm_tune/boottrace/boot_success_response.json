@@ -1,0 +1,8 @@
+{
+  "case_id": "boot_success",
+  "status": "success",
+  "event_sequence_valid": true,
+  "latency_ms": 83.0,
+  "summary": "Boot completed successfully using cited BootTrace evidence.",
+  "evidence_line_ids": ["L001", "L002", "L003"]
+}

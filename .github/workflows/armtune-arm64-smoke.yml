@@ -1,0 +1,146 @@
+name: ArmTune Native Arm64 Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "autotune/arm_tune/**"
+      - "autotune/cli.py"
+      - "tests/test_arm_tune_*.py"
+      - "tests/fixtures/arm_tune/**"
+      - "configs/armtune/**"
+      - ".github/workflows/armtune-arm64-smoke.yml"
+      - "pyproject.toml"
+  push:
+    paths:
+      - "autotune/arm_tune/**"
+      - "autotune/cli.py"
+      - "tests/test_arm_tune_*.py"
+      - "tests/fixtures/arm_tune/**"
+      - "configs/armtune/**"
+      - ".github/workflows/armtune-arm64-smoke.yml"
+      - "pyproject.toml"
+
+jobs:
+  native-arm64-smoke:
+    name: Native Arm64 fixture smoke
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Print host architecture
+        run: |
+          uname -a
+          python - <<'PY'
+          import platform
+          print("system:", platform.system())
+          print("machine:", platform.machine())
+          PY
+
+      - name: Assert native Linux Arm64 runner
+        run: |
+          test "$(uname -s)" = "Linux"
+          case "$(uname -m)" in
+            aarch64|arm64) ;;
+            *) echo "Expected aarch64 or arm64 runner, got $(uname -m)" >&2; exit 1 ;;
+          esac
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Validate package and CLI
+        run: |
+          python -m compileall autotune/arm_tune
+          autotuneai --help
+          autotuneai arm --help
+          autotuneai arm doctor --require-production
+          autotuneai arm inspect-host
+          python -m unittest discover -s tests -p "test_arm_tune*.py" -v
+
+      - name: Run public CLI fake llama-bench E2E
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import stat
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          root = Path.cwd()
+          fixture = root / "tests" / "fixtures" / "arm_tune" / "fake_llama_bench.py"
+          temp = root / ".autotuneai" / "arm64_smoke_input"
+          temp.mkdir(parents=True, exist_ok=True)
+          fake = temp / "fake_llama_bench"
+          fake.write_text(f'#!/usr/bin/env sh\nexec "{sys.executable}" "{fixture}" "$@"\n', encoding="utf-8")
+          fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+          model = temp / "fixture-model.gguf"
+          model.write_bytes(b"fixture model, not real weights\n")
+          config = temp / "benchmark.json"
+          config.write_text(json.dumps({
+              "schema_version": "1.0",
+              "result_origin": "test_fixture",
+              "target": {"type": "local"},
+              "executable": {"path": str(fake)},
+              "model": {"path": str(model)},
+              "benchmark": {
+                  "threads": 1,
+                  "prompt_tokens": 16,
+                  "generation_tokens": 8,
+                  "repetitions": 1,
+                  "timeout_seconds": 5
+              },
+              "artifacts": {
+                  "preserve_raw_stdout": True,
+                  "preserve_raw_stderr": True
+              }
+          }, indent=2), encoding="utf-8")
+          completed = subprocess.run(
+              ["autotuneai", "arm", "benchmark", "--config", str(config)],
+              check=False,
+              capture_output=True,
+              text=True,
+              encoding="utf-8",
+              errors="replace",
+              timeout=30,
+          )
+          print(completed.stdout)
+          print(completed.stderr, file=sys.stderr)
+          if completed.returncode != 0:
+              raise SystemExit(completed.returncode)
+          artifact_dir = None
+          for line in completed.stdout.splitlines():
+              if line.startswith("artifact_directory:"):
+                  artifact_dir = Path(line.split(":", 1)[1].strip())
+          if artifact_dir is None:
+              raise SystemExit("artifact_directory was not printed")
+          result = json.loads((artifact_dir / "benchmark_result.json").read_text(encoding="utf-8"))
+          if result["result_origin"] != "test_fixture":
+              raise SystemExit(f"expected test_fixture result_origin, got {result['result_origin']!r}")
+          if result["provenance"]["result_origin"] != "test_fixture":
+              raise SystemExit("provenance did not preserve test_fixture origin")
+          if result["artifact_validation"]["validation_status"] != "passed":
+              raise SystemExit("artifact validation did not pass")
+          if result["host"]["architecture"]["normalized_machine"] not in {"aarch64", "arm64"}:
+              raise SystemExit("native Arm hardware was not reflected in host evidence")
+          print("fake_e2e_result_origin:", result["result_origin"])
+          print("fake_e2e_artifact_validation:", result["artifact_validation"]["validation_status"])
+          PY
+
+      - name: Upload ArmTune smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: armtune-arm64-smoke-artifacts
+          path: |
+            .autotuneai/runs/**/armtune/benchmark/**
+          if-no-files-found: ignore
+          retention-days: 7

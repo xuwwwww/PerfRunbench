@@ -1,0 +1,4 @@
+| model | threads | test | samples | t/s | extra |
+| --- | --- | --- | --- | --- | --- |
+| fake | 8 | pp256 | 5 | 280.0 +/- 2.0 | ignored |
+| fake | 8 | tg128 | 5 | 70.0 +/- 1.0 | ignored |

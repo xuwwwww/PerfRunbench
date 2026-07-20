@@ -1,0 +1,371 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "synthetic_boottrace_tuning_v1",
+  "description": "Public deterministic BootTrace optional experimental capability suite. These cases are direct key-value extraction checks and are not part of default ArmTune build/runtime tuning eligibility.",
+  "cases": [
+    {
+      "case_id": "tuning_successful_boot",
+      "category": "boottrace_tuning_success",
+      "prompt": "CASE_ID=tuning_successful_boot\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L101,L102,L103,L104\nTrace lines:\nL101 STATUS=success\nL102 FAILURE_STAGE=none\nL103 ROOT_CAUSE=none\nL104 BOOT_RESULT=OS_HANDOFF_COMPLETE\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 128,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "tuning_successful_boot",
+        "status": "success",
+        "failure_stage": "none",
+        "root_cause_category": "none",
+        "required_evidence_line_ids": ["L101", "L102", "L103", "L104"],
+        "allowed_evidence_line_ids": ["L101", "L102", "L103", "L104"]
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "failure_stage", "root_cause_category", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "failure_stage": {"type": "string"},
+              "root_cause_category": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "tuning_successful_boot"},
+        {"type": "allowed_values", "field": "status", "expected": ["success", "warning", "failure", "unknown"]},
+        {"type": "exact_field", "field": "status", "expected": "success"},
+        {"type": "allowed_values", "field": "failure_stage", "expected": ["none", "device_initialization", "boot_selection", "firmware_validation", "network_initialization", "evidence_collection"]},
+        {"type": "exact_field", "field": "failure_stage", "expected": "none"},
+        {"type": "allowed_values", "field": "root_cause_category", "expected": ["none", "recoverable_device_warning", "device_initialization_timeout", "boot_device_missing", "firmware_component_failure", "insufficient_evidence"]},
+        {"type": "exact_field", "field": "root_cause_category", "expected": "none"},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["L101", "L102", "L103", "L104"],
+            "required": ["L101", "L102", "L103", "L104"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "tuning_recoverable_warning",
+      "category": "boottrace_tuning_warning",
+      "prompt": "CASE_ID=tuning_recoverable_warning\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L111,L112,L113,L114\nTrace lines:\nL111 STATUS=warning\nL112 FAILURE_STAGE=device_initialization\nL113 ROOT_CAUSE=recoverable_device_warning\nL114 BOOT_RESULT=CONTINUED_AFTER_DEVICE_RETRY\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 128,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "tuning_recoverable_warning",
+        "status": "warning",
+        "failure_stage": "device_initialization",
+        "root_cause_category": "recoverable_device_warning",
+        "required_evidence_line_ids": ["L111", "L112", "L113", "L114"],
+        "allowed_evidence_line_ids": ["L111", "L112", "L113", "L114"]
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "failure_stage", "root_cause_category", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "failure_stage": {"type": "string"},
+              "root_cause_category": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "tuning_recoverable_warning"},
+        {"type": "allowed_values", "field": "status", "expected": ["success", "warning", "failure", "unknown"]},
+        {"type": "exact_field", "field": "status", "expected": "warning"},
+        {"type": "allowed_values", "field": "failure_stage", "expected": ["none", "device_initialization", "boot_selection", "firmware_validation", "network_initialization", "evidence_collection"]},
+        {"type": "exact_field", "field": "failure_stage", "expected": "device_initialization"},
+        {"type": "allowed_values", "field": "root_cause_category", "expected": ["none", "recoverable_device_warning", "device_initialization_timeout", "boot_device_missing", "firmware_component_failure", "insufficient_evidence"]},
+        {"type": "exact_field", "field": "root_cause_category", "expected": "recoverable_device_warning"},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["L111", "L112", "L113", "L114"],
+            "required": ["L111", "L112", "L113", "L114"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "tuning_device_initialization_timeout",
+      "category": "boottrace_tuning_failure",
+      "prompt": "CASE_ID=tuning_device_initialization_timeout\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L121,L122,L123,L124\nTrace lines:\nL121 STATUS=failure\nL122 FAILURE_STAGE=device_initialization\nL123 ROOT_CAUSE=device_initialization_timeout\nL124 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 128,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "tuning_device_initialization_timeout",
+        "status": "failure",
+        "failure_stage": "device_initialization",
+        "root_cause_category": "device_initialization_timeout",
+        "required_evidence_line_ids": ["L121", "L122", "L123", "L124"],
+        "allowed_evidence_line_ids": ["L121", "L122", "L123", "L124"]
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "failure_stage", "root_cause_category", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "failure_stage": {"type": "string"},
+              "root_cause_category": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "tuning_device_initialization_timeout"},
+        {"type": "allowed_values", "field": "status", "expected": ["success", "warning", "failure", "unknown"]},
+        {"type": "exact_field", "field": "status", "expected": "failure"},
+        {"type": "allowed_values", "field": "failure_stage", "expected": ["none", "device_initialization", "boot_selection", "firmware_validation", "network_initialization", "evidence_collection"]},
+        {"type": "exact_field", "field": "failure_stage", "expected": "device_initialization"},
+        {"type": "allowed_values", "field": "root_cause_category", "expected": ["none", "recoverable_device_warning", "device_initialization_timeout", "boot_device_missing", "firmware_component_failure", "insufficient_evidence"]},
+        {"type": "exact_field", "field": "root_cause_category", "expected": "device_initialization_timeout"},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["L121", "L122", "L123", "L124"],
+            "required": ["L121", "L122", "L123", "L124"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "tuning_missing_boot_device",
+      "category": "boottrace_tuning_failure",
+      "prompt": "CASE_ID=tuning_missing_boot_device\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L131,L132,L133,L134\nTrace lines:\nL131 STATUS=failure\nL132 FAILURE_STAGE=boot_selection\nL133 ROOT_CAUSE=boot_device_missing\nL134 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 128,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "tuning_missing_boot_device",
+        "status": "failure",
+        "failure_stage": "boot_selection",
+        "root_cause_category": "boot_device_missing",
+        "required_evidence_line_ids": ["L131", "L132", "L133", "L134"],
+        "allowed_evidence_line_ids": ["L131", "L132", "L133", "L134"]
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "failure_stage", "root_cause_category", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "failure_stage": {"type": "string"},
+              "root_cause_category": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "tuning_missing_boot_device"},
+        {"type": "allowed_values", "field": "status", "expected": ["success", "warning", "failure", "unknown"]},
+        {"type": "exact_field", "field": "status", "expected": "failure"},
+        {"type": "allowed_values", "field": "failure_stage", "expected": ["none", "device_initialization", "boot_selection", "firmware_validation", "network_initialization", "evidence_collection"]},
+        {"type": "exact_field", "field": "failure_stage", "expected": "boot_selection"},
+        {"type": "allowed_values", "field": "root_cause_category", "expected": ["none", "recoverable_device_warning", "device_initialization_timeout", "boot_device_missing", "firmware_component_failure", "insufficient_evidence"]},
+        {"type": "exact_field", "field": "root_cause_category", "expected": "boot_device_missing"},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["L131", "L132", "L133", "L134"],
+            "required": ["L131", "L132", "L133", "L134"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "tuning_firmware_component_failure",
+      "category": "boottrace_tuning_failure",
+      "prompt": "CASE_ID=tuning_firmware_component_failure\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L141,L142,L143,L144\nTrace lines:\nL141 STATUS=failure\nL142 FAILURE_STAGE=firmware_validation\nL143 ROOT_CAUSE=firmware_component_failure\nL144 BOOT_RESULT=HALTED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 128,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "tuning_firmware_component_failure",
+        "status": "failure",
+        "failure_stage": "firmware_validation",
+        "root_cause_category": "firmware_component_failure",
+        "required_evidence_line_ids": ["L141", "L142", "L143", "L144"],
+        "allowed_evidence_line_ids": ["L141", "L142", "L143", "L144"]
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "failure_stage", "root_cause_category", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "failure_stage": {"type": "string"},
+              "root_cause_category": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "tuning_firmware_component_failure"},
+        {"type": "allowed_values", "field": "status", "expected": ["success", "warning", "failure", "unknown"]},
+        {"type": "exact_field", "field": "status", "expected": "failure"},
+        {"type": "allowed_values", "field": "failure_stage", "expected": ["none", "device_initialization", "boot_selection", "firmware_validation", "network_initialization", "evidence_collection"]},
+        {"type": "exact_field", "field": "failure_stage", "expected": "firmware_validation"},
+        {"type": "allowed_values", "field": "root_cause_category", "expected": ["none", "recoverable_device_warning", "device_initialization_timeout", "boot_device_missing", "firmware_component_failure", "insufficient_evidence"]},
+        {"type": "exact_field", "field": "root_cause_category", "expected": "firmware_component_failure"},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["L141", "L142", "L143", "L144"],
+            "required": ["L141", "L142", "L143", "L144"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "tuning_incomplete_unknown",
+      "category": "boottrace_tuning_unknown",
+      "prompt": "CASE_ID=tuning_incomplete_unknown\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L151,L152,L153,L154\nTrace lines:\nL151 STATUS=unknown\nL152 FAILURE_STAGE=evidence_collection\nL153 ROOT_CAUSE=insufficient_evidence\nL154 BOOT_RESULT=UNKNOWN_INCOMPLETE_TRACE\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 128,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "tuning_incomplete_unknown",
+        "status": "unknown",
+        "failure_stage": "evidence_collection",
+        "root_cause_category": "insufficient_evidence",
+        "required_evidence_line_ids": ["L151", "L152", "L153", "L154"],
+        "allowed_evidence_line_ids": ["L151", "L152", "L153", "L154"]
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "failure_stage", "root_cause_category", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "failure_stage": {"type": "string"},
+              "root_cause_category": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "tuning_incomplete_unknown"},
+        {"type": "allowed_values", "field": "status", "expected": ["success", "warning", "failure", "unknown"]},
+        {"type": "exact_field", "field": "status", "expected": "unknown"},
+        {"type": "allowed_values", "field": "failure_stage", "expected": ["none", "device_initialization", "boot_selection", "firmware_validation", "network_initialization", "evidence_collection"]},
+        {"type": "exact_field", "field": "failure_stage", "expected": "evidence_collection"},
+        {"type": "allowed_values", "field": "root_cause_category", "expected": ["none", "recoverable_device_warning", "device_initialization_timeout", "boot_device_missing", "firmware_component_failure", "insufficient_evidence"]},
+        {"type": "exact_field", "field": "root_cause_category", "expected": "insufficient_evidence"},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["L151", "L152", "L153", "L154"],
+            "required": ["L151", "L152", "L153", "L154"]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "tuning_retry_recovered",
+      "category": "boottrace_tuning_warning",
+      "prompt": "CASE_ID=tuning_retry_recovered\nYou are validating a deterministic synthetic BootTrace tuning case.\nEVIDENCE_LINE_IDS=L161,L162,L163,L164,L165\nTrace lines:\nL161 STATUS=warning\nL162 FAILURE_STAGE=boot_selection\nL163 ROOT_CAUSE=boot_device_missing\nL164 EVENT=RETRY_SELECTED_BACKUP_DEVICE\nL165 BOOT_RESULT=RECOVERED\nReturn exactly one JSON object. Use only these fields: case_id, status, failure_stage, root_cause_category, evidence_line_ids. Copy values only from explicit trace fields. Copy EVIDENCE_LINE_IDS exactly as the evidence_line_ids array. Use unknown when required fields are absent. Never invent evidence IDs.",
+      "response_format": "json",
+      "required": true,
+      "maximum_predicted_tokens": 128,
+      "generation_settings": {
+        "temperature": 0.0,
+        "seed": 42
+      },
+      "expected": {
+        "case_id": "tuning_retry_recovered",
+        "status": "warning",
+        "failure_stage": "boot_selection",
+        "root_cause_category": "boot_device_missing",
+        "required_evidence_line_ids": ["L161", "L162", "L163", "L164", "L165"],
+        "allowed_evidence_line_ids": ["L161", "L162", "L163", "L164", "L165"]
+      },
+      "validators": [
+        {"type": "nonempty_output"},
+        {"type": "valid_json"},
+        {
+          "type": "json_schema",
+          "expected": {
+            "required": ["case_id", "status", "failure_stage", "root_cause_category", "evidence_line_ids"],
+            "properties": {
+              "case_id": {"type": "string"},
+              "status": {"type": "string"},
+              "failure_stage": {"type": "string"},
+              "root_cause_category": {"type": "string"},
+              "evidence_line_ids": {"type": "array"}
+            }
+          }
+        },
+        {"type": "exact_field", "field": "case_id", "expected": "tuning_retry_recovered"},
+        {"type": "allowed_values", "field": "status", "expected": ["success", "warning", "failure", "unknown"]},
+        {"type": "exact_field", "field": "status", "expected": "warning"},
+        {"type": "allowed_values", "field": "failure_stage", "expected": ["none", "device_initialization", "boot_selection", "firmware_validation", "network_initialization", "evidence_collection"]},
+        {"type": "exact_field", "field": "failure_stage", "expected": "boot_selection"},
+        {"type": "allowed_values", "field": "root_cause_category", "expected": ["none", "recoverable_device_warning", "device_initialization_timeout", "boot_device_missing", "firmware_component_failure", "insufficient_evidence"]},
+        {"type": "exact_field", "field": "root_cause_category", "expected": "boot_device_missing"},
+        {
+          "type": "evidence_line_ids",
+          "field": "evidence_line_ids",
+          "expected": {
+            "allowed": ["L161", "L162", "L163", "L164", "L165"],
+            "required": ["L161", "L162", "L163", "L164", "L165"]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+| model | test | t/s |
+| --- | --- | --- |
+| fake | pp128 | nan |
+| fake | tg64 | -5.0 |
