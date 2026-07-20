@@ -54,6 +54,7 @@ configs/armtune/recommendation_apply.example.md
 
 ## Release Boundary
 
-Phase 11 packages the current release. It does not add models, benchmark
-backends, search algorithms, cloud automation, BootTrace prompt research, or
-system-scoped apply.
+Phase 12 split BootTrace-specific model-capability research into a standalone
+BootTraceBench project. Current PerfRunbench documentation covers Arm platform
+inspection, benchmarking, build/runtime tuning, statistical confirmation,
+Performance Passport generation, and guarded recommendation apply.

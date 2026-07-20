@@ -196,7 +196,7 @@ This evidence does not show:
 - KleidiAI execution
 - Arm optimized-path usage beyond host capability evidence
 - deterministic quality-gate validation
-- valid BootTrace output
+- workload-specific semantic correctness
 - build-profile comparison
 - llama-server candidate search
 - Arm Performix evidence

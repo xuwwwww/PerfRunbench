@@ -3,8 +3,7 @@
 ## Scope
 
 This document records the first real ArmTune build and runtime autotuning run
-after the Phase 9 refocus from BootTrace model qualification to Arm build and
-runtime tuning.
+after the Phase 9 refocus on Arm build and runtime tuning.
 
 The run used the existing user-provisioned C7g / Graviton3 Linux Arm64 target,
 the existing Qwen2.5-7B Q4_K_M model, the pinned llama.cpp source tree, the
@@ -12,9 +11,9 @@ existing `llama-bench` and `llama-server` pipelines, the staged runtime search
 engine, the build-profile evidence framework, and the Performance Passport
 framework.
 
-BootTrace quality research, model qualification, UEFI-specific prompt work, and
-semantic quality gates were out of scope. Quality status is intentionally
-`not_evaluated` for the default Phase 9 tuning path.
+Workload-specific semantic model qualification and prompt research were out of
+scope. Quality status is intentionally `not_evaluated` for the default Phase 9
+tuning path.
 
 ## Code And Target State
 
@@ -61,8 +60,8 @@ autotuneai arm verify-passport --passport <performance_passport.json>
 ```
 
 No llama.cpp source update, model download, new quality suite, prompt update,
-BootTrace qualification, cloud provisioning, or AWS lifecycle action was part
-of this evidence commit.
+semantic qualification, cloud provisioning, or AWS lifecycle action was part of
+this evidence commit.
 
 ## Build Evidence
 
@@ -165,8 +164,8 @@ optimum.
 
 `llama-server` was used only for secondary runtime evidence: request
 completion, nonempty output, stream parsing, TTFT, end-to-end latency, cleanup,
-and loopback port release. BootTrace semantic correctness was not required and
-quality status remained `not_evaluated`.
+and loopback port release. Workload-specific semantic correctness was not
+required and quality status remained `not_evaluated`.
 
 All three profiles used:
 
@@ -231,7 +230,7 @@ This supports the bounded wording:
 > inference workload, and measurement protocol.
 
 It does not support a claim of global optimality, cross-instance portability,
-quality-preserving BootTrace correctness, Performix evidence, or formal
+workload-specific semantic correctness, Performix evidence, or formal
 competition-final performance.
 
 ## Artifact And Cleanup Validation
@@ -271,8 +270,8 @@ fixture results, but they also are not a final competition-wide claim.
 - The result covers one `c7g.2xlarge` target and must not be generalized to all
   Arm systems.
 - `llama.cpp` was the first workload adapter, not ArmTune's product identity.
-- BootTrace quality features were preserved but not evaluated and did not
-  participate in default candidate eligibility.
+- Workload-specific semantic gates were not evaluated and did not participate
+  in default candidate eligibility.
 - `arm-optimized` had build evidence for KleidiAI enablement, but did not beat
   `arm-native` in this measured run.
 - The staged runtime search found an eligible improvement; it did not exhaust

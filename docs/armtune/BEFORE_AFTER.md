@@ -181,9 +181,8 @@ ArmTune is now a significant challenge-period update on top of the
 pre-challenge PerfRunbench infrastructure. The challenge-period work added Arm
 target validation, SSH worker execution, Arm host inspection, llama.cpp
 workload adapters, benchmark artifact validation, build-profile evidence,
-bounded runtime search, optional experimental BootTrace capability workloads,
-Performance Passport generation and verification, and guarded
-RecommendationBundle apply.
+bounded runtime search, workload-neutral correctness hooks, Performance
+Passport generation and verification, and guarded RecommendationBundle apply.
 
 ## Phase 11 Release Evidence Summary
 
@@ -239,5 +238,6 @@ Public claim wording:
 > Best observed eligible configuration under the tested Arm target, model,
 > inference workload, and measurement protocol.
 
-BootTrace remains preserved only as an optional experimental capability
-workload and does not participate in default candidate eligibility.
+Firmware-log model capability evaluation was split into BootTraceBench after
+the `v0.1.0-armtune` release. It does not participate in default ArmTune
+candidate eligibility in current main.

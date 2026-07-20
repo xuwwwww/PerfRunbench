@@ -197,13 +197,12 @@ docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md
 docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md
 ```
 
-## BootTrace Experimental Workload
+## Related Historical Experiment
 
-BootTrace prompt contracts, validators, normalization diagnostics, and model
-qualification artifacts are preserved as optional experimental capability
-workloads. They are useful for studying deterministic structured-output
-behavior, but they do not participate in the default ArmTune build/runtime
-tuning eligibility path.
+BootTraceBench is maintained separately as an experimental firmware-log model
+evaluation project. It is not part of PerfRunbench tuning or recommendation
+eligibility. The `v0.1.0-armtune` tag preserves the former integrated
+BootTrace state for historical review.
 
 ## Generic PerfRunbench Workflows
 
@@ -251,7 +250,7 @@ root privileges, cloud credentials, or network access.
 ```text
 autotune/
   arm_tune/       Arm target inspection, llama.cpp adapter, search, profiles,
-                  Passport, and optional experimental quality workloads.
+                  Passport, and workload-neutral correctness hooks.
   recommendation/ Generic RecommendationBundle generation, validation, guarded
                   apply, canary, lease, promote, and rollback.
   resource/       Run directories, process execution, monitoring, CPU affinity,

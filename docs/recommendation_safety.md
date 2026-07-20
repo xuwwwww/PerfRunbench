@@ -22,10 +22,9 @@ inspect target
 -> validate, dry-run, canary, lease, promote, or rollback
 ```
 
-BootTrace prompt contracts, model qualification, and UEFI-specific semantic
-quality checks are preserved as optional experimental capability workloads.
-They do not participate in default candidate eligibility unless an experiment
-explicitly enables them.
+BootTrace-specific prompt contracts and firmware-log model qualification have
+been split into a standalone BootTraceBench project. They are not part of
+default PerfRunbench candidate eligibility.
 
 ## RecommendationBundle
 
@@ -271,6 +270,6 @@ Invalid wording:
 ```text
 Global best Arm configuration.
 Cross-instance performance guarantee.
-BootTrace semantic quality pass.
+External semantic-quality pass from a workload-specific project.
 KleidiAI performance claim without build and runtime evidence.
 ```

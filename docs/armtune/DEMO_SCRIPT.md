@@ -1,6 +1,6 @@
 # PerfRunbench ArmTune Demo Script
 
-This demo shows the default release workflow. BootTrace quality artifacts may
+This demo shows the default release workflow. External workload-quality projects may
 be mentioned as optional experimental evidence, but they do not block or drive
 the default build/runtime tuning recommendation.
 
@@ -109,7 +109,7 @@ arm-native llama-server TTFT median: 62.826 ms
 ```
 
 Highlight request completion, nonempty output, streaming parse, TTFT, E2E
-latency, cleanup, and port release. BootTrace semantic correctness is not part
+latency, cleanup, and port release. External semantic correctness is not part
 of default candidate eligibility.
 
 ### 2:40-3:10 - Passport And Guarded Apply
@@ -138,6 +138,6 @@ guarded apply validation: passed
 - Do not combine improvements from different protocols.
 - Do not claim global optimality.
 - Do not claim KleidiAI from a requested flag alone.
-- Do not present BootTrace as the default performance gate.
+- Do not present external semantic workloads as the default performance gate.
 - Do not reveal endpoint details, identity-file paths, tokens, model weights,
   or private artifact locations.
