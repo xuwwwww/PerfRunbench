@@ -1,8 +1,0 @@
-{
-  "case_id": "boot_config_missing",
-  "status": "failure",
-  "event_sequence_valid": true,
-  "latency_ms": 36.0,
-  "summary": "Boot failed because a required configuration line is missing.",
-  "evidence_line_ids": ["L020", "L021"]
-}

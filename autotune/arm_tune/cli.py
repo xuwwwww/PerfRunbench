@@ -14,7 +14,6 @@ from autotune.arm_tune.config import AFFINITY_MODE_CHOICES, default_local_target
 from autotune.arm_tune.errors import ArmTuneError
 from autotune.arm_tune.passport.generator import generate_passport
 from autotune.arm_tune.passport.verification import verify_passport
-from autotune.arm_tune.quality.calibration import QualityCalibrationResult, load_quality_calibration_config, run_quality_calibration
 from autotune.arm_tune.schemas import (
     ArmBenchmarkResult,
     DoctorStatuses,
@@ -81,13 +80,6 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--max-candidates", type=int)
     optimize.add_argument("--affinity-modes", help="Comma-separated affinity modes to include in search.")
     optimize.set_defaults(handler=_cmd_optimize)
-
-    quality_calibrate = subparsers.add_parser(
-        "quality-calibrate",
-        help="Run optional experimental deterministic quality calibration for a fixed llama-server profile.",
-    )
-    quality_calibrate.add_argument("--config", required=True)
-    quality_calibrate.set_defaults(handler=_cmd_quality_calibrate)
 
     build_plan = subparsers.add_parser("build-plan", help="Create a versioned ArmTune build-profile plan without executing a build.")
     build_plan.add_argument("--config", required=True)
@@ -269,34 +261,6 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
         exit_code = 0 if result.status == "completed" else 1
     finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
     print(_server_optimize_summary(result) if isinstance(result, ArmTuneServerSearchResult) else _optimize_summary(result))
-    return exit_code
-
-
-def _cmd_quality_calibrate(args: argparse.Namespace) -> int:
-    config = load_quality_calibration_config(args.config)
-    run_dir, manifest = create_run(
-        ["autotuneai", "arm", "quality-calibrate", "--config", args.config],
-        ResourceBudget(enforce=False),
-    )
-    calibration_dir = run_dir / "armtune" / "quality_calibration"
-    target = _target_from_spec(config.target)
-    try:
-        result = run_quality_calibration(
-            target=target,
-            config=config,
-            run_id=manifest.run_id,
-            calibration_dir=calibration_dir,
-        )
-    except ArmTuneError:
-        finish_run(run_dir, manifest, "failed", 2)
-        raise
-    except Exception as exc:
-        finish_run(run_dir, manifest, "failed", 3)
-        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
-        return 3
-    exit_code = _quality_calibration_exit_code(result)
-    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
-    print(_quality_calibration_summary(result))
     return exit_code
 
 
@@ -678,36 +642,6 @@ def _server_optimize_summary(result: ArmTuneServerSearchResult) -> str:
         f"artifact_directory: {result.artifact_directory}",
     ]
     return "\n".join(lines)
-
-
-def _quality_calibration_exit_code(result: QualityCalibrationResult) -> int:
-    if result.benchmark_result.cleanup_status == "failed":
-        return 4
-    if result.suitability_state == "suitable":
-        return 0
-    if result.suitability_state in {"unsuitable", "inconclusive", "execution_failed"}:
-        return 1
-    return 3
-
-
-def _quality_calibration_summary(result: QualityCalibrationResult) -> str:
-    return "\n".join(
-        [
-            f"run_id: {result.run_id}",
-            f"target_type: {result.target_type}",
-            f"result_origin: {result.result_origin}",
-            f"suite_case_count: {result.suite_case_count}",
-            f"request_success_count: {result.request_success_count}",
-            f"raw_json_valid_count: {result.raw_json_valid_count}",
-            f"normalized_json_valid_count: {result.normalized_json_valid_count}",
-            f"required_quality_cases_passed: {result.required_quality_cases_passed}/{result.required_quality_cases_total}",
-            f"critical_failure_count: {result.critical_failure_count}",
-            f"failure_category_histogram: {json.dumps(result.failure_category_histogram, sort_keys=True)}",
-            f"quality_gate_status: {result.quality_gate_status}",
-            f"model_profile_suitability: {result.suitability_state}",
-            f"artifact_directory: {result.artifact_directory}",
-        ]
-    )
 
 
 def _build_profile_summary(result) -> str:

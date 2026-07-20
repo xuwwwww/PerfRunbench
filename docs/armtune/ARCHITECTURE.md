@@ -447,87 +447,31 @@ Phase 3B.1 records:
 - `quality_gate_status: not_evaluated`
 
 Phase 3B.1 does not modify the Phase 3A search engine to use `llama-server`.
-It does not perform deterministic quality scoring, BootTrace validation,
-KleidiAI verification, build-profile comparison, Performix integration,
-Performance Passport generation, cloud provisioning, or real AWS execution.
+It does not perform workload-specific semantic scoring, KleidiAI verification,
+build-profile comparison, Performix integration, Performance Passport
+generation, cloud provisioning, or real AWS execution.
 
-## Phase 4 Optional Experimental Quality-Aware Server Tuning
+## Workload-Neutral Correctness Hooks
 
-Phase 4 adds a deterministic local quality layer and a bounded
-`llama-server` search path. The quality layer is not an external model judge:
-it validates public synthetic BootTrace cases against explicit expected
-answers and validator rules stored in a versioned quality suite. After the
-Phase 9 refocus, this remains preserved as an optional experimental capability
-path and is not part of default build/runtime tuning eligibility.
+PerfRunbench keeps generic correctness and validation primitives:
 
-The quality package owns deterministic validation:
+- versioned quality/correctness result schemas
+- suite loading for public JSON validator specifications
+- deterministic validators such as `nonempty_output`, `valid_json`,
+  `json_schema`, `exact_field`, `allowed_values`, `required_substrings`,
+  `regex`, `numeric_range`, and `evidence_line_ids`
+- request completion, stream parsing, cleanup, and artifact digest evidence
+- recommendation safety contracts for generic command, `llama-bench`, and
+  `llama-server`
 
-```text
-autotune/arm_tune/quality/
-  __init__.py
-  schemas.py
-  suite.py
-  validators.py
-  boottrace.py
-  aggregation.py
-```
+These hooks are workload-neutral. They do not include firmware-log case
+taxonomy, prompt contracts, canonical firmware answers, model qualification,
+or workload-specific semantic scoring.
 
-Quality suites are serialized with `schema_version` and stable digests. A
-quality case contains a prompt, expected response format, expected canonical
-fields, validator specifications, required/optional status, maximum predicted
-tokens, and deterministic generation settings. Validator results retain
-`validator_type`, `status`, `expected`, `observed`, and an actionable message;
-ArmTune must not collapse quality evidence into a single boolean.
+External projects may use these ideas through stable JSON files or the generic
+command workload path. PerfRunbench must not import such projects directly.
 
-`autotuneai arm optimize` remains the public entry point. When a config uses
-`runtime.adapter: llama_server`, `workload.mode: server`, and
-`quality_gate.enabled: true`, the controller runs a bounded server search by
-creating normal Phase 3B.1 server benchmark jobs for each candidate. The target
-still executes only allowlisted worker operations, binds `llama-server` to
-loopback, preserves raw SSE and generated outputs, and validates artifact
-digests after download.
-
-The Phase 4 controller does not add an arbitrary remote shell operation. Server
-autotuning is a controller-side orchestration layer over repeated
-`benchmark.llama_server` jobs. Candidate-specific settings are serialized in
-the versioned server job spec, including `threads`, `batch_size`,
-`ubatch_size`, `affinity_mode`, and optional `cpu_affinity`.
-
-In this optional experimental path, candidate comparison is quality-aware:
-
-- Performance distributions use client-observed TTFT as the primary metric and
-  end-to-end latency as a secondary metric.
-- Warm-up requests are preserved but excluded from distributions.
-- Request failures and stream parse failures remain explicit failures, not
-  zero-valued metrics.
-- A candidate is eligible only when lifecycle, cleanup, provenance, binary and
-  model digests, target fingerprint, prompt-suite digest, quality-suite digest,
-  protocol settings, required request execution, required stream parsing, and
-  required quality cases all pass.
-- A faster candidate that fails a critical quality validator is rejected with
-  `rejected_quality`.
-- A candidate inside the configured noise band remains `inconclusive`.
-
-The Phase 4 server optimize artifact root is:
-
-```text
-.autotuneai/runs/<run_id>/armtune/server_optimize/
-```
-
-It contains the sanitized optimize job, effective config, quality suite
-manifest and snapshot, derived prompt-suite snapshot, per-candidate server
-benchmark artifact directories, `server_optimize_result.json`, root
-`artifact_manifest.json`, and `artifact_validation.json`. For local targets,
-the derived prompt-suite snapshot is used directly. For SSH targets, the
-configured workload prompt suite must be an absolute target path that has been
-uploaded separately.
-
-The Phase 4 MVP does not compare build profiles, verify KleidiAI, change the
-llama.cpp source commit, perform quantization search, run concurrency/load
-tests, integrate Performix, generate a complete Performance Passport, or
-produce final competition benchmark claims.
-
-## Phase 5 Competition Evidence Architecture
+## Phase 5 Build And Passport Evidence Architecture
 
 Phase 5 adds a competition-evidence layer without changing the controller and
 target trust boundary. The controller still validates configuration,
@@ -555,30 +499,6 @@ autotune/arm_tune/passport/
   verification.py
 ```
 
-The existing `autotune/arm_tune/quality/` package is extended with:
-
-- response failure categorization
-- auditable output normalization
-- structured-generation capability evidence
-- BootTrace prompt-contract rendering and digesting
-- fixed-profile quality calibration
-
-Quality calibration is separate from default performance optimization. In the
-optional experimental quality path, a model/profile must be suitable before it
-can participate in quality-aware performance comparison. Suitability requires
-request execution, stream parsing, cleanup, deterministic quality validation,
-zero critical failures, and no invented evidence IDs. A normalized output may
-pass only if normalization is enabled by a versioned policy and all semantic
-validators still pass.
-
-Structured-generation support must be evidence-based. The inspected binary
-help output and optional bounded probes determine whether grammar, JSON schema,
-OpenAI-compatible `response_format`, seed, temperature, and deterministic
-sampling controls are `supported`, `unsupported`, `unverified`, or
-`probe_failed`. ArmTune must not accept arbitrary user grammar text in the
-worker protocol; generated schema or grammar material must come only from a
-validated public quality-suite schema.
-
 Build profiles are declarative and versioned. The initial profiles are:
 
 - `portable-baseline`
@@ -600,7 +520,6 @@ libraries, runtime logs, or build output.
 Phase 5 exposes these public commands:
 
 ```text
-autotuneai arm quality-calibrate --config <path>
 autotuneai arm build-plan --config <path>
 autotuneai arm build-profile --config <path>
 autotuneai arm inspect-build --config <path>
@@ -609,59 +528,32 @@ autotuneai arm passport --comparison-result <path>
 autotuneai arm verify-passport --passport <path>
 ```
 
-Profile comparison reuses the server benchmark and quality layers. It compares
-only profiles with compatible model, prompt suite, normalization policy,
-generation settings, target fingerprint, CPU allocation, binary/model digests,
-and quality-suite digest. The primary metric is median target-local
-client-observed TTFT, with median end-to-end latency and p95 values as
-secondary metrics. Failed requests remain failures and are never converted to
-zero-valued latency samples.
+Profile comparison reuses the server benchmark layer. It compares only
+profiles with compatible model, prompt suite, generation settings, target
+fingerprint, CPU allocation, binary/model digests, and protocol evidence. The
+primary metric is median target-local client-observed TTFT, with median
+end-to-end latency and p95 values as secondary metrics. Failed requests remain
+failures and are never converted to zero-valued latency samples.
 
 The Performance Passport is a generated evidence artifact, not a marketing
 claim. It binds repository commit, target fingerprint, source commit, build
-evidence, compiler/CMake versions, binary/model digests, quality suite and
-prompt digests, normalization policy digest, benchmark protocol, profile
-results, quality results, rejected profiles, statistical distributions,
-artifact-manifest digest, claim eligibility, limitations, and redacted
-reproducibility commands. Verification rejects schema, digest, artifact, or
-claim consistency problems.
+evidence, compiler/CMake versions, binary/model digests, prompt-suite digest,
+benchmark protocol, profile results, rejected profiles, statistical
+distributions, artifact-manifest digest, claim eligibility, limitations, and
+redacted reproducibility commands. Verification rejects schema, digest,
+artifact, or claim consistency problems.
 
-## Phase 7 BootTrace Contract Calibration
+## Phase 12 External Workload Boundary
 
-Phase 7 adds prompt-contract versioning without changing the core quality gate
-semantics. The held-out evaluation suite remains
-`configs/armtune/quality/boottrace_suite.json`; the separate public
-development calibration suite is
-`configs/armtune/quality/boottrace_calibration_suite.json`. Development cases
-may guide prompt contracts, but they are never counted as final held-out
-qualification passes.
+Firmware-log model capability evaluation was split into the standalone
+BootTraceBench project after the `v0.1.0-armtune` release. Current
+PerfRunbench does not ship those suites, prompt contracts, canonical answers,
+normalization diagnostics, or model-by-model qualification records.
 
-The controller supports these BootTrace prompt contracts:
-
-- `current-zero-shot`
-- `taxonomy-and-decision-rules`
-- `taxonomy-rules-and-disjoint-few-shot`
-
-The selected contract is configured through
-`quality_gate.prompt_contract_version`. The controller renders the prompts,
-writes `prompt_contract.json` and `prompt_suite_snapshot.json`, records prompt
-digests, expected schema digest, taxonomy version, generation settings, and
-normalization policy, then executes the existing allowlisted
-`benchmark.llama_server` worker operation.
-
-For SSH targets, the controller uploads only the rendered
-`prompt_suite_snapshot.json` into the versioned remote run directory and
-updates the worker job to reference that uploaded file. This ensures the
-remote request artifacts prove which prompt contract was actually sent to
-`llama-server` while preserving the fixed worker command and avoiding arbitrary
-remote shell strings.
-
-The held-out case audit in
-`configs/armtune/quality/boottrace_case_audit.json` records trace sufficiency,
-unique expected classification, taxonomy clarity, required evidence-line
-necessity, ambiguity, and unknown-policy applicability for every evaluation
-case. Canonical answers may change only with written rationale that the fixture
-requires correction, not merely because a model failed.
+The `v0.1.0-armtune` tag preserves the prior integrated state. Current main
+keeps only workload-neutral correctness hooks and historical migration notes.
+Future integration should treat BootTraceBench as an external command workload
+or JSON-producing tool, not as an imported dependency.
 
 ## Phase 9 Default Tuning Architecture
 
@@ -678,7 +570,7 @@ inspect Arm target
 ```
 
 The default eligibility path is evidence-backed performance tuning, not
-BootTrace model qualification. A candidate can be considered eligible only
+workload-specific model qualification. A candidate can be considered eligible only
 when measured Linux Arm64 provenance, matching model/target/protocol digests,
 valid build evidence, successful execution and parsing, cleanup, sufficient
 samples, and a difference outside the configured noise band are present.
@@ -691,11 +583,9 @@ identity is Arm platform inspection, reproducible AI benchmarking,
 build/runtime configuration search, statistical comparison, and auditable
 recommendation.
 
-BootTrace quality modules, suites, validators, normalization diagnostics, and
-historical evidence are preserved as optional experimental capability
-workloads. They are not deleted, rewritten, or weakened, but they do not
-participate in default candidate eligibility unless an operator explicitly
-enables an experimental quality gate for a separate run.
+Workload-specific semantic suites and model-qualification records now live
+outside PerfRunbench. They do not participate in default candidate eligibility
+unless an operator wraps an external tool through a generic workload boundary.
 
 Build-profile evidence must preserve source commit and dirty state,
 compiler/CMake versions, exact build command when available, effective CMake
@@ -786,6 +676,5 @@ Responsibilities:
 - Recommendation safety validates an eligible Passport-derived
   RecommendationBundle before dry-run or canary apply.
 
-BootTrace remains an optional experimental capability workload. Its code,
-fixtures, validators, and historical evidence are preserved, but it is not part
+BootTraceBench is an external historical/experimental project. It is not part
 of the default performance-tuning eligibility path.

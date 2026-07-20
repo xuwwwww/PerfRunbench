@@ -60,7 +60,7 @@ around a single benchmark number.
 - Performance Passport JSON/Markdown generation and verification.
 - RecommendationBundle show, validate, dry-run apply, process canary, lease,
   rollback, and status commands.
-- Optional experimental BootTrace capability workload preserved separately
+- Optional experimental firmware-log capability workload preserved separately
   from the default performance-tuning eligibility path.
 
 ## Real Results
@@ -125,7 +125,7 @@ and reporting infrastructure.
 - It does not prove global optimality or cross-instance portability.
 - `llama-bench` throughput and `llama-server` latency improvements are
   separate protocols.
-- BootTrace is an optional experimental workload, not the default tuning gate.
+- External semantic workloads are not the default tuning gate.
 - Model weights, private target configs, endpoint details, SSH keys, and
   private run artifacts are not committed.
 

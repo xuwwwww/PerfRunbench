@@ -9,7 +9,7 @@ from autotune.arm_tune import SCHEMA_VERSION
 from autotune.arm_tune.schemas import to_plain
 
 
-NORMALIZATION_POLICY_VERSION = "boottrace-normalization-v1"
+NORMALIZATION_POLICY_VERSION = "generic-single-fence-v1"
 FENCED_JSON_PATTERN = re.compile(r"```(?:json|JSON)?\s*(.*?)```", re.DOTALL)
 
 

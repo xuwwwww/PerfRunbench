@@ -183,11 +183,11 @@ class ArmTuneTargetsTest(unittest.TestCase):
 
             remote_path = target.prepare_server_prompt_suite(prompt_suite, run_id="run-123")
 
-            self.assertEqual(remote_path, "/tmp/armtune-runs/run-123/armtune/quality_calibration/prompt_suite_snapshot.json")
-            self.assertEqual(runner.commands[0][-4:], ["arm-host", "mkdir", "-p", "/tmp/armtune-runs/run-123/armtune/quality_calibration"])
+            self.assertEqual(remote_path, "/tmp/armtune-runs/run-123/armtune/server_prompt_suite/prompt_suite_snapshot.json")
+            self.assertEqual(runner.commands[0][-4:], ["arm-host", "mkdir", "-p", "/tmp/armtune-runs/run-123/armtune/server_prompt_suite"])
             self.assertIn("scp", runner.commands[1][0])
             self.assertIn(str(prompt_suite), runner.commands[1])
-            self.assertIn("arm-host:/tmp/armtune-runs/run-123/armtune/quality_calibration/prompt_suite_snapshot.json", runner.commands[1])
+            self.assertIn("arm-host:/tmp/armtune-runs/run-123/armtune/server_prompt_suite/prompt_suite_snapshot.json", runner.commands[1])
 
 
 def _inspection(*, valid: bool = True, system: str = "Linux", machine: str = "aarch64") -> HostInspectionResult:

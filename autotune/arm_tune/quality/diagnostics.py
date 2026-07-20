@@ -13,16 +13,12 @@ QUALITY_FAILURE_CATEGORIES = {
     "markdown_fence_present",
     "invalid_json",
     "missing_required_field",
-    "wrong_status",
-    "wrong_failure_stage",
-    "wrong_root_cause",
     "missing_required_evidence",
     "invented_evidence",
     "truncated_output",
     "request_failure",
     "stream_parse_failure",
-    "unsupported_structured_output",
-    "model_capability_failure",
+    "validator_failure",
 }
 
 
@@ -51,13 +47,6 @@ def categorize_quality_failure(
         categories.add("response_format_violation")
         if _looks_truncated(normalization.normalized_output):
             categories.add("truncated_output")
-    parsed = _parse_if_possible(normalization.normalized_output if normalization.validation_input == "normalized" else generated_output)
-    expected_status = case.expected.get("status")
-    observed_status = parsed.get("status") if isinstance(parsed, dict) else None
-    if isinstance(expected_status, str) and observed_status is not None and observed_status != expected_status:
-        categories.add("wrong_status")
-        if expected_status == "failure" and observed_status in {"success", "warning"}:
-            categories.add("wrong_failure_stage")
     for index, result in enumerate(validator_results):
         if result.status == "passed":
             continue
@@ -72,21 +61,8 @@ def categorize_quality_failure(
                 categories.add("missing_required_field")
             else:
                 categories.add("response_format_violation")
-        elif result.validator_type == "exact_field" and field == "status":
-            categories.add("wrong_status")
-        elif result.validator_type == "exact_field" and field == "failure_stage":
-            categories.add("wrong_failure_stage")
-        elif result.validator_type == "exact_field" and field == "root_cause_category":
-            categories.add("wrong_root_cause")
-        elif result.validator_type == "allowed_values" and result.observed != result.expected:
-            if field == "failure_stage":
-                categories.add("wrong_failure_stage")
-            elif field == "root_cause_category":
-                categories.add("wrong_root_cause")
-            else:
-                categories.add("wrong_status")
-        elif result.validator_type in {"required_substrings", "regex"}:
-            categories.add("wrong_root_cause")
+        elif result.validator_type in {"exact_field", "allowed_values", "required_substrings", "forbidden_substrings", "regex", "numeric_range"}:
+            categories.add("validator_failure")
         elif result.validator_type == "evidence_line_ids":
             if "invented evidence" in message:
                 categories.add("invented_evidence")
@@ -94,8 +70,6 @@ def categorize_quality_failure(
                 categories.add("missing_required_evidence")
         elif result.validator_type == "nonempty_output":
             categories.add("truncated_output")
-    if any(result.critical and result.status != "passed" for result in validator_results):
-        categories.add("model_capability_failure")
     return sorted(category for category in categories if category in QUALITY_FAILURE_CATEGORIES)
 
 

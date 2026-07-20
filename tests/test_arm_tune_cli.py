@@ -115,7 +115,7 @@ class ArmTuneCliTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("PerfRunbench reproducible benchmarking", output.getvalue())
 
-    def test_phase5_arm_commands_are_registered(self) -> None:
+    def test_release_arm_commands_are_registered_without_removed_calibration_command(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
             code = main(["arm", "--help"])
@@ -123,7 +123,6 @@ class ArmTuneCliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         text = output.getvalue()
         for command in [
-            "quality-calibrate",
             "build-plan",
             "build-profile",
             "inspect-build",
@@ -132,6 +131,7 @@ class ArmTuneCliTest(unittest.TestCase):
             "verify-passport",
         ]:
             self.assertIn(command, text)
+        self.assertNotIn("quality-calibrate", text)
 
 
 if __name__ == "__main__":

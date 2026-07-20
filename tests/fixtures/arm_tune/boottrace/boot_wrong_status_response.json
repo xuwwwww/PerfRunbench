@@ -1,8 +1,0 @@
-{
-  "case_id": "boot_retry_recovered",
-  "status": "ok",
-  "event_sequence_valid": true,
-  "latency_ms": 142.0,
-  "summary": "Boot completed after one retry using cited BootTrace evidence.",
-  "evidence_line_ids": ["L010", "L011", "L012", "L013"]
-}
