@@ -32,7 +32,7 @@ class ArmTuneReleasePackagingTest(unittest.TestCase):
 
         self.assertIn("must not be combined", readme)
         self.assertIn("These results must not be combined", devpost)
-        self.assertIn("BootTrace remains optional experimental", limitations)
+        self.assertIn("split into the standalone BootTraceBench project", limitations)
 
     def test_architecture_diagram_and_default_flow_are_documented(self) -> None:
         architecture = _read("docs/armtune/ARCHITECTURE.md")
@@ -50,7 +50,7 @@ class ArmTuneReleasePackagingTest(unittest.TestCase):
             self.assertIn(term, architecture)
 
         self.assertIn("flowchart LR", architecture)
-        self.assertIn("BootTrace remains an optional experimental capability workload", architecture)
+        self.assertIn("BootTraceBench is an external historical/experimental project", architecture)
 
     def test_phase10_sanitized_evidence_contains_apply_validation(self) -> None:
         evidence = _read("docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md")
@@ -78,7 +78,6 @@ class ArmTuneReleasePackagingTest(unittest.TestCase):
             Path("configs/armtune/build_profiles.example.json"),
             Path("configs/armtune/llama_bench_optimize.example.json"),
             Path("configs/armtune/llama_server_optimize.example.json"),
-            Path("configs/armtune/quality_calibration.example.json"),
         ]
         for relative in json_examples:
             content = _read(relative)
@@ -96,6 +95,25 @@ class ArmTuneReleasePackagingTest(unittest.TestCase):
         self.assertIn("--dry-run", recommendation)
         self.assertIn("autotuneai recommendation rollback", recommendation)
         _assert_no_endpoint_or_private_path(recommendation)
+
+    def test_boottrace_specific_workload_is_not_in_default_code_or_configs(self) -> None:
+        forbidden = re.compile(
+            r"boottrace|quality-calibrate|quality_calibrate|prompt_contract",
+            re.IGNORECASE,
+        )
+
+        matches: list[str] = []
+        for root in [ROOT / "autotune", ROOT / "configs"]:
+            for path in root.rglob("*"):
+                if not path.is_file():
+                    continue
+                if path.suffix.lower() not in {".py", ".json", ".md", ".yaml", ".yml"}:
+                    continue
+                content = path.read_text(encoding="utf-8")
+                if forbidden.search(content):
+                    matches.append(str(path.relative_to(ROOT)))
+
+        self.assertEqual(matches, [])
 
 
 def _read(relative: str | Path) -> str:
