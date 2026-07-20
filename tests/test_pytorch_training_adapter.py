@@ -57,6 +57,13 @@ class PyTorchTrainingAdapterTest(unittest.TestCase):
         self.assertNotIn(".pem", content.lower())
         self.assertNotRegex(content, r"\b[A-Za-z]:\\")
 
+    def test_public_pytorch_synthetic_example_supports_generated_config_flags(self) -> None:
+        source = Path("examples/pytorch_synthetic_training/train_synthetic.py").read_text(encoding="utf-8")
+        for flag in ["--micro-batch-size", "--gradient-accumulation", "--num-workers", "--max-steps", "--seed"]:
+            self.assertIn(flag, source)
+        self.assertIn("torch.utils.data.DataLoader", source)
+        self.assertIn("OMP_NUM_THREADS", source)
+
     def test_candidate_generation_preserves_effective_batch_and_stage_status(self) -> None:
         config = _training_config(Path.cwd())
         candidates, statuses = generate_training_candidates(config)

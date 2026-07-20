@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import itertools
+import os
 import sys
 import time
 from pathlib import Path
@@ -20,18 +22,43 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--micro-batch-size", type=int, default=8)
     parser.add_argument("--gradient-accumulation", type=int, default=1)
+    parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--max-steps", type=int, default=8)
+    parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
-    torch.manual_seed(0)
+    if args.micro_batch_size <= 0:
+        raise SystemExit("--micro-batch-size must be positive")
+    if args.gradient_accumulation <= 0:
+        raise SystemExit("--gradient-accumulation must be positive")
+    if args.num_workers < 0:
+        raise SystemExit("--num-workers must be non-negative")
+    if args.max_steps <= 0:
+        raise SystemExit("--max-steps must be positive")
+    omp_threads = int(os.environ.get("OMP_NUM_THREADS", "1"))
+    if omp_threads > 0:
+        torch.set_num_threads(omp_threads)
+    torch.manual_seed(args.seed)
     model = torch.nn.Sequential(torch.nn.Linear(32, 64), torch.nn.ReLU(), torch.nn.Linear(64, 4))
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    dataset_size = max(256, args.micro_batch_size * args.gradient_accumulation * args.max_steps)
+    x_data = torch.randn(dataset_size, 32)
+    y_data = torch.randint(0, 4, (dataset_size,))
+    dataset = torch.utils.data.TensorDataset(x_data, y_data)
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.micro_batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=False,
+        drop_last=True,
+    )
+    batches = itertools.cycle(loader)
     start = time.perf_counter()
     final_loss = 0.0
     for step in range(1, args.max_steps + 1):
         optimizer.zero_grad(set_to_none=True)
         for _ in range(args.gradient_accumulation):
-            x = torch.randn(args.micro_batch_size, 32)
-            y = torch.randint(0, 4, (args.micro_batch_size,))
+            x, y = next(batches)
             loss = torch.nn.functional.cross_entropy(model(x), y)
             loss.backward()
             final_loss = float(loss.detach().item())
@@ -47,6 +74,8 @@ def main() -> int:
             "step_time_ms": (elapsed / args.max_steps) * 1000.0,
             "final_loss": final_loss,
             "examples_processed": examples,
+            "num_workers": args.num_workers,
+            "torch_num_threads": torch.get_num_threads(),
         },
     )
     return 0
