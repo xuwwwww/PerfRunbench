@@ -52,7 +52,7 @@ def collect_environment_fingerprint(
         "architecture": _unknown_if_empty(platform.machine()),
         "cpu_model": _detect_cpu_model(),
         "logical_cpu_count": os.cpu_count() or UNKNOWN,
-        "allowed_cpu_mask": allowed_cpu_mask or _current_affinity_mask(),
+        "allowed_cpu_mask": _canonical_cpu_mask(allowed_cpu_mask or _current_affinity_mask()),
         "executable_sha256": _digest_or_unknown(executable_path),
         "model_sha256": _digest_or_not_applicable(model_path),
         "runtime_identity": runtime_identity or platform.python_implementation() or UNKNOWN,
@@ -90,6 +90,9 @@ def compare_environment_fingerprints(expected: dict[str, Any], observed: dict[st
     for field in HARD_FIELDS:
         expected_value = expected_hard.get(field, UNKNOWN)
         observed_value = observed_hard.get(field, UNKNOWN)
+        if field == "allowed_cpu_mask":
+            expected_value = _canonical_cpu_mask(expected_value)
+            observed_value = _canonical_cpu_mask(observed_value)
         if _is_unknown(expected_value) or _is_unknown(observed_value):
             hard_mismatches.append({"field": field, "expected": expected_value, "observed": observed_value, "reason": "unknown"})
             guard_results.append(
@@ -213,6 +216,37 @@ def _current_affinity_mask() -> str:
     if not count:
         return UNKNOWN
     return ",".join(str(item) for item in range(count))
+
+
+def _canonical_cpu_mask(value: Any) -> str:
+    if value is None:
+        return UNKNOWN
+    text = str(value).strip()
+    if not text:
+        return UNKNOWN
+    if text.lower() in {UNKNOWN, "not_available", NOT_APPLICABLE}:
+        return text.lower()
+    cpus: set[int] = set()
+    for raw_part in text.split(","):
+        part = raw_part.strip()
+        if not part:
+            return text
+        if "-" in part:
+            left, right = [item.strip() for item in part.split("-", 1)]
+            if not left.isdigit() or not right.isdigit():
+                return text
+            start = int(left)
+            end = int(right)
+            if start > end:
+                return text
+            cpus.update(range(start, end + 1))
+            continue
+        if not part.isdigit():
+            return text
+        cpus.add(int(part))
+    if not cpus:
+        return UNKNOWN
+    return ",".join(str(item) for item in sorted(cpus))
 
 
 def _available_memory_mb() -> int | str:

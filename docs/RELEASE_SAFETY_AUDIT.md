@@ -27,3 +27,14 @@ Latest Phase 13 local scan:
 checked_files: 311
 violations: 0
 ```
+
+Phase 14A adds the `pytorch-training` adapter and keeps the same public safety
+boundary:
+
+- generated configs are public placeholders
+- no AWS lifecycle control is performed
+- no model files or datasets are downloaded
+- PyTorch is not a mandatory dependency
+- candidate overlays are copied into artifact directories
+- Python source files are not rewritten
+- arbitrary parser commands and shell strings are not supported

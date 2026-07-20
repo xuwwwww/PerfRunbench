@@ -482,6 +482,8 @@ def _pid_alive(pid: int) -> bool:
         return True
     except OSError:
         return False
+    except Exception:
+        return False
     return True
 
 
@@ -518,6 +520,18 @@ def _metrics_path(launch_spec: dict[str, Any], cwd_path: Path | None) -> Path | 
 def _load_metrics_from_stdout(stdout: str) -> dict[str, Any] | None:
     text = stdout.strip()
     if not text.startswith("{"):
+        for prefix in ("AUTOTUNEAI_TRAIN_RESULT ", "PERFRUNBENCH_METRIC "):
+            records = []
+            for line in stdout.splitlines():
+                if line.startswith(prefix):
+                    try:
+                        raw = json.loads(line[len(prefix) :].strip())
+                    except json.JSONDecodeError:
+                        return None
+                    if isinstance(raw, dict):
+                        records.append(raw.get("metrics") if isinstance(raw.get("metrics"), dict) else raw)
+            if len(records) == 1 and isinstance(records[0], dict):
+                return records[0]
         return None
     try:
         raw = json.loads(text)

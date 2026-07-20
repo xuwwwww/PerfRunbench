@@ -107,13 +107,13 @@ def resolved_argv(command: list[str], *, cwd: Path | None = None) -> list[str]:
 def resolve_executable(value: str, *, cwd: Path | None = None) -> Path | None:
     raw = Path(value)
     if raw.is_absolute() and raw.exists() and raw.is_file():
-        return raw.resolve()
+        return raw.absolute()
     cwd = cwd or Path.cwd()
     candidate = (cwd / raw)
     if candidate.exists() and candidate.is_file():
-        return candidate.resolve()
+        return candidate.absolute()
     resolved = shutil.which(value)
-    return Path(resolved).resolve() if resolved else None
+    return Path(resolved).absolute() if resolved else None
 
 
 def redact_argv(argv: list[str]) -> list[str]:

@@ -9,7 +9,7 @@
 目前專案環境建立在 WSL 的 miniforge：
 
 ```bash
-/home/louis/miniforge3/envs/autotuneai
+<miniforge-root>/envs/autotuneai
 ```
 
 從 PowerShell 進入 WSL：
@@ -21,19 +21,19 @@ wsl
 進入專案：
 
 ```bash
-cd /mnt/d/School/AutoTuneAI
+cd <repo-root>
 ```
 
 查看 WSL 裡的 conda env：
 
 ```bash
-/home/louis/miniforge3/bin/conda info --envs
+<miniforge-root>/bin/conda info --envs
 ```
 
 啟用環境：
 
 ```bash
-source /home/louis/miniforge3/etc/profile.d/conda.sh
+source <miniforge-root>/etc/profile.d/conda.sh
 conda activate autotuneai
 ```
 
@@ -46,22 +46,22 @@ conda activate autotuneai
 ## 2. 如果環境不存在，重新建立
 
 ```bash
-cd /mnt/d/School/AutoTuneAI
-/home/louis/miniforge3/bin/conda env create -f environment.yml
+cd <repo-root>
+<miniforge-root>/bin/conda env create -f environment.yml
 ```
 
 如果環境已存在但套件不完整：
 
 ```bash
-cd /mnt/d/School/AutoTuneAI
-/home/louis/miniforge3/bin/conda run -n autotuneai python -m pip install -r requirements.txt
+cd <repo-root>
+<miniforge-root>/bin/conda run -n autotuneai python -m pip install -r requirements.txt
 ```
 
 ## 3. 快速驗證
 
 ```bash
-cd /mnt/d/School/AutoTuneAI
-/home/louis/miniforge3/bin/conda run -n autotuneai python -m unittest discover -s tests
+cd <repo-root>
+<miniforge-root>/bin/conda run -n autotuneai python -m unittest discover -s tests
 ```
 
 應該看到類似：
@@ -76,7 +76,7 @@ OK
 synthetic benchmark 不跑真模型，用公式模擬 latency / throughput / memory，適合快速測 CLI、tuner、資料格式。
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_benchmark.py \
+<miniforge-root>/bin/conda run -n autotuneai python scripts/run_benchmark.py \
   --config configs/resnet18.yaml \
   --mode synthetic
 ```
@@ -91,7 +91,7 @@ results/raw/resnet18_profile.csv
 ## 5. 跑 PyTorch CPU 真實 benchmark
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_benchmark.py \
+<miniforge-root>/bin/conda run -n autotuneai python scripts/run_benchmark.py \
   --config configs/resnet18.yaml \
   --mode real \
   --backends pytorch \
@@ -105,7 +105,7 @@ results/raw/resnet18_profile.csv
 ## 6. 跑 ONNX Runtime CPU 真實 benchmark
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_benchmark.py \
+<miniforge-root>/bin/conda run -n autotuneai python scripts/run_benchmark.py \
   --config configs/resnet18.yaml \
   --mode real \
   --backends onnxruntime \
@@ -148,7 +148,7 @@ resource_budget:
 你也可以用 CLI 覆蓋：
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_benchmark.py \
+<miniforge-root>/bin/conda run -n autotuneai python scripts/run_benchmark.py \
   --config configs/resnet18.yaml \
   --mode real \
   --backends pytorch \
@@ -182,7 +182,7 @@ affinity_cores
 目前 tuner 先使用 synthetic profiler 和 synthetic cost model：
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_autotune.py \
+<miniforge-root>/bin/conda run -n autotuneai python scripts/run_autotune.py \
   --config configs/resnet18.yaml \
   --search cost_model \
   --trials 18
@@ -193,7 +193,7 @@ affinity_cores
 ## 9. Scheduler simulator
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_scheduler.py \
+<miniforge-root>/bin/conda run -n autotuneai python scripts/run_scheduler.py \
   --workload burst \
   --scheduler deadline_aware \
   --count 100
@@ -233,6 +233,6 @@ git log --oneline -5
 跑全部目前 demo：
 
 ```bash
-/home/louis/miniforge3/bin/conda run -n autotuneai python scripts/run_all_experiments.py
+<miniforge-root>/bin/conda run -n autotuneai python scripts/run_all_experiments.py
 ```
 

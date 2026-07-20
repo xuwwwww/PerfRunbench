@@ -94,6 +94,7 @@ def _summary(result: dict) -> dict:
         "cache_state",
         "newly_tuned",
         "return_code",
+        "run_dir",
         "artifact_dir",
         "performance_passport_path",
         "recommendation_bundle_path",

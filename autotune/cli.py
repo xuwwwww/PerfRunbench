@@ -47,6 +47,8 @@ from autotune.system_tuner.profile_selector import select_system_profile
 from autotune.training_tuner.batch_size import BatchSizeTuningError, tune_batch_size
 from autotune.training_tuner.multi_knob import parse_knob_specs, tune_training_knobs
 from autotune.golden_path.cli import add_cache_parser, add_tune_parser, run_auto_from_args, run_best_from_args
+from autotune.training_adapter.errors import TrainingConfigError
+from autotune.training_adapter.init_config import write_init_config
 
 DEMO_WORKLOAD = ["python", "examples/dummy_train.py"]
 DEMO_CONFIG = "examples/train_config.yaml"
@@ -68,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="PerfRunbench reproducible benchmarking, autotuning, comparison, and guarded recommendation toolkit.",
     )
     subparsers = parser.add_subparsers(dest="command")
+
+    init = subparsers.add_parser("init", help="Create a public PerfRunbench adapter configuration.")
+    init.add_argument("--adapter", required=True, choices=["pytorch-training"])
+    init.add_argument("--output", default="autotune.yaml")
+    init.add_argument("--force", action="store_true", help="Overwrite an existing output config.")
+    init.set_defaults(handler=_cmd_init)
 
     inspect_parser = subparsers.add_parser("inspect", help="Inspect hardware, runtime, limits, and recommendations.")
     inspect_parser.add_argument("--output", default="results/reports/system_info.json")
@@ -366,6 +374,16 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     if not args.no_write:
         path = write_hardware_info(args.output, info)
         print(f"Wrote system info to {path}")
+    return 0
+
+
+def _cmd_init(args: argparse.Namespace) -> int:
+    try:
+        path = write_init_config(args.output, adapter=args.adapter, force=bool(args.force))
+    except TrainingConfigError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(f"Wrote {args.adapter} config: {path}")
+    print(f"Next: autotuneai run --auto --config {path} -- python train.py")
     return 0
 
 

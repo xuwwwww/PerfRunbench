@@ -45,3 +45,14 @@ autotuneai cache gc
 New `tune` results revoke older entries for the same workload identity before
 inserting the new entry.
 
+For training workloads, the cached RecommendationBundle records both a bounded
+slice launch spec for canary validation and a full-run launch spec for the
+actual workload launch. Cache reuse remains tied to the original workload
+identity, environment fingerprint, objective, metric protocol, and adapter
+protocol digests.
+
+`allowed_cpu_mask` is a hard fingerprint field, but equivalent textual CPU mask
+forms are compared through a canonical list representation. For example,
+`0-7` and `0,1,2,3,4,5,6,7` describe the same allowed CPU set and do not require
+retuning by themselves.
+

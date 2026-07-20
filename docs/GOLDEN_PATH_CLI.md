@@ -10,15 +10,23 @@ The command after `--` is preserved as an argv list. PerfRunbench does not
 concatenate it into a shell string and does not use `shell=True` for the
 golden-path launcher.
 
+Executable paths are preserved for launch. This matters for Python virtualenvs:
+an argv entry such as `.venv/bin/python` remains the virtualenv executable in
+RecommendationBundle launch specs instead of being resolved to the underlying
+system interpreter.
+
 ## Commands
 
 ```bash
+autotuneai init --adapter pytorch-training --output autotune.yaml
 autotuneai run -- python train.py
 autotuneai tune --config autotune.yaml -- python train.py
 autotuneai run --best --config autotune.yaml -- python train.py
 autotuneai run --auto --config autotune.yaml -- python train.py
 ```
 
+- `init` writes a public adapter config and refuses to overwrite an existing
+  output unless `--force` is provided.
 - `run --` is the plain monitored wrapper. It launches the command with the
   existing resource runner and does not consult the recommendation cache unless
   an explicit recommendation mode is requested.
@@ -56,6 +64,21 @@ Supported metric sources:
 
 All metric sources must produce finite numeric values for the configured
 objective metric before a candidate can be eligible.
+
+## Training Adapter
+
+`workload.adapter: pytorch-training` routes `tune`, cache-miss `run --auto`,
+and `run --best` through the safe training adapter. The adapter requires a
+bounded slice for tuning, records a slice launch spec for canary validation,
+and records a separate full-run launch spec without the slice control for the
+post-apply workload launch.
+
+The adapter supports only allowlisted CLI, environment, boolean flag, and
+JSON/YAML overlay bindings. It does not rewrite Python source files, execute
+parser commands, or require PyTorch as a core dependency.
+
+Real Arm validation evidence for the training adapter is recorded in
+`docs/results/PHASE_14B_REAL_ARM_PYTORCH_VALIDATION.md`.
 
 ## Safety
 
