@@ -90,6 +90,22 @@ class RecommendationSafetyTest(unittest.TestCase):
         self.assertFalse(result["retune_required"])
         self.assertNotIn("stale_environment", _codes(result))
 
+    def test_hex_allowed_cpu_mask_matches_equivalent_cpu_list(self) -> None:
+        expected = collect_environment_fingerprint(
+            executable_path=sys.executable,
+            runtime_identity="generic-command",
+            runtime_version=platform.python_version(),
+        )
+        expected["hard"]["allowed_cpu_mask"] = "0xff"
+        observed = json.loads(json.dumps(expected))
+        observed["hard"]["allowed_cpu_mask"] = "0,1,2,3,4,5,6,7"
+
+        result = compare_environment_fingerprints(expected, observed)
+
+        self.assertEqual(result["status"], "match")
+        self.assertFalse(result["retune_required"])
+        self.assertNotIn("stale_environment", _codes(result))
+
     def test_correctness_contract_uses_allowlisted_validators(self) -> None:
         contract = {
             "validators": [

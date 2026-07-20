@@ -17,16 +17,20 @@ the product identity.
 
 ## Primary Workflow
 
-The shortest public workflow is:
+The shortest public workflow for a new user is:
 
 ```bash
+python -m pip install .
 autotuneai init --adapter pytorch-training --output autotune.yaml
+autotuneai doctor --config autotune.yaml -- python train.py
 autotuneai run --auto --config autotune.yaml -- python train.py
 ```
 
-`init` writes a public placeholder config for the selected adapter. `run
+`init` writes a public placeholder config for the selected adapter. `doctor`
+performs non-destructive readiness checks without launching the workload,
+tuning candidates, applying recommendations, or changing system settings. `run
 --auto` fingerprints the command and environment, checks the local
-recommendation cache, retunes when policy requires it, validates/canaries the
+RecommendationCache, retunes when policy requires it, validates/canaries the
 selected process-scoped recommendation, launches the full workload, and cleans
 up the apply lease. Use `autotuneai tune` when you want to tune and cache a
 recommendation without launching the long workload afterward.
@@ -64,6 +68,23 @@ synthetic, and CI-runner outputs are labeled separately and are not measured
 Arm performance.
 
 ## Install
+
+PerfRunbench is not published to PyPI in this repository state. Install from a
+source checkout or a locally built wheel:
+
+```bash
+python -m pip install .
+```
+
+Local wheel flow:
+
+```bash
+python -m pip install build
+python -m build
+python -m pip install dist/perfrunbench-<version>-py3-none-any.whl
+```
+
+Development environment:
 
 ```bash
 conda env create -f environment.yml
@@ -231,6 +252,7 @@ tuning commands:
 ```bash
 autotuneai inspect
 autotuneai executors --probe-systemd --probe-docker --check-sudo-cache
+autotuneai doctor --config autotune.yaml -- python train.py
 autotuneai run --auto --config autotune.yaml -- python train.py
 autotuneai tune --config configs/examples/tune_command.yaml -- <command that writes metrics.json>
 autotuneai run --best --config configs/examples/run_command.yaml -- <command that matches the cached identity>

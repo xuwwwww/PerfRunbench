@@ -19,6 +19,7 @@ system interpreter.
 
 ```bash
 autotuneai init --adapter pytorch-training --output autotune.yaml
+autotuneai doctor --config autotune.yaml -- python train.py
 autotuneai run -- python train.py
 autotuneai tune --config autotune.yaml -- python train.py
 autotuneai run --best --config autotune.yaml -- python train.py
@@ -26,7 +27,13 @@ autotuneai run --auto --config autotune.yaml -- python train.py
 ```
 
 - `init` writes a public adapter config and refuses to overwrite an existing
-  output unless `--force` is provided.
+  output unless `--overwrite` is provided. `--force` remains a backward-
+  compatible alias.
+- `doctor` checks config schema, command resolution, identity-file digests,
+  metric/progress contracts, bounded training-slice controls, cache/artifact
+  writability, process-scoped apply support, local CPU/memory/disk guards, and
+  optional adapter dependencies. It does not run the workload, tune, apply, or
+  modify the user config.
 - `run --` is the plain monitored wrapper. It launches the command with the
   existing resource runner and does not consult the recommendation cache unless
   an explicit recommendation mode is requested.
@@ -39,6 +46,23 @@ autotuneai run --auto --config autotune.yaml -- python train.py
   selected process-scoped environment, and rolls back the apply lease.
 - `run --auto` performs cache lookup and policy evaluation before choosing
   reuse, canary, or retune.
+
+First-run `run --auto` behavior:
+
+- cache state `missing` with policy `on_hard_drift_or_missing` triggers a
+  bounded tuning run.
+- if tuning produces an eligible RecommendationBundle, the command is launched
+  with the selected process-scoped configuration.
+- if tuning is inconclusive, failed, or only produces fixture/non-applyable
+  evidence, `run --auto` fails explicitly instead of silently applying a
+  candidate.
+
+Reuse behavior:
+
+- `exact_match` reuses the cached bundle without retuning.
+- `soft_drift` may reuse the cached bundle depending on policy and canary.
+- `hard_drift`, `expired`, `revoked`, `corrupt`, and `ambiguous` states are
+  reported explicitly and do not silently retune unless policy permits it.
 
 ## Config
 
@@ -80,9 +104,19 @@ parser commands, or require PyTorch as a core dependency.
 Real Arm validation evidence for the training adapter is recorded in
 `docs/results/PHASE_14B_REAL_ARM_PYTORCH_VALIDATION.md`.
 
+Windows x86_64 validation evidence is recorded in
+`docs/results/PHASE_15C_WINDOWS_X86_PYTORCH_VALIDATION.md`. That validation
+covered argv preservation for spaces, Unicode, quoted values, and flags after
+`--`; cache-miss `run --auto`; exact-cache reuse; `run --best` refusal when the
+cache is missing; process-scoped canary apply; and rollback cleanup.
+
 ## Safety
 
 Golden-path apply is process-scoped by default. Cache entries store
 fingerprints, digests, bundle IDs, and redacted argv data. Credential-like env
 keys in launch specs are rejected by the existing RecommendationBundle schema.
+
+Environment fingerprints canonicalize equivalent CPU affinity formats. For
+example, a Windows-style affinity mask such as `0xff` is treated as equivalent
+to `0,1,2,3,4,5,6,7` during drift comparison.
 

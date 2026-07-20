@@ -16,7 +16,8 @@ autotuneai init --adapter pytorch-training --output autotune.yaml
 autotuneai run --auto --config autotune.yaml -- python train.py
 ```
 
-`init` refuses to overwrite an existing config unless `--force` is provided.
+`init` refuses to overwrite an existing config unless `--overwrite` is
+provided. `--force` remains a backward-compatible alias.
 The generated YAML is a public placeholder config and contains no cloud
 targets, credentials, model paths, datasets, or private machine paths.
 
@@ -117,3 +118,18 @@ validation, reused the RecommendationCache, rejected a hard-drift bundle copy,
 and passed downloaded artifact digest validation.
 
 See `docs/results/PHASE_14B_REAL_ARM_PYTORCH_VALIDATION.md`.
+
+## Windows x86 Validation
+
+Phase 15C validated the same adapter path on a local Windows x86_64 controller
+with an isolated CPU-only PyTorch environment. The run covered:
+
+- CLI argument preservation for paths and values containing spaces, Unicode,
+  quoted strings, and flags after `--`.
+- CPU-only smoke execution of the public synthetic PyTorch workload.
+- Bounded search with six total candidates including baseline.
+- Cache-miss `run --auto`, exact cache reuse, and `run --best` without retune.
+- Cross-platform hard-drift refusal for Arm RecommendationBundles on Windows.
+- Process-scoped canary apply, rollback, artifact revalidation, and cleanup.
+
+See `docs/results/PHASE_15C_WINDOWS_X86_PYTORCH_VALIDATION.md`.

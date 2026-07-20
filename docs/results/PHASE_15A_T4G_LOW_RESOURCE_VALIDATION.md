@@ -54,6 +54,12 @@ checkout, real PyTorch was not installed or executed. Phase 15A continued with
 the dependency-free training fixture to validate guard behavior safely on the
 same low-resource Arm target.
 
+Phase 15A remains valid as pre-merge guard and portability evidence for the
+low-resource T4g target. Phase 15B later integrated the actual PyTorch training
+adapter source and validated the real public PyTorch synthetic workload on the
+same target class. See
+`docs/results/PHASE_15B_T4G_REAL_PYTORCH_VALIDATION.md`.
+
 ## C7g Recommendation Reuse Refusal
 
 The Phase 14B C7g RecommendationBundle was tested only through validation and
@@ -263,7 +269,7 @@ cleanup_status: passed
 - The target has no swap and approximately 2 GiB memory, so future real
   PyTorch validation must continue to enforce conservative disk and memory
   preflight checks.
-- Private endpoint, SSH identity, private target config, raw private paths, and
+- Non-public endpoint details, SSH identity material, local machine paths, and
   hostnames are intentionally omitted from public documentation.
 
 ## Result
