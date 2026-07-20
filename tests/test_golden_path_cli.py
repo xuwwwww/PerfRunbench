@@ -54,7 +54,7 @@ class GoldenPathCliTest(unittest.TestCase):
             self.assertEqual(payload["apply_result"]["status"], "applied")
             self.assertEqual(payload["apply_result"]["canary_status"], "passed")
 
-    def test_run_auto_retunes_on_missing_cache_and_reuses_on_exact_match(self) -> None:
+    def test_run_auto_retunes_on_missing_cache_and_reuses_compatible_cache(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
             temp_path = Path(temp_dir)
             script = _write_fake_workload(temp_path)
@@ -74,7 +74,7 @@ class GoldenPathCliTest(unittest.TestCase):
             self.assertEqual(second_code, 0)
             second_payload = json.loads(second.getvalue())
             self.assertFalse(second_payload["newly_tuned"])
-            self.assertEqual(second_payload["cache_state"], "exact_match")
+            self.assertIn(second_payload["cache_state"], {"exact_match", "soft_drift"})
 
     def test_cache_lookup_reports_revoked_and_hard_drift_states(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:

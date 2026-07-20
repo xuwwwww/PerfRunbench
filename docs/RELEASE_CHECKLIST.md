@@ -48,10 +48,10 @@ Record:
 
 - wheel filename and SHA-256:
   `dist-v0.2/perfrunbench-0.2.0-py3-none-any.whl`
-  `6c7357061bb2a95bcd4b31e838cfbc714aad0dea253677310dee9072e36fa423`
+  `d7495f4b6b49e149efd53d30048ee89ca6becd1f6beda98fbc622acb6915eb91`
 - sdist filename and SHA-256:
   `dist-v0.2/perfrunbench-0.2.0.tar.gz`
-  `5bbbace4d98d36012d18af0b46b0fc83005589999b359f158e1fb44d7948c341`
+  `93a1fbbd8cd4525a01d5ff34c63e884602b497455ee1828a0ff2c17520351b23`
 - fresh Windows install result: passed
 - optional PyTorch smoke result: skipped; no additional PyTorch wheel was
   downloaded solely for release-candidate validation
