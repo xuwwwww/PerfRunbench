@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from autotune.cli import main
 from autotune.golden_path.config import load_golden_path_config
@@ -32,6 +33,15 @@ class PyTorchTrainingAdapterTest(unittest.TestCase):
             self.assertNotRegex(text, r"\b[A-Za-z]:\\")
             with self.assertRaises(SystemExit):
                 main(["init", "--adapter", "pytorch-training", "--output", str(output)])
+
+    def test_init_config_validates_without_pyyaml(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            output = Path(temp_dir) / "autotune.yaml"
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["init", "--adapter", "pytorch-training", "--output", str(output)]), 0)
+            with patch("autotune.utils.config.yaml", None):
+                payload = load_golden_path_config(output)
+            validate_training_config(payload)
 
     def test_schema_rejects_unknown_training_fields(self) -> None:
         config = _training_config(Path.cwd())
