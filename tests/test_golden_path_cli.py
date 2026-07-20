@@ -11,7 +11,7 @@ from pathlib import Path
 from autotune.cli import main
 from autotune.golden_path.cache import invalidate_cache_entry, lookup_cache
 from autotune.golden_path.config import cache_root, load_golden_path_config
-from autotune.golden_path.identity import build_workload_identity, environment_fingerprint_for_command
+from autotune.golden_path.identity import build_workload_identity, environment_fingerprint_for_command, resolved_argv
 
 
 class GoldenPathCliTest(unittest.TestCase):
@@ -111,6 +111,19 @@ class GoldenPathCliTest(unittest.TestCase):
             config = _write_config(Path(temp_dir))
             with self.assertRaises(SystemExit):
                 main(["tune", "--config", str(config)])
+
+    def test_resolved_argv_preserves_executable_symlink_path(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            temp_path = Path(temp_dir)
+            link = temp_path / "venv-python"
+            try:
+                link.symlink_to(Path(sys.executable))
+            except OSError as exc:
+                self.skipTest(f"symlink creation is not available: {exc}")
+
+            argv = resolved_argv([str(link), "-c", "print('ok')"], cwd=temp_path)
+
+            self.assertEqual(argv[0], str(link.absolute()))
 
     def test_cache_cli_list_show_invalidate_and_gc(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
