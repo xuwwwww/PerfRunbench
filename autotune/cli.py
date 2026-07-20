@@ -47,6 +47,7 @@ from autotune.system_tuner.profile_selector import select_system_profile
 from autotune.training_tuner.batch_size import BatchSizeTuningError, tune_batch_size
 from autotune.training_tuner.multi_knob import parse_knob_specs, tune_training_knobs
 from autotune.golden_path.cli import add_cache_parser, add_tune_parser, run_auto_from_args, run_best_from_args
+from autotune.golden_path.doctor import format_doctor_result, run_doctor
 from autotune.training_adapter.errors import TrainingConfigError
 from autotune.training_adapter.init_config import write_init_config
 
@@ -74,8 +75,15 @@ def build_parser() -> argparse.ArgumentParser:
     init = subparsers.add_parser("init", help="Create a public PerfRunbench adapter configuration.")
     init.add_argument("--adapter", required=True, choices=["pytorch-training"])
     init.add_argument("--output", default="autotune.yaml")
-    init.add_argument("--force", action="store_true", help="Overwrite an existing output config.")
+    init.add_argument("--overwrite", "--force", dest="overwrite", action="store_true", help="Overwrite an existing output config.")
     init.set_defaults(handler=_cmd_init)
+
+    doctor = subparsers.add_parser("doctor", help="Check PerfRunbench readiness without running or tuning the workload.")
+    doctor.add_argument("--config", required=True)
+    doctor.add_argument("--json", action="store_true")
+    doctor.add_argument("--debug", action="store_true")
+    doctor.add_argument("workload", nargs=argparse.REMAINDER)
+    doctor.set_defaults(handler=_cmd_doctor)
 
     inspect_parser = subparsers.add_parser("inspect", help="Inspect hardware, runtime, limits, and recommendations.")
     inspect_parser.add_argument("--output", default="results/reports/system_info.json")
@@ -379,12 +387,27 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
 
 def _cmd_init(args: argparse.Namespace) -> int:
     try:
-        path = write_init_config(args.output, adapter=args.adapter, force=bool(args.force))
+        path = write_init_config(args.output, adapter=args.adapter, force=bool(args.overwrite))
     except TrainingConfigError as exc:
         raise SystemExit(str(exc)) from exc
-    print(f"Wrote {args.adapter} config: {path}")
-    print(f"Next: autotuneai run --auto --config {path} -- python train.py")
+    print(f"Created {path}")
+    print("")
+    print("Check readiness:")
+    print(f"  autotuneai doctor --config {path} -- python train.py")
+    print("")
+    print("Run automatically:")
+    print(f"  autotuneai run --auto --config {path} -- python train.py")
     return 0
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    command = _command_after_separator(args.workload, "Usage: autotuneai doctor --config <config> -- <command>")
+    result = run_doctor(args.config, command, debug=bool(args.debug))
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(format_doctor_result(result))
+    return 0 if result.get("ready") else 1
 
 
 def _cmd_executors(args: argparse.Namespace) -> int:
