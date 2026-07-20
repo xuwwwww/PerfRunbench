@@ -76,10 +76,20 @@ def apply_recommendation_bundle(
         if options.scope == "system":
             system_restore_run_dir = _apply_system_scope(selected, options=options)
             guards.append(guard_pass("apply", "system_scope_applied", "System-scoped allowlisted profile was applied."))
-        canary = _run_canary(bundle, launch_spec, options=options, result_dir=result_dir)
+        if options.canary_runs <= 0:
+            canary = {
+                "schema_version": RECOMMENDATION_SCHEMA_VERSION,
+                "status": "skipped",
+                "runs": [],
+                "guard_results": guard_dicts(
+                    [guard_pass("post_apply", "canary_skipped_by_policy", "Canary was skipped by explicit apply policy.")]
+                ),
+            }
+        else:
+            canary = _run_canary(bundle, launch_spec, options=options, result_dir=result_dir)
         guards.extend(GuardResult.from_dict(item) for item in canary["guard_results"])
         result["canary"] = canary
-        if canary["status"] != "passed" or _has_fail(guards):
+        if canary["status"] not in {"passed", "skipped"} or _has_fail(guards):
             rollback = rollback_recommendation_bundle(bundle, root=options.root, system_restore_run_dir=system_restore_run_dir)
             result["rollback"] = rollback
             result["status"] = "rolled_back_after_canary_failure"
