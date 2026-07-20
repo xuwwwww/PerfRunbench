@@ -34,3 +34,7 @@ Automatic retuning is limited to process-scoped command launch configuration.
 It does not provision cloud resources, modify global system state, download
 models, or add benchmark backends.
 
+For `pytorch-training`, cache-miss retuning also requires a bounded slice
+control. If no slice control is configured, `run --auto` fails before candidate
+search instead of running an unbounded full training job for every candidate.
+

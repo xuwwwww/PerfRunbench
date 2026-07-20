@@ -20,14 +20,20 @@ the product identity.
 The shortest public workflow is:
 
 ```bash
+autotuneai init --adapter pytorch-training --output autotune.yaml
 autotuneai run --auto --config autotune.yaml -- python train.py
 ```
 
-`run --auto` fingerprints the command and environment, checks the local
+`init` writes a public placeholder config for the selected adapter. `run
+--auto` fingerprints the command and environment, checks the local
 recommendation cache, retunes when policy requires it, validates/canaries the
-selected process-scoped recommendation, launches the workload, and cleans up
-the apply lease. Use `autotuneai tune` when you want to tune and cache a
+selected process-scoped recommendation, launches the full workload, and cleans
+up the apply lease. Use `autotuneai tune` when you want to tune and cache a
 recommendation without launching the long workload afterward.
+
+The `pytorch-training` adapter tunes bounded training slices with allowlisted
+knob bindings. It does not require PyTorch as a core dependency and does not
+rewrite user source files.
 
 The default ArmTune flow is:
 
@@ -268,6 +274,13 @@ root privileges, cloud credentials, or network access.
 autotune/
   golden_path/    Command identity, metric-source parsing, bounded tuning,
                   recommendation cache lookup, and automatic reuse policy.
+  training_adapter/
+                  PyTorch training adapter config validation, safe knob
+                  bindings, bounded slices, effective-batch guards, and
+                  training metric parsing.
+  training_metrics.py
+                  Dependency-free helper for structured training progress and
+                  result records.
   arm_tune/       Arm target inspection, llama.cpp adapter, search, profiles,
                   Passport, and workload-neutral correctness hooks.
   recommendation/ Generic RecommendationBundle generation, validation, guarded

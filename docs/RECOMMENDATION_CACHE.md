@@ -45,3 +45,9 @@ autotuneai cache gc
 New `tune` results revoke older entries for the same workload identity before
 inserting the new entry.
 
+For training workloads, the cached RecommendationBundle records both a bounded
+slice launch spec for canary validation and a full-run launch spec for the
+actual workload launch. Cache reuse remains tied to the original workload
+identity, environment fingerprint, objective, metric protocol, and adapter
+protocol digests.
+
