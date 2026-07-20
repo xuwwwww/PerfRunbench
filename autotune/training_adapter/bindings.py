@@ -108,6 +108,8 @@ def launch_spec_from_plan(plan: CandidatePlan, config: dict[str, Any], *, full_r
         }
     )
     spec["metadata"] = metadata
+    if not full_run:
+        spec["timeout_seconds"] = float(slice_config(config).get("max_wall_time_seconds", spec.get("timeout_seconds", 300.0)))
     LaunchSpec(**{key: spec[key] for key in ("argv", "adapter", "cwd", "env", "timeout_seconds", "metadata", "expected_artifacts", "correctness_contract", "schema_version") if key in spec})
     return spec
 

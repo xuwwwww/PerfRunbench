@@ -58,11 +58,16 @@ Known PyTorch, CUDA, and allocator messages are mapped to `out_of_memory` or
 `killed_by_system` where possible. Missing progress or missing final result is
 not converted into a zero metric.
 
-## Stall Boundary
+## Timeout And Stall Boundary
 
-The current adapter validates preserved stdout/result artifacts after each
-bounded candidate run. A candidate with no final result record, stale progress,
-or fewer than the required completed steps is not eligible.
+The adapter applies the slice `max_wall_time_seconds` to bounded candidate
+runs. A candidate that exceeds that wall-time limit is terminated and recorded
+as `timeout`.
 
-Future real-time no-progress termination can extend this protocol without
-changing the serialized result schema.
+The adapter also validates preserved stdout/result artifacts after each bounded
+candidate run. A candidate with no final result record, stale progress, or
+fewer than the required completed steps is not eligible.
+
+The serialized progress schema already records startup and no-progress timeout
+settings. A finer real-time progress watcher can extend this protocol without
+changing the top-level result schema.

@@ -68,6 +68,7 @@ def run_with_budget(
     advanced_options: AdvancedRunOptions | None = None,
     capture_output: bool = False,
     cwd: str | Path | None = None,
+    timeout_seconds: float | None = None,
 ) -> tuple[int, Path]:
     run_dir, manifest, child_env, runtime_env_result, selected_executor, selected_use_sudo, selection_notes = _prepare_run(
         command,
@@ -116,6 +117,8 @@ def run_with_budget(
                 stderr_handle = (run_dir / "stderr.txt").open("w", encoding="utf-8", errors="replace")
                 manifest.notes.append("stdout_path=stdout.txt")
                 manifest.notes.append("stderr_path=stderr.txt")
+            if timeout_seconds is not None:
+                manifest.notes.append(f"timeout_seconds={float(timeout_seconds):.6f}")
             process = _open_process(
                 command_to_run,
                 child_env,
@@ -136,13 +139,14 @@ def run_with_budget(
                         sample_interval_seconds,
                         hard_kill,
                         use_sudo=selected_use_sudo,
+                        timeout_seconds=timeout_seconds,
                     )
                     if control_group:
                         manifest.notes.append(f"systemd_control_group={control_group}")
                     else:
                         manifest.notes.append("systemd_control_group=unavailable")
                 else:
-                    return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill)
+                    return_code = _monitor_child(process, budget, timeline, sample_interval_seconds, hard_kill, timeout_seconds=timeout_seconds)
             status = "completed" if return_code == 0 else "failed"
     except RuntimeError as exc:
         manifest.notes.append(f"runtime_error={exc}")
@@ -583,11 +587,18 @@ def _monitor_child(
     timeline: list[ChildSample],
     sample_interval_seconds: float,
     hard_kill: bool,
+    *,
+    timeout_seconds: float | None = None,
 ) -> int:
+    deadline = time.monotonic() + float(timeout_seconds) if timeout_seconds is not None else None
     try:
         import psutil
     except ModuleNotFoundError:
-        return process.wait()
+        try:
+            return process.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            _terminate_process_tree(process)
+            return 124
 
     child = psutil.Process(process.pid)
     child.cpu_percent(interval=None)
@@ -599,9 +610,16 @@ def _monitor_child(
             if hard_kill and _exceeds_memory_budget(sample, budget, psutil):
                 _terminate_process_tree(process)
                 return process.returncode if process.returncode is not None else 137
+            if deadline is not None and time.monotonic() >= deadline:
+                _terminate_process_tree(process)
+                return 124
         except psutil.NoSuchProcess:
             break
-        time.sleep(sample_interval_seconds)
+        if deadline is not None:
+            remaining = max(0.0, deadline - time.monotonic())
+            time.sleep(min(sample_interval_seconds, remaining))
+        else:
+            time.sleep(sample_interval_seconds)
     return process.wait()
 
 
@@ -614,7 +632,9 @@ def _monitor_systemd_scope(
     hard_kill: bool,
     *,
     use_sudo: bool,
+    timeout_seconds: float | None = None,
 ) -> tuple[int, str | None]:
+    deadline = time.monotonic() + float(timeout_seconds) if timeout_seconds is not None else None
     try:
         import psutil
     except ModuleNotFoundError:
@@ -640,7 +660,14 @@ def _monitor_systemd_scope(
         if hard_kill and _exceeds_memory_budget(sample, budget, psutil):
             _terminate_systemd_scope(unit_name, process, use_sudo=use_sudo)
             return process.returncode if process.returncode is not None else 137
-        time.sleep(sample_interval_seconds)
+        if deadline is not None and time.monotonic() >= deadline:
+            _terminate_systemd_scope(unit_name, process, use_sudo=use_sudo)
+            return 124, control_group
+        if deadline is not None:
+            remaining = max(0.0, deadline - time.monotonic())
+            time.sleep(min(sample_interval_seconds, remaining))
+        else:
+            time.sleep(sample_interval_seconds)
     return process.wait(), control_group
 
 

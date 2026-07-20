@@ -138,6 +138,21 @@ class PyTorchTrainingAdapterTest(unittest.TestCase):
                 self.assertTrue(any(trial["training_diagnostics"].get("failure_class") == expected for trial in failures))
                 self.assertTrue(all(trial.get("objective_metric_value") is None for trial in failures))
 
+    def test_hanging_slice_is_terminated_by_max_wall_time(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            root = Path(temp_dir)
+            script = _write_fixture(root)
+            config = _training_config(root)
+            config["training"]["slice"]["max_wall_time_seconds"] = 0.2
+            config_path = root / "autotune_timeout.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+
+            result = tune_command(config_path, [sys.executable, str(script), "--mode", "hang"])
+
+            failures = [trial for trial in result["trials"] if trial.get("failed")]
+            self.assertTrue(failures)
+            self.assertTrue(any(trial["training_diagnostics"].get("failure_class") == "timeout" for trial in failures))
+
 
 def _write_fixture(root: Path) -> Path:
     script = root / "train_fixture.py"
@@ -160,6 +175,9 @@ def _write_fixture(root: Path) -> Path:
                 "    raise SystemExit(9)",
                 "if args.mode == 'stall':",
                 "    time.sleep(0.01)",
+                "    raise SystemExit(0)",
+                "if args.mode == 'hang':",
+                "    time.sleep(60.0)",
                 "    raise SystemExit(0)",
                 "steps = int(args.max_steps or 3)",
                 "cpu_threads = int(os.environ.get('OMP_NUM_THREADS', '1'))",

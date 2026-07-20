@@ -160,6 +160,8 @@ def _validate_metrics(metrics: dict[str, Any], config: dict[str, Any]) -> None:
 
 def _classify_failure(return_code: int, stdout: str, stderr: str, *, metric_error: str | None = None) -> str:
     combined = f"{stdout}\n{stderr}".lower()
+    if return_code == 124:
+        return "timeout"
     if any(marker in combined for marker in OOM_MARKERS):
         return "out_of_memory"
     if return_code in {-9, 137} or any(marker in combined for marker in KILLED_MARKERS):

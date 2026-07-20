@@ -223,6 +223,7 @@ def _run_trial(
             advanced_options=AdvancedRunOptions(extra_env=env),
             capture_output=True,
             cwd=workload_cwd(config),
+            timeout_seconds=float(slice_config(config).get("max_wall_time_seconds", 300.0)),
         )
         parsed = load_training_result_for_run(run_dir, config, return_code=return_code)
         metrics = parsed["metrics"]

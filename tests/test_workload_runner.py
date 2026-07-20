@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -34,6 +35,18 @@ class WorkloadRunnerTest(unittest.TestCase):
         self.assertTrue((run_dir / "resource_timeline.json").exists())
         manifest = load_manifest(Path(run_dir))
         self.assertEqual(manifest["status"], "completed")
+
+    def test_run_with_budget_terminates_after_timeout_seconds(self) -> None:
+        return_code, run_dir = run_with_budget(
+            [sys.executable, "-c", "import time; time.sleep(60)"],
+            ResourceBudget(memory_budget_gb=1),
+            sample_interval_seconds=0.05,
+            timeout_seconds=0.2,
+        )
+        self.assertEqual(return_code, 124)
+        manifest = load_manifest(Path(run_dir))
+        self.assertEqual(manifest["status"], "failed")
+        self.assertTrue(any(note.startswith("timeout_seconds=") for note in manifest["notes"]))
 
     def test_run_with_budget_passes_run_dir_to_workload_metrics(self) -> None:
         return_code, run_dir = run_with_budget(
