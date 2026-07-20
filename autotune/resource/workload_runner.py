@@ -66,6 +66,8 @@ def run_with_budget(
     gpu_tuning_sudo: bool = False,
     runtime_env_profile: str | None = None,
     advanced_options: AdvancedRunOptions | None = None,
+    capture_output: bool = False,
+    cwd: str | Path | None = None,
 ) -> tuple[int, Path]:
     run_dir, manifest, child_env, runtime_env_result, selected_executor, selected_use_sudo, selection_notes = _prepare_run(
         command,
@@ -83,6 +85,8 @@ def run_with_budget(
     return_code = 1
     status = "failed"
     terminate_process = _terminate_process_tree
+    stdout_handle = None
+    stderr_handle = None
     try:
         with _tuning_lifecycle(
             run_dir,
@@ -107,7 +111,19 @@ def run_with_budget(
                 docker_image=docker_image,
                 monitored=True,
             )
-            process = _open_process(command_to_run, child_env, new_process_group=selected_executor != "systemd")
+            if capture_output:
+                stdout_handle = (run_dir / "stdout.txt").open("w", encoding="utf-8", errors="replace")
+                stderr_handle = (run_dir / "stderr.txt").open("w", encoding="utf-8", errors="replace")
+                manifest.notes.append("stdout_path=stdout.txt")
+                manifest.notes.append("stderr_path=stderr.txt")
+            process = _open_process(
+                command_to_run,
+                child_env,
+                new_process_group=selected_executor != "systemd",
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+                cwd=cwd,
+            )
             if selected_executor == "systemd" and unit_name:
                 terminate_process = lambda item: _terminate_systemd_scope(unit_name, item, use_sudo=selected_use_sudo)
             with _interrupt_restore_guard(lambda: process, terminate_process=terminate_process):
@@ -137,6 +153,10 @@ def run_with_budget(
             terminate_process(process)
         return_code = 130
     finally:
+        if stdout_handle is not None:
+            stdout_handle.close()
+        if stderr_handle is not None:
+            stderr_handle.close()
         write_json(run_dir / "resource_timeline.json", [asdict(sample) for sample in timeline])
         write_json(run_dir / "resource_summary.json", _summarize_timeline(timeline, budget))
         finish_run(run_dir, manifest, status, return_code)
@@ -424,8 +444,22 @@ def _finalize_active_tuning_state(active_tuning_state: dict[str, object] | None,
         clear_active_tuning_state()
 
 
-def _open_process(command: list[str], env: dict[str, str], *, new_process_group: bool) -> subprocess.Popen:
+def _open_process(
+    command: list[str],
+    env: dict[str, str],
+    *,
+    new_process_group: bool,
+    stdout: object | None = None,
+    stderr: object | None = None,
+    cwd: str | Path | None = None,
+) -> subprocess.Popen:
     kwargs: dict[str, Any] = {"env": env}
+    if cwd is not None:
+        kwargs["cwd"] = str(cwd)
+    if stdout is not None:
+        kwargs["stdout"] = stdout
+    if stderr is not None:
+        kwargs["stderr"] = stderr
     if new_process_group:
         if os.name == "nt":
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)

@@ -80,6 +80,22 @@ Guarded apply does not create a new benchmark result. Canary metrics are safety
 evidence only and must not replace the repeated Phase 9 benchmark
 distributions.
 
+## Golden-Path CLI Limits
+
+`autotuneai run --auto` is a convenience workflow for command identity,
+bounded retuning, cache reuse, guarded process-scoped apply, and command
+launch. It is not a guarantee that a cached recommendation is globally optimal
+or portable to another machine, model, dataset, container image, or workload
+configuration.
+
+The recommendation cache is local. Cache match states distinguish exact
+matches, soft drift, hard drift, expiry, revocation, corruption, ambiguity, and
+missing entries, but the operator still owns workload-level correctness and
+production SLO decisions.
+
+The golden-path metric sources are allowlisted JSON/JSONL/stdout record inputs.
+PerfRunbench does not infer application quality from arbitrary logs.
+
 ## External Workload Correctness
 
 Workload-neutral correctness hooks remain in PerfRunbench: request completion,

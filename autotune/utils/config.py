@@ -12,7 +12,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only on minimal syst
 
 def load_config(path: str | Path) -> dict[str, Any]:
     config_path = Path(path)
-    with config_path.open("r", encoding="utf-8") as handle:
+    with config_path.open("r", encoding="utf-8-sig") as handle:
         if config_path.suffix in {".yaml", ".yml"}:
             if yaml is not None:
                 return yaml.safe_load(handle) or {}

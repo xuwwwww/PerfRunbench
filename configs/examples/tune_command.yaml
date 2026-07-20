@@ -1,0 +1,36 @@
+schema_version: "1.0"
+workload:
+  adapter: generic-command
+  timeout_seconds: 300
+  identity_files:
+    - <workload_identity_file>
+objective:
+  metric: throughput
+  direction: maximize
+metrics:
+  source: json_file
+  path: metrics.json
+  base: run_dir
+tuning:
+  preset: quick
+  warmup_runs: 0
+  search_runs: 1
+  confirmation_runs: 2
+  min_valid_trials: 2
+  noise_band_percent: 2.0
+  shuffle_seed: 13
+  candidates:
+    - id: candidate-a
+      env:
+        PERFRUNBENCH_EXAMPLE_MODE: candidate-a
+    - id: candidate-b
+      env:
+        PERFRUNBENCH_EXAMPLE_MODE: candidate-b
+cache:
+  root: .autotuneai/cache/recommendations
+  retune_policy: on_hard_drift_or_missing
+  canary_policy: on_new_or_drift
+  ttl_days: 14
+apply:
+  canary_runs: 1
+  lease_minutes: 30

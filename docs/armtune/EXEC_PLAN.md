@@ -9,11 +9,16 @@ tag:
 v0.1.0-armtune
 ```
 
-Current development is Phase 12: extracting workload-specific firmware-log
-model capability evaluation into a standalone BootTraceBench repository while
-keeping PerfRunbench focused on Arm AI inference benchmarking, autotuning,
+Current development is Phase 13: Golden-path CLI and Recommendation Cache.
+The focus is CLI usability for the generic PerfRunbench workflow:
+
+```text
+autotuneai run --auto --config autotune.yaml -- python train.py
+```
+
+PerfRunbench remains focused on reproducible benchmarking, autotuning,
 statistical confirmation, Performance Passport evidence, and guarded
-recommendation apply.
+recommendation apply. BootTraceBench is external and experimental.
 
 ## Default Product Flow
 
@@ -108,7 +113,7 @@ speedup.
 
 ## Phase 12: BootTrace Repository Extraction
 
-Status: in progress.
+Status: completed and published.
 
 Goal:
 
@@ -126,8 +131,9 @@ cloud automation, or performance tuning features.
 
 Required outputs:
 
-- `<local-boottracebench-repo>` as a standalone local repository.
-- PerfRunbench branch `refactor/split-boottrace` from latest `origin/main`.
+- `https://github.com/xuwwwww/BootTraceBench` as a standalone public
+  repository.
+- PerfRunbench branch `refactor/split-boottrace`, merged to `main` by PR #2.
 - `docs/refactors/BOOTTRACE_EXTRACTION_PLAN.md`.
 - `docs/refactors/BOOTTRACE_MIGRATION.md`.
 - `docs/refactors/BOOTTRACE_EXTRACTION_VALIDATION.md`.
@@ -141,7 +147,36 @@ Required outputs:
   - `docs: document external BootTraceBench migration`
   - `test: validate PerfRunbench after BootTrace extraction`
 
-No repository is pushed during Phase 12.
+## Phase 13: Golden-Path CLI And Recommendation Cache
+
+Status: in progress.
+
+Goals:
+
+- Add the default public workflow:
+  `autotuneai run --auto --config autotune.yaml -- <command>`.
+- Add `autotuneai tune --config <config> -- <command>`.
+- Add `autotuneai run --best --config <config> -- <command>`.
+- Preserve existing advanced commands and the legacy `autotuneai run --`
+  resource wrapper.
+- Add a versioned command-tuning config schema with allowlisted metric
+  sources.
+- Add WorkloadIdentity fingerprints that hash executable, script, selected
+  config files, and explicit identity files without hashing whole directories.
+- Add RecommendationCache lookup, insert, list, show, invalidate, and gc.
+- Support cache match states:
+  `exact_match`, `soft_drift`, `hard_drift`, `expired`, `revoked`,
+  `missing`, `corrupt`, and `ambiguous`.
+- Implement `retune_policy` and `canary_policy` for `run --auto`.
+- Keep recommendation apply process-scoped by default.
+
+Non-goals:
+
+- No AWS access.
+- No model downloads.
+- No real llama.cpp workload execution.
+- No new BootTrace prompts, model qualification, or UEFI-specific work.
+- No new benchmark backend or search algorithm.
 
 ## Current Claim Boundary
 

@@ -678,3 +678,59 @@ Responsibilities:
 
 BootTraceBench is an external historical/experimental project. It is not part
 of the default performance-tuning eligibility path.
+
+## Phase 13 Golden-Path CLI Architecture
+
+Phase 13 adds a generic command-first workflow above the existing resource,
+statistics, Passport, and recommendation layers:
+
+```text
+controller CLI
+-> command argv parser
+-> WorkloadIdentity fingerprint
+-> metric-source allowlist
+-> bounded candidate runner
+-> statistical guard
+-> generic Performance Passport
+-> RecommendationBundle
+-> RecommendationCache
+-> auto retune/reuse policy
+-> process-scoped guarded apply
+-> workload launch
+-> rollback lease cleanup
+```
+
+The public entrypoints are:
+
+```bash
+autotuneai run -- <command>
+autotuneai tune --config <config> -- <command>
+autotuneai run --best --config <config> -- <command>
+autotuneai run --auto --config <config> -- <command>
+```
+
+The command after `--` remains an argv list. The golden-path code validates
+that a command exists, preserves argument boundaries, rejects credential-like
+launch-spec environment variables, and uses the existing process runner rather
+than constructing shell strings.
+
+`WorkloadIdentity` is separate from environment fingerprinting. It records a
+versioned digest over redacted argv data, cwd digest, executable digest, an
+optional script digest, configured identity/config file digests, adapter,
+objective, and metric protocol. It does not hash entire directories.
+
+The recommendation cache is local and versioned under:
+
+```text
+.autotuneai/cache/recommendations/
+```
+
+Cache lookup classifies entries as `exact_match`, `soft_drift`, `hard_drift`,
+`expired`, `revoked`, `missing`, `corrupt`, or `ambiguous`. `run --auto` then
+uses `retune_policy` and `canary_policy` to decide whether to reuse, canary, or
+retune. `run --best` is stricter: it requires a reusable eligible cache entry
+and always canaries before launching.
+
+The Phase 13 layer does not add new Arm benchmark backends. ArmTune continues
+to own Arm target inspection, `llama.cpp` build/runtime evidence, and
+Arm-specific Performance Passport details.

@@ -46,6 +46,7 @@ from autotune.system_tuner.runtime import (
 from autotune.system_tuner.profile_selector import select_system_profile
 from autotune.training_tuner.batch_size import BatchSizeTuningError, tune_batch_size
 from autotune.training_tuner.multi_knob import parse_knob_specs, tune_training_knobs
+from autotune.golden_path.cli import add_cache_parser, add_tune_parser, run_auto_from_args, run_best_from_args
 
 DEMO_WORKLOAD = ["python", "examples/dummy_train.py"]
 DEMO_CONFIG = "examples/train_config.yaml"
@@ -116,7 +117,13 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--runtime-profile", choices=available_runtime_profiles(), help="Apply workload runtime environment variables to the child process.")
     run.add_argument("--apply-recommendation", action="store_true", help="Apply the cached empirical tuning recommendation.")
     run.add_argument("--recommendation", default=str(LATEST_RECOMMENDATION), help="Recommendation JSON to use with --apply-recommendation.")
+    run.add_argument("--config", help="Golden-path config for --best or --auto.")
+    run.add_argument("--best", action="store_true", help="Apply the best eligible cached recommendation for this command.")
+    run.add_argument("--auto", action="store_true", help="Reuse an eligible cached recommendation or retune according to policy.")
     run.set_defaults(handler=_cmd_run)
+
+    add_tune_parser(subparsers)
+    add_cache_parser(subparsers)
 
     launch_performance_parser = subparsers.add_parser(
         "launch-performance",
@@ -401,6 +408,16 @@ def _cmd_recommendation(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    if getattr(args, "best", False) and getattr(args, "auto", False):
+        raise SystemExit("--best and --auto cannot be used together")
+    if getattr(args, "best", False) or getattr(args, "auto", False):
+        if not getattr(args, "config", None):
+            raise SystemExit("--config is required with --best or --auto")
+        if getattr(args, "apply_recommendation", False):
+            raise SystemExit("--apply-recommendation cannot be combined with --best or --auto")
+        if getattr(args, "best", False):
+            return run_best_from_args(args.config, args.workload)
+        return run_auto_from_args(args.config, args.workload)
     command = _command_after_separator(args.workload, "Usage: autotuneai run [budget args] -- <command>")
     budget = _budget_from_args(args)
     recommendation = _resolve_cached_recommendation(args)
