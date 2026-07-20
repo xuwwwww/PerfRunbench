@@ -85,6 +85,15 @@ class ArmTuneConfigTest(unittest.TestCase):
 
         self.assertEqual(spec.type, "local")
 
+    def test_load_json_config_accepts_utf8_bom(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "target.json"
+            path.write_text('{"schema_version": "1.0", "target": {"type": "local"}}', encoding="utf-8-sig")
+
+            payload = load_config(path)
+
+        self.assertEqual(payload["schema_version"], "1.0")
+
     def test_sanitized_dict_redacts_identity_file_path(self) -> None:
         spec = parse_target_spec(
             {
