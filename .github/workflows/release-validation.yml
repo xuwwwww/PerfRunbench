@@ -71,7 +71,7 @@ jobs:
 
       - name: Focused unit tests
         run: |
-          python -m unittest tests.test_golden_path_cli tests.test_golden_path_doctor tests.test_pytorch_training_adapter tests.test_recommendation_safety tests.test_workload_runner -v
+          python -m unittest tests.test_golden_path_cli tests.test_golden_path_doctor tests.test_pytorch_training_adapter tests.test_recommendation_safety tests.test_release_smoke tests.test_workload_runner -v
 
       - name: Compile package
         run: python -m compileall autotune

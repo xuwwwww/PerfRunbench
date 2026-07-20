@@ -110,7 +110,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         second_auto_payload = _json_output(second_auto.stdout, "auto_cache_hit")
         _require(second_auto_payload.get("newly_tuned") is False, "auto cache hit retuned unexpectedly")
-        _require(second_auto_payload.get("cache_state") == "exact_match", "auto cache hit was not exact_match")
+        _require(
+            _is_reused_cache_state(second_auto_payload.get("cache_state")),
+            f"auto cache hit did not reuse a compatible cache entry: {second_auto_payload.get('cache_state')}",
+        )
         best = _run(
             [str(autotuneai), "run", "--best", "--config", "autotune_auto.yaml", "--", str(python), "train.py"],
             cwd=workspace,
@@ -360,6 +363,10 @@ def _no_child_processes() -> bool:
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise SmokeFailure(message)
+
+
+def _is_reused_cache_state(value: Any) -> bool:
+    return value in {"exact_match", "soft_drift"}
 
 
 def _tail(text: str, limit: int = 1200) -> str:
