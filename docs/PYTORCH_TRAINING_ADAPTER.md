@@ -16,7 +16,8 @@ autotuneai init --adapter pytorch-training --output autotune.yaml
 autotuneai run --auto --config autotune.yaml -- python train.py
 ```
 
-`init` refuses to overwrite an existing config unless `--force` is provided.
+`init` refuses to overwrite an existing config unless `--overwrite` is
+provided. `--force` remains a backward-compatible alias.
 The generated YAML is a public placeholder config and contains no cloud
 targets, credentials, model paths, datasets, or private machine paths.
 

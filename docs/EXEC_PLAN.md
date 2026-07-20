@@ -35,6 +35,20 @@ cloud automation, or system-scoped tuning feature was added.
 
 ## Next Steps
 
+Phase 16 prepares the v0.2 release candidate:
+
+```text
+fresh install
+-> init
+-> doctor
+-> tune
+-> run --auto cache miss
+-> run --auto cache hit
+-> run --best
+-> cache operations
+-> release CI matrix
+```
+
 Keep feature expansion stopped unless a release-blocking correctness issue is
-found. Submission work should focus on documentation, release notes, PR review,
+found. Submission work should focus on release-candidate validation, PR review,
 and CI verification.

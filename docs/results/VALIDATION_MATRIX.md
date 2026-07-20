@@ -9,6 +9,7 @@ Numbers from different targets or protocols must not be combined.
 | 15A | Linux Arm64 T4g.small / Neoverse-N1 class | Dependency-free fixture, PyTorch skipped when unsafe | Low-resource guard and portability evidence | No performance claim | passed |
 | 15B | Linux Arm64 T4g.small / Neoverse-N1 class | Public synthetic PyTorch training | Real low-resource Arm PyTorch workflow | Do not compare with C7g | passed |
 | 15C | Windows x86_64 controller | Public synthetic PyTorch training | Local CLI, cache, drift, apply, and portability validation | Do not compare with Arm | passed |
+| 16 | Windows local clean venv plus GitHub Actions matrix | Dependency-free public fixtures | Release-candidate installed-wheel usability | Packaging and CLI usability, not performance | pending final CI |
 
 ## Current Evidence Boundaries
 
@@ -39,3 +40,22 @@ cleanup_status: passed
 
 Phase 15C also validated the CPU-affinity mask canonicalization fix for
 Windows-style hex masks such as `0xff`.
+
+## Phase 16 Release Candidate Scope
+
+Phase 16 validates that a fresh user can install the built distribution,
+initialize a config, check readiness with `autotuneai doctor`, run bounded
+tuning through `run --auto`, reuse recommendations, and inspect the cache
+without knowing internal Passport, RecommendationBundle, or cache paths.
+
+Required CI platforms:
+
+```text
+windows-latest
+ubuntu-latest
+ubuntu-24.04-arm
+```
+
+The required CI matrix uses dependency-free fixtures and must not install
+PyTorch, download models/datasets, access AWS, or turn fixture evidence into
+measured performance evidence.
