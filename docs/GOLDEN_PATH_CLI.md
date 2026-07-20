@@ -10,6 +10,11 @@ The command after `--` is preserved as an argv list. PerfRunbench does not
 concatenate it into a shell string and does not use `shell=True` for the
 golden-path launcher.
 
+Executable paths are preserved for launch. This matters for Python virtualenvs:
+an argv entry such as `.venv/bin/python` remains the virtualenv executable in
+RecommendationBundle launch specs instead of being resolved to the underlying
+system interpreter.
+
 ## Commands
 
 ```bash
@@ -71,6 +76,9 @@ post-apply workload launch.
 The adapter supports only allowlisted CLI, environment, boolean flag, and
 JSON/YAML overlay bindings. It does not rewrite Python source files, execute
 parser commands, or require PyTorch as a core dependency.
+
+Real Arm validation evidence for the training adapter is recorded in
+`docs/results/PHASE_14B_REAL_ARM_PYTORCH_VALIDATION.md`.
 
 ## Safety
 

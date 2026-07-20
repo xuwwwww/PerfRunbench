@@ -20,6 +20,11 @@ autotuneai run --auto --config autotune.yaml -- python train.py
 The generated YAML is a public placeholder config and contains no cloud
 targets, credentials, model paths, datasets, or private machine paths.
 
+When tuning inside a Python virtualenv, prefer passing the virtualenv Python
+executable explicitly. PerfRunbench preserves executable symlink paths in
+launch specs so a virtualenv interpreter is not collapsed to the underlying
+system Python interpreter.
+
 ## Adapter Contract
 
 Top-level config structures must include `schema_version: "1.0"`.
@@ -102,3 +107,13 @@ slice protocol, and measurement protocol.
 
 PerfRunbench does not claim global optimality and does not convert failed,
 stalled, or invalid-metric candidates into zero-valued measurements.
+
+## Real Arm Validation
+
+Phase 14B validated the adapter on a real Linux Arm64 / Neoverse-V1 target with
+an isolated CPU-only PyTorch environment. The selected synthetic-workload
+configuration preserved effective batch size, passed process-scoped canary
+validation, reused the RecommendationCache, rejected a hard-drift bundle copy,
+and passed downloaded artifact digest validation.
+
+See `docs/results/PHASE_14B_REAL_ARM_PYTORCH_VALIDATION.md`.
