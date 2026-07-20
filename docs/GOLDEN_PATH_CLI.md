@@ -80,9 +80,19 @@ parser commands, or require PyTorch as a core dependency.
 Real Arm validation evidence for the training adapter is recorded in
 `docs/results/PHASE_14B_REAL_ARM_PYTORCH_VALIDATION.md`.
 
+Windows x86_64 validation evidence is recorded in
+`docs/results/PHASE_15C_WINDOWS_X86_PYTORCH_VALIDATION.md`. That validation
+covered argv preservation for spaces, Unicode, quoted values, and flags after
+`--`; cache-miss `run --auto`; exact-cache reuse; `run --best` refusal when the
+cache is missing; process-scoped canary apply; and rollback cleanup.
+
 ## Safety
 
 Golden-path apply is process-scoped by default. Cache entries store
 fingerprints, digests, bundle IDs, and redacted argv data. Credential-like env
 keys in launch specs are rejected by the existing RecommendationBundle schema.
+
+Environment fingerprints canonicalize equivalent CPU affinity formats. For
+example, a Windows-style affinity mask such as `0xff` is treated as equivalent
+to `0,1,2,3,4,5,6,7` during drift comparison.
 
