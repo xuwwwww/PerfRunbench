@@ -31,7 +31,7 @@ from autotune.golden_path.metrics import MetricSourceError, load_metrics_for_run
 from autotune.golden_path.policy import should_canary, should_retune
 from autotune.recommendation.apply import ApplyOptions, apply_recommendation_bundle, rollback_recommendation_bundle
 from autotune.recommendation.bundle import create_recommendation_bundle, write_recommendation_bundle
-from autotune.recommendation.schemas import atomic_write_json, file_sha256, stable_digest
+from autotune.recommendation.schemas import atomic_write_json, file_sha256, stable_digest, validate_launch_spec
 from autotune.recommendation.statistics import StatisticalGuardConfig, evaluate_statistical_evidence
 from autotune.resource.advanced_tuning import AdvancedRunOptions
 from autotune.resource.workload_runner import run_with_budget
@@ -39,6 +39,10 @@ from autotune.resource.workload_runner import run_with_budget
 
 def tune_command(config_path: str | Path, command: list[str]) -> dict[str, Any]:
     config = load_golden_path_config(config_path)
+    if workload_section(config).get("adapter") == "pytorch-training":
+        from autotune.training_adapter.runner import tune_training_command
+
+        return tune_training_command(config_path, command)
     objective = objective_from_config(config)
     tuning = tuning_section(config)
     candidates = candidate_configs(config)
@@ -150,7 +154,11 @@ def run_auto(config_path: str | Path, command: list[str]) -> dict[str, Any]:
     if should_retune(str(lookup["state"]), policy["retune_policy"]):
         tuned = tune_command(config_path, command)
         if tuned.get("status") != "recommended" or "cache_entry" not in tuned:
-            return {"schema_version": SCHEMA_VERSION, "status": "failed", "reason": "retune did not produce an eligible recommendation", "tuning_result": _public_tuning(tuned)}
+            detail = tuned.get("reason")
+            reason = "retune did not produce an eligible recommendation"
+            if detail:
+                reason = f"{reason}: {detail}"
+            return {"schema_version": SCHEMA_VERSION, "status": "failed", "reason": reason, "tuning_result": _public_tuning(tuned)}
         config = load_golden_path_config(config_path)
         lookup = _lookup(config_path, command, config)
         newly_tuned = True
@@ -185,16 +193,19 @@ def _apply_and_launch(config: dict[str, Any], command: list[str], lookup: dict[s
     if apply_result.get("status") != "applied":
         return {"schema_version": SCHEMA_VERSION, "status": "failed", "cache_lookup": _public_lookup(lookup), "apply_result": apply_result}
     launch_spec = bundle.get("selected_configuration", {}).get("launch_spec", {})
-    selected_env = {str(key): str(value) for key, value in launch_spec.get("env", {}).items()} if isinstance(launch_spec.get("env"), dict) else {}
+    runtime_launch_spec = _runtime_launch_spec(launch_spec)
+    selected_env = {str(key): str(value) for key, value in runtime_launch_spec.get("env", {}).items()} if isinstance(runtime_launch_spec.get("env"), dict) else {}
+    launch_command = [str(item) for item in runtime_launch_spec.get("argv", command)]
+    launch_cwd = runtime_launch_spec.get("cwd")
     try:
         return_code, run_dir = run_with_budget(
-            command,
+            launch_command,
             budget_from_config(config),
             sample_interval_seconds=float(config.get("sample_interval_seconds", 0.5)),
             hard_kill=bool(config.get("hard_kill", False)),
             advanced_options=AdvancedRunOptions(extra_env=selected_env),
             capture_output=True,
-            cwd=_cwd(config),
+            cwd=Path(str(launch_cwd)) if isinstance(launch_cwd, str) and launch_cwd else _cwd(config),
         )
     finally:
         rollback = rollback_recommendation_bundle(bundle, root=cache_root(config) / "apply_state")
@@ -428,3 +439,13 @@ def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _runtime_launch_spec(launch_spec: dict[str, Any]) -> dict[str, Any]:
+    metadata = launch_spec.get("metadata", {}) if isinstance(launch_spec.get("metadata"), dict) else {}
+    full_run = metadata.get("full_run_launch_spec")
+    if isinstance(full_run, dict):
+        validate_launch_spec(full_run)
+        return full_run
+    validate_launch_spec(launch_spec)
+    return launch_spec

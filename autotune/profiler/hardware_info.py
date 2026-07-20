@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -97,7 +98,7 @@ def collect_runtime_info() -> dict[str, Any]:
 def collect_limit_info() -> dict[str, Any]:
     return {
         "cgroup_memory_max_mb": read_cgroup_memory_limit_mb(),
-        "wsl_config_visible": Path("/mnt/c/Users/User/.wslconfig").exists() if is_wsl() else False,
+        "wsl_config_visible": wsl_config_visible(),
         "systemd_run_available": shutil.which("systemd-run") is not None,
         "systemd_state": read_systemd_state(),
     }
@@ -118,6 +119,15 @@ def is_wsl() -> bool:
     version_path = Path("/proc/version")
     if version_path.exists():
         return "microsoft" in version_path.read_text(encoding="utf-8", errors="ignore").lower()
+    return False
+
+
+def wsl_config_visible() -> bool:
+    if not is_wsl():
+        return False
+    userprofile = os.environ.get("USERPROFILE")
+    if userprofile:
+        return (Path(userprofile) / ".wslconfig").exists()
     return False
 
 
