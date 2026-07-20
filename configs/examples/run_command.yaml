@@ -1,0 +1,22 @@
+schema_version: "1.0"
+workload:
+  adapter: generic-command
+  timeout_seconds: 300
+  identity_files:
+    - <workload_identity_file>
+objective:
+  metric: throughput
+  direction: maximize
+metrics:
+  source: json_file
+  path: metrics.json
+  base: run_dir
+tuning:
+  preset: reuse-only
+cache:
+  root: .autotuneai/cache/recommendations
+  retune_policy: never
+  canary_policy: always
+apply:
+  canary_runs: 1
+  lease_minutes: 30

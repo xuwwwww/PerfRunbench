@@ -17,6 +17,18 @@ the product identity.
 
 ## Primary Workflow
 
+The shortest public workflow is:
+
+```bash
+autotuneai run --auto --config autotune.yaml -- python train.py
+```
+
+`run --auto` fingerprints the command and environment, checks the local
+recommendation cache, retunes when policy requires it, validates/canaries the
+selected process-scoped recommendation, launches the workload, and cleans up
+the apply lease. Use `autotuneai tune` when you want to tune and cache a
+recommendation without launching the long workload afterward.
+
 The default ArmTune flow is:
 
 ```text
@@ -199,10 +211,11 @@ docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md
 
 ## Related Historical Experiment
 
-BootTraceBench is maintained separately as an experimental firmware-log model
-evaluation project. It is not part of PerfRunbench tuning or recommendation
-eligibility. The `v0.1.0-armtune` tag preserves the former integrated
-BootTrace state for historical review.
+BootTraceBench is maintained separately at
+`https://github.com/xuwwwww/BootTraceBench` as an experimental firmware-log
+model evaluation project. It is not part of PerfRunbench tuning or
+recommendation eligibility. The `v0.1.0-armtune` tag preserves the former
+integrated BootTrace state for historical review.
 
 ## Generic PerfRunbench Workflows
 
@@ -212,6 +225,10 @@ tuning commands:
 ```bash
 autotuneai inspect
 autotuneai executors --probe-systemd --probe-docker --check-sudo-cache
+autotuneai run --auto --config autotune.yaml -- python train.py
+autotuneai tune --config configs/examples/tune_command.yaml -- <command that writes metrics.json>
+autotuneai run --best --config configs/examples/run_command.yaml -- <command that matches the cached identity>
+autotuneai cache list
 autotuneai run -- python examples/dummy_train.py
 autotuneai tune-system
 autotuneai tune-runtime --profile runtime-pytorch-max-performance
@@ -249,6 +266,8 @@ root privileges, cloud credentials, or network access.
 
 ```text
 autotune/
+  golden_path/    Command identity, metric-source parsing, bounded tuning,
+                  recommendation cache lookup, and automatic reuse policy.
   arm_tune/       Arm target inspection, llama.cpp adapter, search, profiles,
                   Passport, and workload-neutral correctness hooks.
   recommendation/ Generic RecommendationBundle generation, validation, guarded
