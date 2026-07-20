@@ -226,6 +226,14 @@ def _canonical_cpu_mask(value: Any) -> str:
         return UNKNOWN
     if text.lower() in {UNKNOWN, "not_available", NOT_APPLICABLE}:
         return text.lower()
+    if text.lower().startswith("0x"):
+        try:
+            mask = int(text, 16)
+        except ValueError:
+            return text
+        if mask <= 0:
+            return UNKNOWN
+        return ",".join(str(index) for index in range(mask.bit_length()) if mask & (1 << index))
     cpus: set[int] = set()
     for raw_part in text.split(","):
         part = raw_part.strip()
