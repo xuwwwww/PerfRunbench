@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<defs>
+  <style>
+    .title { font: 700 34px Arial, sans-serif; fill: #16202a; }
+    .subtitle { font: 400 20px Arial, sans-serif; fill: #576574; }
+    .label { font: 700 22px Arial, sans-serif; fill: #16202a; }
+    .value { font: 700 22px Arial, sans-serif; fill: #16202a; }
+    .annotation { font: 700 28px Arial, sans-serif; fill: #00796b; }
+    .footnote { font: 400 18px Arial, sans-serif; fill: #576574; }
+    .small { font: 600 16px Arial, sans-serif; fill: #16202a; }
+    .matrixText { font: 700 17px Arial, sans-serif; fill: white; }
+    .matrixTextSmall { font: 700 14px Arial, sans-serif; fill: white; }
+    .boxText { font: 600 15px Arial, sans-serif; fill: #16202a; }
+  </style>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+    <path d="M0,0 L0,6 L9,3 z" fill="#1f6fb2" />
+  </marker>
+</defs>
+<rect width="1280" height="720" fill="#f7f9fb"/>
+<text x="70" y="78" class="title">Multi-target validation summary</text>
+<text x="70" y="116" class="subtitle">Capability evidence only; no cross-machine throughput ranking</text>
+<rect x="70" y="160" width="360" height="330" rx="10" fill="#ffffff" stroke="#d7dee8" stroke-width="2"/>
+<text x="94" y="206" class="label">C7g Arm64</text>
+<rect x="94" y="252" width="190" height="32" rx="16" fill="#00796b"/>
+<text x="110" y="274" class="matrixTextSmall">passed_preliminary</text>
+<text x="94" y="312" class="small">llama.cpp tuning</text>
+<rect x="94" y="330" width="190" height="32" rx="16" fill="#00796b"/>
+<text x="110" y="352" class="matrixTextSmall">passed_preliminary</text>
+<text x="94" y="390" class="small">PyTorch tuning</text>
+<rect x="94" y="408" width="190" height="32" rx="16" fill="#2e7d32"/>
+<text x="110" y="430" class="matrixTextSmall">passed</text>
+<text x="94" y="468" class="small">guarded apply</text>
+<rect x="470" y="160" width="360" height="330" rx="10" fill="#ffffff" stroke="#d7dee8" stroke-width="2"/>
+<text x="494" y="206" class="label">T4g Arm64</text>
+<rect x="494" y="252" width="190" height="32" rx="16" fill="#2e7d32"/>
+<text x="510" y="274" class="matrixTextSmall">passed</text>
+<text x="494" y="312" class="small">low-resource guards</text>
+<rect x="494" y="330" width="190" height="32" rx="16" fill="#00796b"/>
+<text x="510" y="352" class="matrixTextSmall">passed_preliminary</text>
+<text x="494" y="390" class="small">real PyTorch tuning</text>
+<rect x="494" y="408" width="190" height="32" rx="16" fill="#2e7d32"/>
+<text x="510" y="430" class="matrixTextSmall">passed</text>
+<text x="494" y="468" class="small">cross-target drift refusal</text>
+<rect x="870" y="160" width="360" height="330" rx="10" fill="#ffffff" stroke="#d7dee8" stroke-width="2"/>
+<text x="894" y="206" class="label">Windows x86_64</text>
+<rect x="894" y="252" width="190" height="32" rx="16" fill="#2e7d32"/>
+<text x="910" y="274" class="matrixTextSmall">passed</text>
+<text x="894" y="312" class="small">golden-path CLI</text>
+<rect x="894" y="330" width="190" height="32" rx="16" fill="#00796b"/>
+<text x="910" y="352" class="matrixTextSmall">passed_preliminary</text>
+<text x="894" y="390" class="small">real CPU PyTorch tuning</text>
+<rect x="894" y="408" width="190" height="32" rx="16" fill="#2e7d32"/>
+<text x="910" y="430" class="matrixTextSmall">passed</text>
+<text x="894" y="468" class="small">Arm recommendation refusal</text>
+<text x="70" y="626" class="footnote">Synthetic PyTorch results are guard/workflow evidence, not production training claims.</text>
+<text x="70" y="650" class="footnote">C7g, T4g, and Windows protocols are intentionally not placed on one performance axis.</text>
+</svg>
