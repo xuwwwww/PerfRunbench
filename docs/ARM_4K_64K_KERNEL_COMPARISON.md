@@ -65,3 +65,22 @@ This does not create a 4K/64K performance comparison. Every 64K profile remains
 blocked until a future phase explicitly authorizes kernel installation,
 one-time boot selection, recovery validation, and protocol-matched
 measurements.
+
+## Phase 21C2A 4K-Only Isolation Boundary
+
+Phase 21C2A is not a 4K/64K comparison. It keeps the installed AWS 4K kernel
+and changes only allowlisted one-time boot parameters:
+
+```text
+G1: nohz_full=2-7 rcu_nocbs=2-7 irqaffinity=0-1
+G2: G1 + isolcpus=managed_irq,2-7
+G3: G1 + isolcpus=domain,managed_irq,2-7
+```
+
+The primary causal comparison is the matched six-CPU G0 baseline versus the
+experimental six-CPU profile. The full eight-CPU G0 baseline is retained only
+as a secondary product-capacity tradeoff. It must not be used as the denominator
+for a boot-isolation speedup percentage.
+
+Phase 21C2B remains the earliest possible phase for installing, booting, or
+measuring a 64K kernel.

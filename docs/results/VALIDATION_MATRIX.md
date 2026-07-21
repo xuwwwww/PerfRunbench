@@ -17,6 +17,7 @@ Numbers from different targets or protocols must not be combined.
 | 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
 | 21C0 | Local fake Linux roots plus read-only Linux Arm64 C7g / Neoverse-V1 audit | Synthetic boot fixtures and read-only boot/kernel inventory | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, official 64K package metadata, and future protocol plan | Planning and read-only inventory only; no kernel install, no bootloader write, no reboot | passed |
 | 21C1 | Linux Arm64 C7g / Neoverse-V1 | No benchmark workload | Same-kernel GRUB one-time boot rehearsal with serial-console recovery validation | Reboot safety evidence only; no kernel change and no performance claim | passed |
+| 21C2A | Local fake Linux roots | Synthetic boot fixtures only | 4K one-time boot-parameter isolation planning, temporary-entry guards, and matched baseline identities | Local preparation only; no AWS access, no reboot, no bootloader write, no performance claim | pending real execution |
 
 ## Current Evidence Boundaries
 
@@ -236,3 +237,39 @@ final GRUB environment list matched the pre-arm state.
 
 No 64K kernel was installed or booted, no permanent boot default was changed,
 and no benchmark was run.
+
+## Phase 21C2A 4K Boot Isolation Local Preparation Summary
+
+Phase 21C2A prepares guarded one-time 4K boot-parameter experiments:
+
+```text
+G0 original-4k-default
+G1 4k-nohz-rcu-irq
+G2 4k-managed-irq-isolation
+G3 4k-domain-isolation
+```
+
+The local plan adds isolated temporary GRUB custom-entry metadata, explicit
+removal verification, permanent-default refusal, maximum one reboot per
+experimental transaction, and mandatory return to G0 before another profile.
+
+Comparison identities are fixed before real measurement:
+
+```text
+E1 full-capacity baseline: G0 CPUs 0-7, threads 8
+E2 matched causal baseline: G0 CPUs 2-7, threads 6
+E3 experimental profile: G1/G2/G3 CPUs 2-7, threads 6
+```
+
+Only E2 versus E3 can support a causal boot-isolation percentage. E1 is a
+secondary product-capacity tradeoff.
+
+Current boundary:
+
+```text
+phase21c2a_local_preparation: passed
+ready_for_manual_c7g_start: true
+kernel_or_boot_state_modified: false
+aws_accessed: false
+performance_improvement_verified: false
+```

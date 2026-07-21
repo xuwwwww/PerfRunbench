@@ -142,3 +142,29 @@ kernel_or_boot_state_modified: false
 
 No Phase 21C reboot, bootloader write, kernel installation, initramfs
 generation, or permanent default change was performed.
+
+## Phase 21C2A Local Preparation
+
+Phase 21C2A narrows the next real boot experiment to the already installed
+known-good AWS 4K kernel only. It does not install or remove kernel packages,
+does not use a 64K kernel, and does not access AWS during local preparation.
+
+Prepared 4K profile order:
+
+| label | profile | appended parameters |
+| --- | --- | --- |
+| G0 | `original-4k-default` | none |
+| G1 | `4k-nohz-rcu-irq` | `nohz_full=2-7`, `rcu_nocbs=2-7`, `irqaffinity=0-1` |
+| G2 | `4k-managed-irq-isolation` | G1 parameters plus `isolcpus=managed_irq,2-7` |
+| G3 | `4k-domain-isolation` | G1 parameters plus `isolcpus=domain,managed_irq,2-7` |
+
+Experimental profiles are planned as isolated temporary GRUB custom entries.
+The original generated Ubuntu menu entry is not edited, `grub.cfg` is not
+hand-edited, and the permanent default must remain unchanged. Each experiment
+must start from G0, use at most one reboot, and return to G0 before another
+experimental profile is attempted.
+
+The local planner validates CPU-list syntax, housekeeping CPUs `0-1`, workload
+CPUs `2-7`, no duplicate or conflicting kernel parameters, command-line size,
+and supported evidence for `CONFIG_NO_HZ_FULL`, `CONFIG_RCU_NOCB_CPU`, and
+`CONFIG_CPU_ISOLATION`. Unknown kernel-config evidence is a blocker.

@@ -269,3 +269,62 @@ kernel_or_boot_state_modified: false
 ```
 
 Phase 21C real boot changes remain future work.
+
+## Phase 21C1 - Same-Kernel Boot Rehearsal
+
+Phase 21C1 used the validated recovery path to perform exactly one same-kernel
+guest reboot through a one-time GRUB entry. It did not install kernels, boot a
+64K kernel, alter EFI BootOrder, change the permanent GRUB default, or run a
+benchmark workload.
+
+Key observations:
+
+- Recovery snapshot, Serial Console login, Serial Console sudo, fallback
+  kernel, and one-time boot selection were verified before the reboot.
+- The host returned with the same 4K AWS kernel, same base page size, and same
+  command line.
+- GRUB left an empty `next_entry=` key after consuming the one-time value; the
+  run cleared it and verified final `grubenv` matched the pre-arm state.
+- Downloaded artifact validation checked `30/30` artifacts.
+
+Conclusion:
+
+```text
+phase21c1_one_time_boot_rehearsal: passed
+ready_for_phase21c_real_boot_validation: true
+performance_improvement_verified: false
+```
+
+## Phase 21C2A - 4K Boot Isolation Local Preparation
+
+Phase 21C2A prepares the first real 4K boot-parameter experiment but remains at
+the local boundary until the user manually starts C7g. AWS is not accessed
+during local preparation.
+
+Key decisions:
+
+- Limit this phase to the installed known-good AWS 4K kernel.
+- Keep 64K kernel installation and validation out of scope until Phase 21C2B.
+- Generate isolated temporary GRUB custom-entry plans instead of editing the
+  generated Ubuntu menu entry.
+- Preserve all original kernel arguments and append only allowlisted
+  parameters.
+- Require `0-1` housekeeping CPUs, `2-7` workload CPUs, supported kernel config
+  evidence, and a one-reboot transaction returning to G0.
+- Separate E1 full-capacity baseline from E2 matched causal baseline and E3
+  experimental profile.
+
+The local fixture suite covers parameter preservation, duplicate/conflicting
+parameter refusal, malformed CPU lists, missing housekeeping CPUs, temporary
+entry cleanup, permanent-default refusal, experimental-entry non-reuse, G0
+return requirements, post-boot health failure classification, Serial Console
+policy preservation, and matched-baseline comparison guards.
+
+Current boundary:
+
+```text
+phase21c2a_local_preparation: passed
+kernel_or_boot_state_modified: false
+aws_accessed: false
+performance_improvement_verified: false
+```

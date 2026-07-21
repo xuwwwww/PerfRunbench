@@ -69,3 +69,30 @@ baseline and must not be ranked against steady-state decode throughput.
 evidence only. It validated request completion, nonempty output, stream
 parsing, TTFT/E2E recording, cleanup, and port release; it did not participate
 in candidate eligibility.
+
+## Phase 21C2A Boot-Isolation Comparison Identities
+
+Phase 21C2A uses three measurement identities so CPU-allocation effects are not
+mistaken for boot-parameter effects:
+
+| identity | protocol role | profile | workload CPUs | generation threads | batch threads |
+| --- | --- | --- | --- | --- | --- |
+| E1 | full-capacity baseline | G0 `original-4k-default` | `0-7` | 8 | 8 |
+| E2 | matched causal baseline | G0 `original-4k-default` | `2-7` | 6 | no more than 6 |
+| E3 | experimental profile | G1/G2/G3 | `2-7` | 6 | no more than 6 |
+
+Only E2 versus E3 can support a causal boot-isolation percentage. E1 versus the
+best experimental profile is a secondary product-capacity tradeoff and must be
+labeled as such.
+
+Phase 21C2A keeps protocols separate:
+
+| protocol | primary use |
+| --- | --- |
+| `steady_state_decode` | primary throughput classification with the 5% noise band |
+| `interactive_server` | secondary warm-server TTFT/E2E evidence |
+| `system_noise` | scheduler, IRQ, softirq, migration, and utilization evidence |
+| `cold_model_load` | optional secondary cold-load check only |
+
+Throughput, latency, system-noise, and cold-load outcomes must not be combined
+into one score or one improvement percentage.

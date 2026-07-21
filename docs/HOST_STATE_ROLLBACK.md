@@ -122,3 +122,25 @@ The result remained blocked because the private evidence did not verify the
 recovery snapshot marker, out-of-band recovery path, one-time boot clearing,
 post-boot SSH health check, rollback command, or user authorization for a real
 reboot sequence.
+
+## Temporary Boot Entries
+
+Phase 21C2A prepares experimental 4K boot profiles through an isolated
+temporary GRUB custom-entry plan. The generated plan must be inspected before a
+real reboot and must satisfy:
+
+```text
+original generated Ubuntu menu entry: untouched
+permanent default: unchanged
+direct grub.cfg edit: refused
+temporary custom entry: unique and removable
+experimental entry reuse: refused
+maximum reboot count per experiment: 1
+transaction start: original-4k-default
+transaction end: original-4k-default
+```
+
+Cleanup requires removal or restoration of the temporary custom-entry file,
+`update-grub`, clearing any consumed one-time `next_entry`, and verifying the
+temporary entry ID is absent. If the host does not return exactly to the
+original known-good 4K state, the next experimental profile must not begin.
