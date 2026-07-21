@@ -19,6 +19,8 @@ from autotune.system_profiles.boot_readiness import (
     build_recovery_plan,
     collect_boot_inventory,
     fixture_boot_experiment_result,
+    validate_phase21c2a_comparison,
+    validate_phase21c2a_measurement_identity,
     verify_one_time_boot_plan,
     verify_boot_experiment_result,
 )
@@ -464,6 +466,204 @@ class SystemProfilesTest(unittest.TestCase):
                 build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, housekeeping_cpus="0-x", workload_cpus="2-7")
             with self.assertRaisesRegex(SystemProfileError, "housekeeping CPU range must not be empty"):
                 build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, housekeeping_cpus="", workload_cpus="2-7")
+
+    def test_phase21c2a_4k_profiles_generate_temporary_entries_and_matched_baselines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            inventory = collect_boot_inventory(root)
+
+            baseline = build_one_time_boot_plan("original-4k-default", inventory)
+            nohz = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+            managed = build_one_time_boot_plan("4k-managed-irq-isolation", inventory)
+            domain = build_one_time_boot_plan("4k-domain-isolation", inventory)
+
+            self.assertEqual(baseline.eligibility_state, "baseline_known_good")
+            self.assertFalse(baseline.temporary_entry_plan["temporary_entry_required"])
+            self.assertEqual(baseline.causal_baseline_identity, "E2-matched-six-cpu-baseline")
+            self.assertEqual(baseline.capacity_baseline_identity, "E1-full-capacity-baseline")
+
+            self.assertIn("nohz_full=2-7", nohz.exact_candidate_command_line)
+            self.assertIn("rcu_nocbs=2-7", nohz.exact_candidate_command_line)
+            self.assertIn("irqaffinity=0-1", nohz.exact_candidate_command_line)
+            self.assertNotIn("BOOT_IMAGE=", nohz.temporary_entry_plan["linux_arguments"])
+            self.assertIn("root=LABEL=cloudimg-rootfs", nohz.temporary_entry_plan["linux_arguments"])
+            self.assertIn("menuentry 'PerfRunbench Phase 21C2A 4k-nohz-rcu-irq'", nohz.temporary_entry_plan["menuentry_text"])
+            self.assertFalse(nohz.temporary_entry_plan["grub_cfg_direct_edit_allowed"])
+            self.assertFalse(nohz.temporary_entry_plan["permanent_default_change_allowed"])
+            self.assertEqual(nohz.temporary_entry_plan["transaction_requirements"]["starts_from_profile"], "original-4k-default")
+            self.assertEqual(nohz.temporary_entry_plan["transaction_requirements"]["returns_to_profile"], "original-4k-default")
+            self.assertTrue(nohz.temporary_entry_plan["transaction_requirements"]["refuse_experimental_to_experimental_chain"])
+            self.assertFalse(nohz.temporary_entry_plan["transaction_requirements"]["experimental_entry_reusable"])
+            self.assertEqual(nohz.temporary_entry_plan["transaction_requirements"]["maximum_reboot_count"], 1)
+            self.assertEqual(nohz.serial_console_recovery_policy, "verified")
+
+            self.assertIn("isolcpus=managed_irq,2-7", managed.exact_candidate_command_line)
+            self.assertIn("isolcpus=domain,managed_irq,2-7", domain.exact_candidate_command_line)
+            self.assertTrue(domain.advanced_less_flexible)
+
+            identities = {item["identity_id"]: item for item in nohz.comparison_identities}
+            self.assertEqual(identities["E1-full-capacity-baseline"]["workload_cpus"], "0-7")
+            self.assertEqual(identities["E1-full-capacity-baseline"]["generation_threads"], 8)
+            self.assertEqual(identities["E2-matched-six-cpu-baseline"]["workload_cpus"], "2-7")
+            self.assertEqual(identities["E2-matched-six-cpu-baseline"]["generation_threads"], 6)
+            self.assertEqual(identities["E2-matched-six-cpu-baseline"]["batch_threads"], 6)
+            self.assertEqual(identities["E3-experimental-six-cpu-profile"]["profile_id"], "4k-nohz-rcu-irq")
+            self.assertEqual(identities["E3-experimental-six-cpu-profile"]["workload_cpu_count"], 6)
+            self.assertEqual(identities["E3-experimental-six-cpu-profile"]["percentage_claim_scope"], "causal_boot_isolation")
+            self.assertEqual(verify_one_time_boot_plan(nohz.to_dict())["status"], "passed")
+            self.assertEqual(verify_one_time_boot_plan(managed.to_dict())["status"], "passed")
+            self.assertEqual(verify_one_time_boot_plan(domain.to_dict())["status"], "passed")
+
+    def test_phase21c2a_rejects_malformed_conflicting_and_unsafe_boot_parameters(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root, cmdline_suffix=" isolcpus=managed_irq,0-3")
+            inventory = collect_boot_inventory(root)
+
+            plan = build_one_time_boot_plan("4k-domain-isolation", inventory)
+
+            self.assertIn("duplicate_kernel_parameter:isolcpus", plan.blockers)
+            self.assertIn("conflicting_isolcpus_value", plan.blockers)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root, cmdline_suffix=" nohz_full=1-7 rcu_nocbs=1-7 irqaffinity=0")
+            inventory = collect_boot_inventory(root)
+
+            plan = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+
+            self.assertIn("duplicate_kernel_parameter:nohz_full", plan.blockers)
+            self.assertIn("existing_nohz_full_conflict", plan.blockers)
+            self.assertIn("existing_rcu_nocbs_conflict", plan.blockers)
+            self.assertIn("existing_irqaffinity_conflict", plan.blockers)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            inventory = collect_boot_inventory(root)
+
+            oversized = " " + "x" * 2100
+            _write_phase21c0_boot_fixture(root, cmdline_suffix=oversized)
+            inventory_with_long_cmdline = collect_boot_inventory(root)
+            long_plan = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory_with_long_cmdline)
+            self.assertIn("kernel_command_line_too_long", long_plan.blockers)
+
+            with mock.patch.object(boot_readiness_module, "_profile_args", return_value=["mitigations=off"]):
+                unsafe_plan = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+            self.assertIn("prohibited_kernel_parameter:mitigations", unsafe_plan.blockers)
+            self.assertIn("unallowlisted_kernel_parameter:mitigations", unsafe_plan.blockers)
+
+            with self.assertRaisesRegex(SystemProfileError, "malformed CPU range"):
+                build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, workload_cpus="2,,7")
+            with self.assertRaisesRegex(SystemProfileError, "at least two housekeeping CPUs"):
+                build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, housekeeping_cpus="0", workload_cpus="2-7")
+            with self.assertRaisesRegex(SystemProfileError, "disjoint"):
+                build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, housekeeping_cpus="0-1", workload_cpus="1-7")
+            with self.assertRaisesRegex(SystemProfileError, "duplicates"):
+                build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, housekeeping_cpus="0,0", workload_cpus="2-7")
+
+            overlong = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+            overlong_raw = overlong.to_dict()
+            overlong_raw["temporary_entry_plan"]["transaction_requirements"]["maximum_reboot_count"] = 2
+            self.assertIn("maximum_reboot_count_not_one", verify_one_time_boot_plan(overlong_raw)["issues"])
+
+    def test_phase21c2a_requires_supported_kernel_config_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            (root / "boot/config-6.17.0-1019-aws").write_text(
+                "\n".join(
+                    [
+                        "CONFIG_ARM64_4K_PAGES=y",
+                        "CONFIG_NO_HZ_FULL=y",
+                        "CONFIG_RCU_NOCB_CPU=y",
+                        "# CONFIG_CPU_ISOLATION is not set",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            inventory = collect_boot_inventory(root)
+
+            plan = build_one_time_boot_plan("4k-managed-irq-isolation", inventory)
+
+            self.assertIn("CONFIG_CPU_ISOLATION", plan.blockers)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            (root / "boot/config-6.17.0-1019-aws").unlink()
+            inventory = collect_boot_inventory(root)
+
+            plan = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+
+            self.assertIn("CONFIG_NO_HZ_FULL", plan.blockers)
+            self.assertIn("CONFIG_RCU_NOCB_CPU", plan.blockers)
+
+    def test_phase21c2a_comparison_identity_guards_causal_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            inventory = collect_boot_inventory(root)
+            plan = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+            raw = plan.to_dict()
+
+            self.assertEqual(validate_phase21c2a_comparison(raw)["status"], "passed")
+
+            mismatched = json.loads(json.dumps(raw))
+            for identity in mismatched["comparison_identities"]:
+                if identity["identity_id"] == "E3-experimental-six-cpu-profile":
+                    identity["workload_cpu_count"] = 5
+            validation = validate_phase21c2a_comparison(mismatched)
+
+            self.assertEqual(validation["status"], "failed")
+            self.assertIn("mismatched_cpu_count_cannot_support_causal_percentage", validation["issues"])
+
+            bad_threads = {"workload_cpus": "2-7", "generation_threads": 7, "batch_threads": 6}
+            bad_batch = {"workload_cpus": "2-7", "generation_threads": 6, "batch_threads": 7}
+
+            self.assertIn("generation_threads_exceed_workload_cpus", validate_phase21c2a_measurement_identity(bad_threads)["issues"])
+            self.assertIn("batch_threads_exceed_workload_cpus", validate_phase21c2a_measurement_identity(bad_batch)["issues"])
+
+    def test_phase21c2a_fake_e2e_requires_return_to_g0_and_original_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            inventory = collect_boot_inventory(root)
+
+            for profile_id in ["4k-nohz-rcu-irq", "4k-managed-irq-isolation", "4k-domain-isolation"]:
+                plan = build_one_time_boot_plan(profile_id, inventory)
+                transaction = plan.temporary_entry_plan["transaction_requirements"]
+
+                self.assertEqual(transaction["starts_from_profile"], "original-4k-default")
+                self.assertEqual(transaction["returns_to_profile"], "original-4k-default")
+                self.assertTrue(transaction["refuse_experimental_to_experimental_chain"])
+                self.assertFalse(transaction["experimental_entry_reusable"])
+                self.assertTrue(transaction["permanent_default_must_remain_unchanged"])
+                self.assertFalse(transaction["grub_cfg_direct_edit_allowed"])
+                self.assertTrue(plan.temporary_entry_plan["removal_verification"]["entry_id_absent_after_cleanup"])
+
+                restored = fixture_boot_experiment_result(plan, health_passed=True, original_state_restored=True)
+                failed_health = fixture_boot_experiment_result(plan, health_passed=False, original_state_restored=True)
+                pending_cleanup = fixture_boot_experiment_result(plan, health_passed=True, original_state_restored=False)
+
+                self.assertEqual(restored.status, "failed")
+                restored_issues = verify_boot_experiment_result(restored.to_dict())["issues"]
+                self.assertIn("experiment_result_not_passed", restored_issues)
+                self.assertIn("user_authorization_missing", restored.blockers)
+                self.assertIn("post_boot_health_check_failed", verify_boot_experiment_result(failed_health.to_dict())["issues"])
+                self.assertIn("rollback_or_original_state_verification_failed", verify_boot_experiment_result(pending_cleanup.to_dict())["issues"])
+
+                mutated = plan.to_dict()
+                mutated["temporary_entry_plan"]["transaction_requirements"]["returns_to_profile"] = profile_id
+                mutated["temporary_entry_plan"]["transaction_requirements"]["experimental_entry_reusable"] = True
+                mutated["temporary_entry_plan"]["grub_cfg_direct_edit_allowed"] = True
+                issues = verify_one_time_boot_plan(mutated)["issues"]
+
+                self.assertIn("transaction_does_not_require_return_to_g0", issues)
+                self.assertIn("experimental_entry_reuse_not_refused", issues)
+                self.assertIn("grub_cfg_direct_edit_not_refused", issues)
 
     def test_phase21c0_cli_inventory_plan_verify_and_recovery_e2e(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

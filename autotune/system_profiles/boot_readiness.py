@@ -35,6 +35,13 @@ PHASE21C0_BOOT_PROFILES = [
     "64k-managed-irq-isolation",
 ]
 
+PHASE21C2A_4K_PROFILES = [
+    "original-4k-default",
+    "4k-nohz-rcu-irq",
+    "4k-managed-irq-isolation",
+    "4k-domain-isolation",
+]
+
 CONFIG_KEYS = [
     "CONFIG_ARM64_4K_PAGES",
     "CONFIG_ARM64_64K_PAGES",
@@ -87,6 +94,22 @@ HEALTH_CHECKS = [
     "no_dirty_host_state",
     "benchmark_preflight_passes",
 ]
+
+PHASE21C2A_ALLOWED_BOOT_PARAMETER_KEYS = {
+    "nohz_full",
+    "rcu_nocbs",
+    "irqaffinity",
+    "isolcpus",
+}
+
+PHASE21C2A_PROHIBITED_BOOT_PARAMETER_KEYS = {
+    "idle",
+    "mitigations",
+    "nosmt",
+    "processor.max_cstate",
+}
+
+PHASE21C2A_MAX_CMDLINE_BYTES = 2048
 
 
 def collect_boot_inventory(root: str | Path | None = None) -> BootInventory:
@@ -262,10 +285,12 @@ def build_one_time_boot_plan(profile_id: str, inventory: BootInventory, *, house
         "cpu_count": _logical_cpu_count(inventory),
         "root_filesystem": inventory.filesystem_inventory.get("root_filesystem_type", NOT_AVAILABLE),
     }
-    plan_blockers = _plan_blockers(profile_id, inventory, candidate, additions)
+    plan_blockers = _plan_blockers(profile_id, inventory, candidate, additions, housekeeping_cpus, workload_cpus, command_line)
     eligibility = "planning_ready" if not plan_blockers else "blocked"
     if profile_id == "original-4k-default":
         eligibility = "baseline_known_good" if not plan_blockers else "blocked"
+    temporary_entry_plan = _temporary_grub_entry_plan(profile_id, inventory, candidate, additions, command_line, housekeeping_cpus, workload_cpus)
+    comparison_identities = build_phase21c2a_comparison_identities(inventory, profile_id, housekeeping_cpus=housekeeping_cpus, workload_cpus=workload_cpus)
     health = PostBootHealthPolicy(required_checks=HEALTH_CHECKS, timeout_seconds=inventory.recovery.maximum_health_check_timeout_seconds, failure_action="execute_documented_recovery_path")
     rollback = BootRollbackPlan(
         rollback_commands=_rollback_commands(inventory),
@@ -305,6 +330,11 @@ def build_one_time_boot_plan(profile_id: str, inventory: BootInventory, *, house
         eligibility_state=eligibility,
         blockers=plan_blockers,
         advanced_less_flexible=profile_id == "4k-domain-isolation",
+        temporary_entry_plan=temporary_entry_plan,
+        comparison_identities=comparison_identities,
+        causal_baseline_identity="E2-matched-six-cpu-baseline",
+        capacity_baseline_identity="E1-full-capacity-baseline",
+        experimental_identity="E3-experimental-six-cpu-profile" if profile_id != "original-4k-default" else NOT_AVAILABLE,
     )
 
 
@@ -330,6 +360,12 @@ def verify_one_time_boot_plan(raw_plan: dict[str, Any]) -> dict[str, Any]:
     rollback = raw_plan.get("rollback_plan", {})
     if not isinstance(rollback, dict) or not rollback.get("rollback_commands"):
         issues.append("rollback_command_missing")
+    temporary = raw_plan.get("temporary_entry_plan", {})
+    if raw_plan.get("profile_id") in PHASE21C2A_4K_PROFILES and raw_plan.get("profile_id") != "original-4k-default":
+        issues.extend(_verify_temporary_grub_entry_plan(temporary))
+    comparison = validate_phase21c2a_comparison(raw_plan)
+    if comparison["status"] != "passed":
+        issues.extend(comparison["issues"])
     return {
         "schema_version": "1.0",
         "status": "passed" if not issues else "failed",
@@ -337,6 +373,93 @@ def verify_one_time_boot_plan(raw_plan: dict[str, Any]) -> dict[str, Any]:
         "plan_digest": versioned_digest(raw_plan) if isinstance(raw_plan, dict) else NOT_AVAILABLE,
         "kernel_or_boot_state_modified": False,
     }
+
+
+def build_phase21c2a_comparison_identities(inventory: BootInventory, experimental_profile_id: str, *, housekeeping_cpus: str = "0-1", workload_cpus: str = "2-7") -> list[dict[str, Any]]:
+    _validate_cpu_layout(housekeeping_cpus, workload_cpus)
+    workload_count = len(_expand_cpu_list(workload_cpus))
+    full_cpus = _format_cpu_list(range(_logical_cpu_count_int(inventory)))
+    full_count = len(_expand_cpu_list(full_cpus))
+    identities = [
+        _measurement_identity(
+            identity_id="E1-full-capacity-baseline",
+            role="capacity_baseline",
+            profile_id="original-4k-default",
+            workload_cpus=full_cpus,
+            generation_threads=full_count,
+            batch_threads=full_count,
+            comparison_use="secondary_product_tradeoff_only",
+        ),
+        _measurement_identity(
+            identity_id="E2-matched-six-cpu-baseline",
+            role="causal_baseline",
+            profile_id="original-4k-default",
+            workload_cpus=workload_cpus,
+            generation_threads=workload_count,
+            batch_threads=workload_count,
+            comparison_use="primary_boot_isolation_baseline",
+        ),
+    ]
+    if experimental_profile_id != "original-4k-default":
+        identities.append(
+            _measurement_identity(
+                identity_id="E3-experimental-six-cpu-profile",
+                role="experimental",
+                profile_id=experimental_profile_id,
+                workload_cpus=workload_cpus,
+                generation_threads=workload_count,
+                batch_threads=workload_count,
+                comparison_use="primary_boot_isolation_experimental",
+            )
+        )
+    return identities
+
+
+def validate_phase21c2a_measurement_identity(identity: dict[str, Any]) -> dict[str, Any]:
+    issues = []
+    try:
+        cpus = _expand_cpu_list(str(identity.get("workload_cpus", "")))
+    except SystemProfileError:
+        cpus = []
+        issues.append("malformed_workload_cpu_list")
+    generation_threads = _int_or_none(identity.get("generation_threads"))
+    batch_threads = _int_or_none(identity.get("batch_threads"))
+    if not cpus:
+        issues.append("empty_workload_cpu_list")
+    if generation_threads is None or generation_threads < 1:
+        issues.append("invalid_generation_threads")
+    elif cpus and generation_threads > len(cpus):
+        issues.append("generation_threads_exceed_workload_cpus")
+    if batch_threads is not None and cpus and batch_threads > len(cpus):
+        issues.append("batch_threads_exceed_workload_cpus")
+    return {"schema_version": "1.0", "status": "passed" if not issues else "failed", "issues": issues}
+
+
+def validate_phase21c2a_comparison(raw_plan: dict[str, Any]) -> dict[str, Any]:
+    identities = raw_plan.get("comparison_identities", [])
+    issues = []
+    if not isinstance(identities, list) or not identities:
+        return {"schema_version": "1.0", "status": "failed", "issues": ["comparison_identities_missing"]}
+    by_id = {str(item.get("identity_id")): item for item in identities if isinstance(item, dict)}
+    for identity in identities:
+        if isinstance(identity, dict):
+            identity_status = validate_phase21c2a_measurement_identity(identity)
+            issues.extend(identity_status["issues"])
+    e1 = by_id.get("E1-full-capacity-baseline")
+    e2 = by_id.get("E2-matched-six-cpu-baseline")
+    e3 = by_id.get("E3-experimental-six-cpu-profile")
+    if raw_plan.get("profile_id") == "original-4k-default":
+        if not e1 or not e2:
+            issues.append("baseline_identities_missing")
+    else:
+        if not e2 or not e3:
+            issues.append("primary_boot_isolation_pair_missing")
+        elif e2.get("workload_cpu_count") != e3.get("workload_cpu_count"):
+            issues.append("mismatched_cpu_count_cannot_support_causal_percentage")
+        if e1 and e3 and e1.get("workload_cpu_count") != e3.get("workload_cpu_count"):
+            if e1.get("comparison_use") != "secondary_product_tradeoff_only":
+                issues.append("full_capacity_baseline_misused_for_causal_percentage")
+    return {"schema_version": "1.0", "status": "passed" if not issues else "failed", "issues": sorted(set(issues), key=issues.index)}
 
 
 def build_recovery_plan(inventory: BootInventory) -> dict[str, Any]:
@@ -889,11 +1012,13 @@ def _has_initramfs_tool_or_fixture(reader: RootReader) -> bool:
     return not reader.is_fake and shutil.which("update-initramfs") is not None
 
 
-def _plan_blockers(profile_id: str, inventory: BootInventory, candidate: KernelCandidate, additions: list[str]) -> list[str]:
+def _plan_blockers(profile_id: str, inventory: BootInventory, candidate: KernelCandidate, additions: list[str], housekeeping_cpus: str, workload_cpus: str, command_line: str) -> list[str]:
     blockers = []
-    duplicate_keys = _duplicate_kernel_parameter_keys(inventory.current_command_line, additions)
-    if duplicate_keys:
-        blockers.extend(f"duplicate_kernel_parameter:{key}" for key in duplicate_keys)
+    blockers.extend(_phase21c2a_cpu_layout_blockers(inventory, housekeeping_cpus, workload_cpus))
+    blockers.extend(_kernel_parameter_conflict_blockers(inventory.current_command_line, additions))
+    blockers.extend(_boot_parameter_allowlist_blockers(additions))
+    if len(command_line.encode("utf-8")) > PHASE21C2A_MAX_CMDLINE_BYTES:
+        blockers.append("kernel_command_line_too_long")
     if profile_id != "original-4k-default":
         for code in ["missing_recovery_snapshot", "missing_snapshot_marker", "serial_console_not_verified", "no_out_of_band_recovery", "fallback_kernel_missing", "fallback_kernel_unverified", "bootloader_unknown", "one_time_boot_unavailable", "ssh_post_boot_check_missing", "rollback_command_missing", "user_authorization_missing"]:
             if inventory.blocker_matrix[code]["state"] == "blocked":
@@ -914,6 +1039,238 @@ def _plan_blockers(profile_id: str, inventory: BootInventory, candidate: KernelC
     return sorted(set(blockers), key=blockers.index)
 
 
+def _temporary_grub_entry_plan(profile_id: str, inventory: BootInventory, candidate: KernelCandidate, additions: list[str], command_line: str, housekeeping_cpus: str, workload_cpus: str) -> dict[str, Any]:
+    if profile_id == "original-4k-default":
+        return {
+            "schema_version": "1.0",
+            "temporary_entry_required": False,
+            "reason": "baseline uses existing current known-good entry",
+            "grub_cfg_direct_edit_allowed": False,
+            "permanent_default_change_allowed": False,
+        }
+    entry_id = f"perfrunbench-phase21c2a-{profile_id}-{stable_digest({'profile_id': profile_id, 'command_line': command_line})[:12]}"
+    title = f"PerfRunbench Phase 21C2A {profile_id}"
+    custom_entry_path = f"/etc/grub.d/09_perfrunbench_phase21c2a_{_safe_entry_name(profile_id)}"
+    linux_path = candidate.vmlinuz_path
+    initrd_path = candidate.initrd_path
+    linux_arguments = _linux_arguments_for_custom_entry(command_line)
+    entry_text = _render_grub_menuentry(title=title, entry_id=entry_id, linux_path=linux_path, initrd_path=initrd_path, linux_arguments=linux_arguments)
+    return {
+        "schema_version": "1.0",
+        "temporary_entry_required": True,
+        "mechanism": "isolated_temporary_grub_custom_entry",
+        "profile_id": profile_id,
+        "entry_title": title,
+        "entry_id": entry_id,
+        "custom_entry_path": custom_entry_path,
+        "backup_path": f"{custom_entry_path}.perfrunbench-backup",
+        "candidate_vmlinuz_path": linux_path,
+        "candidate_initrd_path": initrd_path,
+        "linux_arguments": linux_arguments,
+        "root_argument": _root_argument(command_line),
+        "appended_parameters": additions,
+        "housekeeping_cpus": housekeeping_cpus,
+        "workload_cpus": workload_cpus,
+        "menuentry_text": entry_text,
+        "install_steps": [
+            "back up any existing temporary custom-entry file",
+            "write this generated entry to the isolated custom-entry file",
+            "run update-grub",
+            "verify the generated entry id is present exactly once",
+            "run grub-reboot with the generated entry id",
+        ],
+        "cleanup_steps": [
+            "remove the isolated custom-entry file",
+            "restore previous file only if a pre-existing file was backed up",
+            "run update-grub",
+            "run grub-editenv - unset next_entry after the one-time value is consumed",
+            "verify the generated entry id is absent",
+        ],
+        "transaction_requirements": {
+            "starts_from_profile": "original-4k-default",
+            "returns_to_profile": "original-4k-default",
+            "refuse_experimental_to_experimental_chain": True,
+            "experimental_entry_reusable": False,
+            "maximum_reboot_count": 1,
+            "permanent_default_must_remain_unchanged": True,
+            "grub_cfg_direct_edit_allowed": False,
+        },
+        "removal_verification": {
+            "entry_id_absent_after_cleanup": True,
+            "custom_entry_file_absent_or_restored": True,
+            "permanent_default_unchanged": True,
+            "next_entry_absent": True,
+        },
+        "grub_cfg_direct_edit_allowed": False,
+        "permanent_default_change_allowed": False,
+    }
+
+
+def _verify_temporary_grub_entry_plan(temporary: Any) -> list[str]:
+    issues = []
+    if not isinstance(temporary, dict) or not temporary:
+        return ["temporary_grub_entry_plan_missing"]
+    if temporary.get("mechanism") != "isolated_temporary_grub_custom_entry":
+        issues.append("temporary_grub_entry_mechanism_missing")
+    if temporary.get("grub_cfg_direct_edit_allowed") is not False:
+        issues.append("grub_cfg_direct_edit_not_refused")
+    if temporary.get("permanent_default_change_allowed") is not False:
+        issues.append("permanent_default_change_not_refused")
+    if not temporary.get("entry_id") or not str(temporary.get("entry_id")).startswith("perfrunbench-phase21c2a-"):
+        issues.append("temporary_entry_id_missing")
+    if not temporary.get("entry_title") or "Phase 21C2A" not in str(temporary.get("entry_title")):
+        issues.append("temporary_entry_title_missing")
+    if not temporary.get("custom_entry_path") or not str(temporary.get("custom_entry_path")).startswith("/etc/grub.d/09_perfrunbench_phase21c2a_"):
+        issues.append("temporary_custom_entry_path_missing")
+    if not temporary.get("candidate_vmlinuz_path") or temporary.get("candidate_vmlinuz_path") == NOT_AVAILABLE:
+        issues.append("temporary_entry_vmlinuz_missing")
+    if not temporary.get("candidate_initrd_path") or temporary.get("candidate_initrd_path") == NOT_AVAILABLE:
+        issues.append("temporary_entry_initrd_missing")
+    if not temporary.get("root_argument") or temporary.get("root_argument") == NOT_AVAILABLE:
+        issues.append("temporary_entry_root_argument_missing")
+    transaction = temporary.get("transaction_requirements", {})
+    if transaction.get("starts_from_profile") != "original-4k-default":
+        issues.append("transaction_does_not_start_from_g0")
+    if transaction.get("returns_to_profile") != "original-4k-default":
+        issues.append("transaction_does_not_require_return_to_g0")
+    if transaction.get("refuse_experimental_to_experimental_chain") is not True:
+        issues.append("experimental_to_experimental_chain_not_refused")
+    if transaction.get("experimental_entry_reusable") is not False:
+        issues.append("experimental_entry_reuse_not_refused")
+    if transaction.get("maximum_reboot_count") != 1:
+        issues.append("maximum_reboot_count_not_one")
+    removal = temporary.get("removal_verification", {})
+    if removal.get("entry_id_absent_after_cleanup") is not True:
+        issues.append("temporary_entry_removal_not_verified")
+    return issues
+
+
+def _measurement_identity(*, identity_id: str, role: str, profile_id: str, workload_cpus: str, generation_threads: int, batch_threads: int, comparison_use: str) -> dict[str, Any]:
+    cpus = _expand_cpu_list(workload_cpus)
+    return {
+        "schema_version": "1.0",
+        "identity_id": identity_id,
+        "role": role,
+        "profile_id": profile_id,
+        "workload_cpus": workload_cpus,
+        "workload_cpu_count": len(cpus),
+        "generation_threads": generation_threads,
+        "batch_threads": batch_threads,
+        "batch_threads_lte_workload_cpus": batch_threads <= len(cpus),
+        "generation_threads_lte_workload_cpus": generation_threads <= len(cpus),
+        "comparison_use": comparison_use,
+        "primary_metric": "decode_tokens_per_second",
+        "percentage_claim_scope": "causal_boot_isolation" if role in {"causal_baseline", "experimental"} else "capacity_tradeoff_only",
+    }
+
+
+def _format_cpu_list(cpus: range | list[int]) -> str:
+    items = list(cpus)
+    if not items:
+        return ""
+    ranges = []
+    start = prev = items[0]
+    for cpu in items[1:]:
+        if cpu == prev + 1:
+            prev = cpu
+            continue
+        ranges.append(f"{start}-{prev}" if start != prev else str(start))
+        start = prev = cpu
+    ranges.append(f"{start}-{prev}" if start != prev else str(start))
+    return ",".join(ranges)
+
+
+def _logical_cpu_count_int(inventory: BootInventory) -> int:
+    count = _int_or_none(inventory.logical_cpus)
+    if count is None or count < 1:
+        raise SystemProfileError("logical CPU count must be known for Phase 21C2A comparison identities")
+    return count
+
+
+def _safe_entry_name(text: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_]+", "_", text).strip("_")
+
+
+def _linux_arguments_for_custom_entry(command_line: str) -> str:
+    parts = [part for part in command_line.split() if not part.startswith("BOOT_IMAGE=")]
+    return " ".join(parts)
+
+
+def _root_argument(command_line: str) -> str:
+    for part in command_line.split():
+        if part.startswith("root="):
+            return part
+    return NOT_AVAILABLE
+
+
+def _render_grub_menuentry(*, title: str, entry_id: str, linux_path: str, initrd_path: str, linux_arguments: str) -> str:
+    return "\n".join(
+        [
+            f"menuentry '{title}' --id '{entry_id}' {{",
+            f"    linux {linux_path} {linux_arguments}".rstrip(),
+            f"    initrd {initrd_path}",
+            "}",
+            "",
+        ]
+    )
+
+
+def _phase21c2a_cpu_layout_blockers(inventory: BootInventory, housekeeping: str, workload: str) -> list[str]:
+    blockers = []
+    house = _expand_cpu_list(housekeeping)
+    work = _expand_cpu_list(workload)
+    if house != [0, 1]:
+        blockers.append("phase21c2a_requires_housekeeping_cpus_0_1")
+    if work != [2, 3, 4, 5, 6, 7]:
+        blockers.append("phase21c2a_requires_workload_cpus_2_7")
+    if len(house) < 2:
+        blockers.append("insufficient_housekeeping_cpus")
+    visible = _int_or_none(inventory.logical_cpus)
+    if visible is not None:
+        outside = [cpu for cpu in [*house, *work] if cpu < 0 or cpu >= visible]
+        if outside:
+            blockers.append("cpu_range_outside_visible_cpus")
+    return blockers
+
+
+def _boot_parameter_allowlist_blockers(additions: list[str]) -> list[str]:
+    blockers = []
+    for arg in additions:
+        key = arg.split("=", 1)[0]
+        if key in PHASE21C2A_PROHIBITED_BOOT_PARAMETER_KEYS:
+            blockers.append(f"prohibited_kernel_parameter:{key}")
+        if key not in PHASE21C2A_ALLOWED_BOOT_PARAMETER_KEYS:
+            blockers.append(f"unallowlisted_kernel_parameter:{key}")
+    return blockers
+
+
+def _kernel_parameter_conflict_blockers(current: str, additions: list[str]) -> list[str]:
+    blockers = []
+    current_values = _kernel_parameter_values(current)
+    for arg in additions:
+        key, value = arg.split("=", 1) if "=" in arg else (arg, "")
+        if key not in current_values:
+            continue
+        blockers.append(f"duplicate_kernel_parameter:{key}")
+        if key == "isolcpus" and current_values[key] != value:
+            blockers.append("conflicting_isolcpus_value")
+        if key == "nohz_full" and current_values[key] != value:
+            blockers.append("existing_nohz_full_conflict")
+        if key == "rcu_nocbs" and current_values[key] != value:
+            blockers.append("existing_rcu_nocbs_conflict")
+        if key == "irqaffinity" and current_values[key] != value:
+            blockers.append("existing_irqaffinity_conflict")
+    return sorted(set(blockers), key=blockers.index)
+
+
+def _kernel_parameter_values(command_line: str) -> dict[str, str]:
+    values = {}
+    for part in [] if command_line in {"", NOT_AVAILABLE} else command_line.split():
+        key, value = part.split("=", 1) if "=" in part else (part, "")
+        values.setdefault(key, value)
+    return values
+
+
 def _candidate_for_profile(profile_id: str, inventory: BootInventory) -> KernelCandidate:
     if profile_id.startswith("64k"):
         return inventory.candidate_64k_kernel
@@ -925,10 +1282,12 @@ def _profile_args(profile_id: str, inventory: BootInventory, housekeeping: str, 
         return []
     if profile_id.endswith("nohz-rcu-irq"):
         return [f"nohz_full={workload}", f"rcu_nocbs={workload}", f"irqaffinity={housekeeping}"]
+    if profile_id == "4k-managed-irq-isolation":
+        return [f"nohz_full={workload}", f"rcu_nocbs={workload}", f"irqaffinity={housekeeping}", f"isolcpus=managed_irq,{workload}"]
     if profile_id.endswith("managed-irq-isolation"):
         return [f"isolcpus=managed_irq,{workload}"]
     if profile_id == "4k-domain-isolation":
-        return [f"isolcpus=domain,managed_irq,{workload}", f"nohz_full={workload}", f"rcu_nocbs={workload}", f"irqaffinity={housekeeping}"]
+        return [f"nohz_full={workload}", f"rcu_nocbs={workload}", f"irqaffinity={housekeeping}", f"isolcpus=domain,managed_irq,{workload}"]
     return []
 
 
@@ -969,16 +1328,23 @@ def _validate_cpu_layout(housekeeping: str, workload: str) -> None:
         raise SystemProfileError("housekeeping CPU range must not be empty")
     if not work:
         raise SystemProfileError("workload CPU range must not be empty")
+    if len(house) < 2:
+        raise SystemProfileError("at least two housekeeping CPUs are required")
     if set(house) & set(work):
         raise SystemProfileError("housekeeping and workload CPU ranges must be disjoint")
+    if len(set(house)) != len(house) or len(set(work)) != len(work):
+        raise SystemProfileError("CPU ranges must not contain duplicates")
 
 
 def _expand_cpu_list(text: str) -> list[int]:
     cpus = []
-    for part in text.split(","):
+    if text.strip() == "":
+        return cpus
+    parts = text.split(",")
+    if any(part.strip() == "" for part in parts):
+        raise SystemProfileError("malformed CPU range")
+    for part in parts:
         part = part.strip()
-        if not part:
-            continue
         if "-" in part:
             start_text, end_text = part.split("-", 1)
             if not start_text.isdigit() or not end_text.isdigit():

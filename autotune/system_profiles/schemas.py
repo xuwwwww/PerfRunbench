@@ -279,6 +279,12 @@ class OneTimeBootPlan:
     eligibility_state: str
     blockers: list[str] = field(default_factory=list)
     advanced_less_flexible: bool = False
+    temporary_entry_plan: dict[str, Any] = field(default_factory=dict)
+    comparison_identities: list[dict[str, Any]] = field(default_factory=list)
+    causal_baseline_identity: str = NOT_AVAILABLE
+    capacity_baseline_identity: str = NOT_AVAILABLE
+    experimental_identity: str = NOT_AVAILABLE
+    kernel_or_boot_state_modified: bool = False
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
