@@ -64,7 +64,7 @@ def apply_system_profile_plan(
             issues.append(f"{change.label}: target path is unavailable")
             host_state_dirty = host_state_dirty or applied_any
             break
-        before = _read(target)
+        before = _read_effective(target)
         if change.before_value != NOT_AVAILABLE and before != change.before_value:
             records.append(_failed(change, f"dirty host: expected {change.before_value!r}, observed {before!r}"))
             issues.append(f"{change.label}: dirty host before apply")
@@ -77,7 +77,7 @@ def apply_system_profile_plan(
             issues.append(f"{change.label}: write failed")
             host_state_dirty = True
             break
-        effective = _read(target)
+        effective = _read_effective(target)
         applied = effective == change.requested_value
         if not applied:
             issues.append(f"{change.label}: effective state mismatch")
@@ -134,7 +134,7 @@ def verify_system_profile(
         if record.interface in {"process", "process_env", "workload_protocol"}:
             continue
         target = reader.path(record.path)
-        observed = _read(target) if target.exists() else NOT_AVAILABLE
+        observed = _read_effective(target) if target.exists() else NOT_AVAILABLE
         if observed != record.requested_value:
             issues.append(f"{record.label}: expected effective {record.requested_value!r}, observed {observed!r}")
             dirty = True
@@ -175,7 +175,7 @@ def rollback_system_profile(
             dirty = True
             restored.append(LeaseChangeRecord(**{**record.to_dict(), "error": f"rollback write failed: {exc}"}))
             continue
-        observed = _read(target)
+        observed = _read_effective(target)
         if observed != record.before_value:
             issues.append(f"{record.label}: rollback verification mismatch")
             dirty = True
@@ -224,3 +224,28 @@ def _read(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="replace").strip()
     except OSError:
         return NOT_AVAILABLE
+
+
+def _read_effective(path: Path) -> str:
+    text = _read(path)
+    if _is_bracketed_mode_path(path):
+        return _selected_bracketed_mode(text)
+    return text
+
+
+def _is_bracketed_mode_path(path: Path) -> bool:
+    normalized = path.as_posix()
+    return normalized in {
+        "/sys/kernel/mm/transparent_hugepage/enabled",
+        "/sys/kernel/mm/transparent_hugepage/defrag",
+    }
+
+
+def _selected_bracketed_mode(text: str) -> str:
+    if not text or text == NOT_AVAILABLE:
+        return NOT_AVAILABLE
+    start = text.find("[")
+    end = text.find("]", start + 1)
+    if start != -1 and end != -1:
+        return text[start + 1 : end]
+    return text
