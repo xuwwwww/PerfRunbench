@@ -19,6 +19,7 @@ from autotune.system_profiles.boot_readiness import (
     collect_boot_inventory,
     fixture_boot_experiment_result,
     verify_one_time_boot_plan,
+    verify_boot_experiment_result,
 )
 from autotune.system_profiles.catalog import (
     PROHIBITED_PROFILE_IDS,
@@ -397,6 +398,27 @@ class SystemProfilesTest(unittest.TestCase):
             restored = fixture_boot_experiment_result(baseline, health_passed=True, original_state_restored=True)
             self.assertEqual(failed_health.status, "failed")
             self.assertEqual(restored.status, "passed")
+            self.assertEqual(verify_boot_experiment_result(restored.to_dict())["status"], "passed")
+            failed_validation = verify_boot_experiment_result(failed_health.to_dict())
+            self.assertEqual(failed_validation["status"], "failed")
+            self.assertIn("post_boot_health_check_failed", failed_validation["issues"])
+
+    def test_phase21c0_rejects_real_boot_or_mutated_result_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            plan = build_one_time_boot_plan("original-4k-default", collect_boot_inventory(root))
+            result = fixture_boot_experiment_result(plan, health_passed=True, original_state_restored=True).to_dict()
+            result["boot_attempted"] = True
+            result["reboot_performed"] = True
+            result["kernel_or_boot_state_modified"] = True
+
+            validation = verify_boot_experiment_result(result)
+
+            self.assertEqual(validation["status"], "failed")
+            self.assertIn("real_boot_attempt_is_out_of_scope_for_phase21c0", validation["issues"])
+            self.assertIn("real_reboot_is_out_of_scope_for_phase21c0", validation["issues"])
+            self.assertIn("kernel_or_boot_state_modified", validation["issues"])
 
     def test_phase21c0_rejects_duplicate_bad_cpu_and_missing_housekeeping(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

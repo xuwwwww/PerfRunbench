@@ -373,6 +373,32 @@ def fixture_boot_experiment_result(plan: OneTimeBootPlan, *, health_passed: bool
     )
 
 
+def verify_boot_experiment_result(raw_result: dict[str, Any]) -> dict[str, Any]:
+    issues = []
+    if raw_result.get("schema_version") != "1.0":
+        issues.append("missing_or_unsupported_schema_version")
+    if raw_result.get("kernel_or_boot_state_modified") is True:
+        issues.append("kernel_or_boot_state_modified")
+    if raw_result.get("boot_attempted") is True:
+        issues.append("real_boot_attempt_is_out_of_scope_for_phase21c0")
+    if raw_result.get("reboot_performed") is True:
+        issues.append("real_reboot_is_out_of_scope_for_phase21c0")
+    if raw_result.get("health_status") != "passed":
+        issues.append("post_boot_health_check_failed")
+    if raw_result.get("rollback_status") != "passed":
+        issues.append("rollback_or_original_state_verification_failed")
+    if raw_result.get("status") != "passed":
+        issues.append("experiment_result_not_passed")
+    return {
+        "schema_version": "1.0",
+        "status": "passed" if not issues else "failed",
+        "issues": sorted(set(issues), key=issues.index),
+        "result_digest": versioned_digest(raw_result) if isinstance(raw_result, dict) else NOT_AVAILABLE,
+        "kernel_or_boot_state_modified": False,
+        "phase21c0_local_only": True,
+    }
+
+
 def read_kernel_config(reader: RootReader, release: str) -> KernelConfigCapability:
     paths = []
     if release and release != NOT_AVAILABLE:
