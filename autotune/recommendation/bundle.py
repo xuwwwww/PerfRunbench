@@ -60,6 +60,7 @@ def create_recommendation_bundle(
     expires_at: str | None = None,
     source_result_path: str | Path | None = None,
     provenance: dict[str, Any] | None = None,
+    host_profile_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     _validate_run_id(source_run_id)
     if status not in RECOMMENDATION_STATUS_ELIGIBLE:
@@ -93,6 +94,7 @@ def create_recommendation_bundle(
         "statistical_evidence": statistical_evidence or {},
         "apply_scope": apply_scope,
         "rollback_configuration": rollback_configuration or {"type": "process_exit", "system_restore_run_id": None},
+        "host_profile_evidence": host_profile_evidence or {},
         "created_at": created_at,
         "expires_at": expires_at,
         "provenance": provenance or {},
@@ -223,6 +225,16 @@ def validate_recommendation_bundle(
         guards.append(guard_fail("recommendation", "measured_source_required", f"Source result_origin={result_origin or 'not_available'} is not measured.", recoverable=True))
     else:
         guards.append(guard_pass("recommendation", "source_origin_applyable", "Source result_origin is measured."))
+    host_profile_evidence = bundle.get("host_profile_evidence", {})
+    if isinstance(host_profile_evidence, dict) and host_profile_evidence.get("host_state_dirty") is True:
+        guards.append(
+            guard_fail(
+                "preflight",
+                "dirty_host_state",
+                "Host system profile evidence reports dirty residual state; recommendation is not applyable.",
+                recoverable=True,
+            )
+        )
     return _validation_result(guards)
 
 
