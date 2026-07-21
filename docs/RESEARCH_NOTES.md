@@ -69,3 +69,37 @@ Real T4g follow-up:
 - no benchmark, runtime search, Passport, or RecommendationBundle was produced
 
 This is an `insufficient_evidence` guard result, not a speedup claim.
+
+## Phase 20 - C7g CPU-Aware Build Backend And Runtime Tuning
+
+Phase 20 returned to a real C7g / Neoverse-V1 target with the existing
+Qwen2.5-7B Q4_K_M model and pinned `llama.cpp` source
+`47c786924ad1ab7e91da2cdc72fcdb563780c2bd`.
+
+Key observations:
+
+- `explicit-neoverse-v1` was added as an explicit profile and built
+  successfully.
+- `portable-reference` failed to build under the pinned source/build policy and
+  was preserved as rejected evidence.
+- `native-kleidiai` and `native-kleidiai-lto` built and measured, but were not
+  eligible because KleidiAI runtime backend usage was not evidenced.
+- Fixed build-profile comparison found `explicit-neoverse-v1` at
+  `17.78 tok/s` decode median versus `upstream-default` at `17.71 tok/s`;
+  the `0.395257%` delta stayed inside the 5% noise band.
+- Bounded runtime search tested six unique candidates and selected the
+  baseline; complete confirmation median decode was `17.72 tok/s`.
+- Secondary `llama-server` measurement completed 3/3 measured requests with
+  median TTFT `61.470 ms` and median E2E latency `911.976 ms`; quality was
+  `not_evaluated`.
+- Performance Passport generation and verification passed, but the claim state
+  was `ineligible_provenance` because the measured comparison did not produce
+  an eligible performance claim.
+- Artifact manifests validated remotely and after download: `77/77`.
+
+Conclusion:
+
+```text
+phase20_c7g_build_backend_runtime_tuning: passed
+performance_improvement_verified: false
+```

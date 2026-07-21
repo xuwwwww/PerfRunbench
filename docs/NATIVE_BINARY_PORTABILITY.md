@@ -69,3 +69,22 @@ Passing one does not imply passing the other.
 The default safe behavior is refusal before workload launch when compatibility
 cannot be proven.
 
+## Phase 20 C7g Guard Outcome
+
+Phase 20 built CPU-aware `llama.cpp` binaries on a C7g / Neoverse-V1 target.
+The `explicit-neoverse-v1` build was eligible for comparison on that target,
+while KleidiAI-requested builds were rejected from recommendation eligibility
+because runtime backend evidence was not proven.
+
+This preserves the portability boundary:
+
+```text
+CPU-specific binary evidence is target/protocol evidence.
+It is not portable to Neoverse-N1, x86_64, or another target by name.
+Requested optimized backend flags do not create portability or speedup claims.
+```
+
+Any future reuse of a Phase 20 binary must validate architecture, CPU feature
+requirements, CPU model policy, binary SHA-256, source commit, and startup
+smoke before workload launch.
+

@@ -148,3 +148,40 @@ Disallowed wording:
 - combined improvement across different protocols
 - portability of a CPU-specific binary without native-binary guard evidence
 
+## Phase 20 C7g Evidence Update
+
+Phase 20 exercised this model on a real C7g / Neoverse-V1 target with the
+existing Qwen2.5-7B Q4_K_M model and pinned `llama.cpp` source commit
+`47c786924ad1ab7e91da2cdc72fcdb563780c2bd`.
+
+One source change added an explicit `explicit-neoverse-v1` profile so C7g
+validation no longer had to represent the CPU-specific candidate as a generic
+`explicit-current-cpu` profile. A second source change made Performance
+Passport output write an artifact manifest for independent validation.
+
+Observed build-profile comparison:
+
+```text
+baseline_profile: upstream-default
+candidate_profile: explicit-neoverse-v1
+baseline_decode_median_tok_s: 17.71
+candidate_decode_median_tok_s: 17.78
+delta_percent: 0.395257
+noise_band_percent: 5.0
+recommendation_status: inconclusive
+```
+
+Observed runtime search on `explicit-neoverse-v1`:
+
+```text
+candidate_count: 6
+selected_candidate: baseline
+complete_confirmation_decode_median_tok_s: 17.72
+recommendation_status: inconclusive
+```
+
+KleidiAI-requested profiles were preserved as measured evidence but rejected
+from recommendation eligibility because runtime backend usage was
+`requested_but_runtime_unverified`. Phase 20 therefore validates the build and
+runtime tuning pipeline, not a build-profile or KleidiAI speedup claim.
+

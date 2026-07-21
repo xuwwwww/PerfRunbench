@@ -11,6 +11,7 @@ Numbers from different targets or protocols must not be combined.
 | 15C | Windows x86_64 controller | Public synthetic PyTorch training | Local CLI, cache, drift, apply, and portability validation | Do not compare with Arm | passed |
 | 16 | Windows local clean venv plus GitHub Actions matrix | Dependency-free public fixtures | Release-candidate installed-wheel usability | Packaging and CLI usability, not performance | pending final CI |
 | 19 | Linux Arm64 T4g.small / Neoverse-N1 class | No suitable existing model available; build evidence only | CPU-aware native build tuning guard validation | Build artifacts collected, but no benchmark or recommendation claim | insufficient evidence |
+| 20 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp | CPU-aware build/backend evidence, bounded runtime search, server timing, Passport, and artifact validation | Real measured workflow validation; build and runtime improvements stayed inside the 5% noise band | passed |
 
 ## Current Evidence Boundaries
 
@@ -63,3 +64,26 @@ ubuntu-24.04-arm
 The required CI matrix uses dependency-free fixtures and must not install
 PyTorch, download models/datasets, access AWS, or turn fixture evidence into
 measured performance evidence.
+
+## Phase 20 C7g Build/Backend Summary
+
+Phase 20 returned to a user-provisioned C7g / Neoverse-V1 target with the
+existing Qwen2.5-7B Q4_K_M model and pinned `llama.cpp` source commit
+`47c786924ad1ab7e91da2cdc72fcdb563780c2bd`.
+
+The validation completed build-profile comparison, bounded runtime search,
+secondary `llama-server` measurement, Performance Passport generation and
+verification, remote artifact revalidation, and downloaded artifact
+revalidation.
+
+Outcome:
+
+```text
+build_profile_recommendation: inconclusive
+runtime_search_recommendation: inconclusive
+selected_runtime_candidate: baseline
+KleidiAI_status: requested profiles rejected unless runtime backend evidence exists
+Performance_Passport: verification passed, claim_eligibility_state ineligible_provenance
+artifact_revalidation: 77/77 passed remotely and after download
+performance_improvement_verified: false
+```

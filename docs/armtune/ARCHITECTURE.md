@@ -761,3 +761,31 @@ Native binary compatibility is separate from workload identity. Before reuse,
 PerfRunbench validates architecture, required CPU features, CPU model policy,
 binary digest, and startup smoke where required. A Neoverse-N1 CPU-model-bound
 binary is not silently reused on Neoverse-V1 or x86_64.
+
+## Phase 20 C7g Evidence Boundary
+
+Phase 20 exercised the Phase 19 architecture on a C7g / Neoverse-V1 target
+with pinned `llama.cpp` source and an existing Qwen2.5-7B Q4_K_M model:
+
+```text
+source lock
+-> explicit Neoverse-V1 build profile
+-> fixed build-profile comparison
+-> bounded runtime search
+-> secondary llama-server timing
+-> Performance Passport
+-> artifact revalidation
+```
+
+The architecture behaved correctly under a real measured run:
+
+- build/backend evidence rejected `portable-reference` and
+  KleidiAI-requested profiles when required evidence was missing
+- the statistical guard returned `inconclusive` when the best evidence-valid
+  build stayed inside the 5% noise band
+- runtime search selected the baseline when no candidate beat noise
+- the Performance Passport verified successfully but retained
+  `claim_eligibility_state: ineligible_provenance`
+
+This is a successful pipeline validation, not an eligible performance
+improvement claim.

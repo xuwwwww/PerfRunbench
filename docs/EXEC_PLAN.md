@@ -86,3 +86,38 @@ The target produced build artifacts for `upstream-default` and
 The run therefore stopped before benchmark comparison, runtime search,
 Performance Passport, or recommendation apply. This is a guard outcome, not a
 performance result.
+
+## Phase 20: C7g Build Backend And Runtime Tuning
+
+Phase 20 validates the CPU-aware build-profile implementation on a real
+C7g / Neoverse-V1 target with the existing Qwen2.5-7B Q4_K_M model and pinned
+`llama.cpp` source `47c786924ad1ab7e91da2cdc72fcdb563780c2bd`.
+
+Completed:
+
+- add the explicit `explicit-neoverse-v1` build profile
+- build `upstream-default`, `explicit-neoverse-v1`, `native-kleidiai`, and
+  `native-kleidiai-lto`
+- preserve `portable-reference` as `build_failed`
+- reject KleidiAI-requested profiles from eligibility when runtime backend
+  evidence is not proven
+- run fixed build-profile comparison
+- run a six-candidate bounded runtime search
+- run secondary `llama-server` TTFT/E2E measurement without BootTrace quality
+  eligibility
+- generate and verify a Performance Passport
+- validate 77 artifact manifests on-target and again after download
+
+Current Phase 20 real C7g outcome:
+
+```text
+build_profile_recommendation: inconclusive
+runtime_search_recommendation: inconclusive
+performance_improvement_verified: false
+phase20_c7g_build_backend_runtime_tuning: passed
+```
+
+The best evidence-valid build profile was `explicit-neoverse-v1`, but its
+decode median (`17.78 tok/s`) was only `0.395257%` above `upstream-default`
+(`17.71 tok/s`), inside the configured 5% noise band. Runtime search selected
+the baseline configuration with a confirmed decode median of `17.72 tok/s`.
