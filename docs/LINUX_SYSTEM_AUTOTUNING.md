@@ -1,14 +1,34 @@
 # Linux System Autotuning
 
-PerfRunbench Phase 21A adds a guarded Linux host-system profile framework for
-future Arm validation. It does not apply real host changes in this phase.
-Implementation and tests use fake `/proc`, `/sys`, cgroup, boot, block-device,
-IRQ, and service fixtures.
+PerfRunbench Phase 21A adds a guarded Linux host-system profile framework.
+Phase 21B validates a bounded subset of reversible real-host mechanisms on a
+C7g / Neoverse-V1 Arm64 target. Phase 21B does not produce a verified
+performance improvement; it validates rollback, artifact, and noise-band guard
+behavior.
 
 Phase 20 only exhausted the tested compiler and simple runtime candidates for
 one `llama.cpp` workload. It did not evaluate CPU frequency governors, cpusets,
 IRQ/workqueue isolation, THP, HugeTLB, allocators, storage startup policy, or
 boot-kernel isolation.
+
+Phase 21B executed:
+
+```text
+baseline-current
+thp-never
+allocator-glibc-bounded-arenas
+scheduler-batch
+affinity-cpus-1-7
+vm-system-conservative
+thp-always
+```
+
+The final result was:
+
+```text
+performance_improvement_verified: false
+host_restored_to_original_state: true
+```
 
 ## Default Flow
 
@@ -110,34 +130,34 @@ autotuneai system boot-plan --profile aws-4k-default --json
 autotuneai system compare --run-id <run-id> --json
 ```
 
-Phase 21A reversible apply uses fake roots only unless a future phase adds an
-explicit real-host opt-in:
+Real-host reversible apply requires an explicit opt-in and is intended for
+controlled validation only:
 
 ```bash
 autotuneai system apply \
-  --root <fake-root> \
   --profile cpufreq-performance \
   --lease-minutes 30 \
   --snapshot host-state.json \
   --lease-output lease.json \
+  --allow-real-system \
   --json
 
 autotuneai system verify \
-  --root <fake-root> \
   --profile cpufreq-performance \
   --snapshot host-state.json \
   --lease lease.json \
+  --allow-real-system \
   --json
 
 autotuneai system rollback \
-  --root <fake-root> \
   --snapshot host-state.json \
   --lease lease.json \
+  --allow-real-system \
   --json
 ```
 
 ## Claim Boundary
 
-Phase 21A is local implementation and fixture validation only. It does not
-claim a C7g or T4g performance improvement, does not access AWS, and does not
-modify a real host.
+Phase 21A is local implementation and fixture validation only. Phase 21B is
+real C7g reversible-system guard validation. It does not claim a performance
+improvement because no positive candidate cleared the configured 5% noise band.

@@ -37,5 +37,19 @@ host_state_dirty: true
 
 Further tuning must be refused until the host is inspected and restored.
 
-Phase 21A apply and rollback operate on fake roots for validation. Real system
-mutation remains out of scope.
+Phase 21A apply and rollback operate on fake roots for validation. Phase 21B
+then validated bounded real-host reversible profiles on C7g without persistent
+configuration changes.
+
+Phase 21B confirmed:
+
+```text
+thp-never: rollback passed
+thp-always: rollback passed
+vm-system-conservative: rollback passed
+final normalized snapshot == original normalized snapshot
+active runtime lease or lock files: none
+```
+
+Historical lease artifacts preserve their apply-time `active` value for audit
+purposes. Runtime lease release is recorded separately by the release report.

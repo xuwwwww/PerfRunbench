@@ -148,6 +148,35 @@ Phase 21A scope:
 - reversible fake-root leases and rollback
 - boot-kernel profile planning without bootloader writes
 - system benchmark protocol separation
+
+## Phase 21B: C7g Reversible Linux System Validation
+
+Phase 21B validated a bounded real-host subset of the Phase 21A framework on a
+C7g / Neoverse-V1 target using the fixed Qwen2.5-7B Q4_K_M
+`upstream-default` `llama-bench` protocol.
+
+Completed:
+
+- verified controller and target source match
+- captured immutable original snapshots with a private recovery marker digest
+- rehearsed a fixture watchdog rollback
+- executed `baseline-current`, `thp-never`,
+  `allocator-glibc-bounded-arenas`, `scheduler-batch`,
+  `affinity-cpus-1-7`, `vm-system-conservative`, and `thp-always`
+- rolled back every host-level profile and verified final normalized host
+  state matched the original
+- validated artifacts remotely and after download
+
+Current Phase 21B outcome:
+
+```text
+phase21b_c7g_reversible_system_validation: passed
+performance_improvement_verified: false
+host_restored_to_original_state: true
+```
+
+The best positive observed candidate was `thp-always` at `+0.344%` versus the
+baseline, inside the configured 5% noise band. It is not a recommendation.
 - optional host evidence binding for RecommendationBundle and Performance
   Passport
 

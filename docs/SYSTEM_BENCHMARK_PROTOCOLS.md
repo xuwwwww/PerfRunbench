@@ -19,3 +19,25 @@ Examples:
 - HugeTLB must prove a mapped HugeTLB page, not just a reserved pool
 
 Search is staged and never a full Cartesian product.
+
+## Phase 21B Protocol Boundary
+
+Phase 21B used only `steady_state_decode` for ranking reversible system
+profiles:
+
+```text
+binary: upstream-default llama-bench
+prompt_tokens: 512
+generation_tokens: 128
+repetitions_per_candidate: 5
+noise_band_percent: 5.0
+```
+
+No `cold_model_load`, `warm_first_request`, `interactive_server`, or
+`concurrent_server` result was ranked in Phase 21B. THP, sysctl, allocator,
+scheduler, and affinity results must therefore be read only as steady-state
+decode evidence.
+
+The only clear Phase 21B outcome outside the noise band was a regression for
+the reduced CPU-set affinity candidate. Positive deltas stayed inside the 5%
+noise band and were not promoted.

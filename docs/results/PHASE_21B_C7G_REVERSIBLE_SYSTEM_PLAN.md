@@ -1,7 +1,13 @@
 # Phase 21B C7g Reversible System Plan
 
-Phase 21B is the future real C7g validation phase for reversible non-boot
-system profiles. Phase 21A does not execute this plan.
+Phase 21B has now been executed. The real validation record is:
+
+```text
+docs/results/PHASE_21B_C7G_REVERSIBLE_SYSTEM_VALIDATION.md
+```
+
+This plan remains as the pre-run design boundary for reversible non-boot
+system profiles.
 
 Prerequisites:
 
@@ -40,3 +46,11 @@ Success criteria:
 - artifact manifests validate remotely and after download
 
 Lack of improvement is a valid result.
+
+Actual Phase 21B outcome:
+
+```text
+phase21b_c7g_reversible_system_validation: passed
+performance_improvement_verified: false
+host_restored_to_original_state: true
+```

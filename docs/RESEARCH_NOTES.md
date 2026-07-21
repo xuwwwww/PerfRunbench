@@ -127,3 +127,39 @@ Key decisions:
 Phase 21A does not overturn Phase 20. Phase 20 showed no build/simple-runtime
 candidate outside the 5% noise band. System and kernel mechanisms remain
 unevaluated until Phase 21B/21C.
+
+## Phase 21B - C7g Reversible System Validation
+
+Phase 21B validated bounded reversible host-system tuning on the same C7g /
+Neoverse-V1 class target and fixed Qwen2.5-7B Q4_K_M `llama-bench` protocol.
+
+Key observations:
+
+- The target exposed no CPUFreq policy, so governor tuning was correctly
+  `unsupported`.
+- `thp-never`, `thp-always`, and `vm-system-conservative` were applied under
+  lease, measured, rolled back, and verified against the original normalized
+  snapshot.
+- `vm-system-conservative` temporarily changed only `vm.stat_interval` and
+  `kernel.sched_autogroup_enabled`, then restored both.
+- `affinity-cpus-1-7` regressed by `-10.493%` because it reduced the workload
+  CPU set and thread count.
+- Positive candidates stayed inside the 5% noise band; no recommendation was
+  created.
+- The final normalized snapshot matched the original, and remote/local artifact
+  validation checked `712/712` artifacts.
+
+Phase 21B found two real-host correctness issues and fixed them:
+
+```text
+891a3c4 fix: tolerate volatile system queue masks
+f723384 fix: normalize bracketed sysfs mode verification
+```
+
+Conclusion:
+
+```text
+phase21b_c7g_reversible_system_validation: passed
+performance_improvement_verified: false
+host_restored_to_original_state: true
+```

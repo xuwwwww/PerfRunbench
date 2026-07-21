@@ -13,6 +13,7 @@ Numbers from different targets or protocols must not be combined.
 | 19 | Linux Arm64 T4g.small / Neoverse-N1 class | No suitable existing model available; build evidence only | CPU-aware native build tuning guard validation | Build artifacts collected, but no benchmark or recommendation claim | insufficient evidence |
 | 20 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp | CPU-aware build/backend evidence, bounded runtime search, server timing, Passport, and artifact validation | Real measured workflow validation; build and runtime improvements stayed inside the 5% noise band | passed |
 | 21A | Local fake Linux roots | Synthetic `/proc`, `/sys`, cgroup, IRQ, block, and boot fixtures | Host system and kernel profile framework, leases, rollback, and boot-plan safety | Planning and fake E2E only; no AWS and no real host mutation | passed |
+| 21B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Reversible Linux host-system apply, measurement, rollback, cleanup, and artifact validation | Real measured guard validation; no positive candidate cleared the 5% noise band | passed |
 
 ## Current Evidence Boundaries
 
@@ -108,3 +109,26 @@ dirty_host_recommendation: ineligible
 
 This phase does not provide a performance result. It prepares future C7g
 validation for reversible system profiles and reboot-required kernel profiles.
+
+## Phase 21B C7g Reversible System Summary
+
+Phase 21B applied bounded reversible real-host profiles one at a time from the
+verified original state, measured the fixed `llama-bench` steady-state decode
+protocol, and rolled each profile back before the next candidate.
+
+Outcome:
+
+```text
+candidate_count: 7
+baseline_decode_median_tok_s: 17.44
+best_positive_candidate: thp-always at 17.50 tok/s
+best_positive_delta_percent: 0.344
+noise_band_percent: 5.0
+performance_improvement_verified: false
+host_restored_to_original_state: true
+remote_artifacts_checked: 712
+local_artifacts_checked: 712
+```
+
+`affinity-cpus-1-7` was a measured regression at `-10.493%`, because it
+reduced the workload CPU set and thread count from the eight-CPU baseline.
