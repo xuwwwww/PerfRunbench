@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from autotune.cli import main as autotune_main
 from autotune.recommendation.bundle import create_recommendation_bundle, validate_recommendation_bundle
@@ -21,7 +22,7 @@ from autotune.system_profiles.catalog import (
 from autotune.system_profiles.lease import apply_system_profile_plan, rollback_system_profile, verify_system_profile
 from autotune.system_profiles.protocols import list_protocols
 from autotune.system_profiles.schemas import NOT_AVAILABLE
-from autotune.system_profiles.snapshot import collect_host_state_snapshot
+from autotune.system_profiles.snapshot import RootReader, _queue_masks, collect_host_state_snapshot
 
 
 class SystemProfilesTest(unittest.TestCase):
@@ -59,6 +60,24 @@ class SystemProfilesTest(unittest.TestCase):
             profiles = {item["profile_id"]: item for item in list_profiles(snapshot, root)}
             self.assertEqual(profiles["cpufreq-performance"]["eligibility_state"], "unsupported")
             self.assertEqual(profiles["numa-policy"]["eligibility_state"], "unsupported")
+
+    def test_volatile_network_queue_masks_remain_not_available(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mask = root / "sys/class/net/eth0/queues/rx-0/rps_cpus"
+            mask.parent.mkdir(parents=True)
+            mask.write_text("ff\n", encoding="utf-8")
+            original_read_text = Path.read_text
+
+            def flaky_read_text(path: Path, *args: object, **kwargs: object) -> str:
+                if path == mask:
+                    raise FileNotFoundError(str(path))
+                return original_read_text(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "read_text", flaky_read_text):
+                masks = _queue_masks(RootReader(root), "rps_cpus")
+
+            self.assertEqual(masks["/sys/class/net/eth0/queues/rx-0/rps_cpus"], NOT_AVAILABLE)
 
     def test_profile_catalog_rejects_unsafe_profiles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

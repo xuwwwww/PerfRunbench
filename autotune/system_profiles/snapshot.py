@@ -451,7 +451,11 @@ def _per_size_thp(reader: RootReader) -> dict[str, str] | str:
 def _queue_masks(reader: RootReader, filename: str) -> dict[str, str] | str:
     values = {}
     for path in reader.glob(f"/sys/class/net/*/queues/*/{filename}"):
-        values[reader.relative_abs(path)] = _not_empty(path.read_text(encoding="utf-8", errors="replace").strip())
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            text = NOT_AVAILABLE
+        values[reader.relative_abs(path)] = _not_empty(text)
     return values or NOT_AVAILABLE
 
 
