@@ -89,6 +89,21 @@ PROFILE_DEFINITIONS = {
         optimization_policy="standard_release",
         portability_scope="cpu_model_bound",
     ),
+    "explicit-neoverse-v1": BuildProfileDefinition(
+        profile_id="explicit-neoverse-v1",
+        description="Explicit Neoverse-V1 compiler target for C7g validation after compiler probe succeeds.",
+        cmake_definitions={
+            "CMAKE_BUILD_TYPE": "Release",
+            "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+            "GGML_NATIVE": "OFF",
+            "CMAKE_C_FLAGS": "-mcpu=neoverse-v1",
+            "CMAKE_CXX_FLAGS": "-mcpu=neoverse-v1",
+        },
+        cpu_target_policy="explicit_cpu_target",
+        backend_policy="default_cpu",
+        optimization_policy="standard_release",
+        portability_scope="cpu_model_bound",
+    ),
     "native-kleidiai": BuildProfileDefinition(
         profile_id="native-kleidiai",
         description="Native CPU build requesting GGML_CPU_KLEIDIAI, eligible only with build and runtime backend evidence.",

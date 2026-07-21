@@ -24,11 +24,46 @@ class ArmTuneCpuBuildProfileTest(unittest.TestCase):
             root = Path(temp_dir)
             config = _build_config(root)
             payload = json.loads(config.read_text(encoding="utf-8"))
-            payload["profiles"][0]["requested_definitions"] = {"CMAKE_C_FLAGS": "-Ofast"}
+            payload["profiles"][0]["requested_definitions"] = {"CMAKE_INSTALL_PREFIX": "/tmp/out"}
             atomic_write_json(config, payload)
 
             with self.assertRaises(ArmTuneConfigError):
                 run_build_profile(config_path=config, run_id="run", output_dir=root / "out")
+
+    def test_build_profile_rejects_shell_fragment_cmake_flag(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = _build_config(root)
+            payload = json.loads(config.read_text(encoding="utf-8"))
+            payload["profiles"][0]["requested_definitions"] = {"CMAKE_C_FLAGS": "-mcpu=neoverse-v1 && echo bad"}
+            atomic_write_json(config, payload)
+
+            with self.assertRaises(ArmTuneConfigError):
+                run_build_profile(config_path=config, run_id="run", output_dir=root / "out")
+
+    def test_explicit_neoverse_v1_profile_is_allowlisted(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = _build_config(root)
+            payload = json.loads(config.read_text(encoding="utf-8"))
+            payload["profiles"] = [
+                {
+                    "profile_id": "explicit-neoverse-v1",
+                    "effective_cmake_cache": {
+                        "GGML_NATIVE": "OFF",
+                        "CMAKE_C_FLAGS": "-mcpu=neoverse-v1",
+                        "CMAKE_CXX_FLAGS": "-mcpu=neoverse-v1",
+                    },
+                    "effective_compiler_flags": ["-mcpu=neoverse-v1"],
+                }
+            ]
+            payload["binaries"] = {"explicit-neoverse-v1": {"path": str(_binary(root, "explicit-neoverse-v1"))}}
+            atomic_write_json(config, payload)
+
+            result = run_build_profile(config_path=config, run_id="run", output_dir=root / "out")
+
+            self.assertEqual(result.profiles[0].profile_id, "explicit-neoverse-v1")
+            self.assertEqual(result.profiles[0].requested_definitions["CMAKE_C_FLAGS"], "-mcpu=neoverse-v1")
 
     def test_build_profile_rejects_shell_fragment_flag(self) -> None:
         with TemporaryDirectory() as temp_dir:
