@@ -238,4 +238,34 @@ qualification, duplicate command-line parameter refusal, one-time boot plan
 verification, recovery plan generation, post-boot health failure
 classification, and original-state fixture verification.
 
+Remote C7g read-only audit observations:
+
+- The running target was Linux `aarch64` with 8 logical CPUs, GRUB UEFI, AWS
+  4K kernel `6.17.0-1019-aws`, and base page size `4096`.
+- The audit verified a known-good fallback kernel and stable read-only
+  inventory comparison.
+- Official AWS ARM64 64K package metadata was found for
+  `linux-image-6.14.0-1018-aws-64k` version `6.14.0-1018.18~24.04.1`.
+- The 64K candidate state is `metadata_qualified_not_installed`; no package was
+  installed and no 64K kernel was booted.
+- Recovery snapshot and out-of-band recovery inputs were not verified, so every
+  modified boot profile remained blocked.
+- Remote and downloaded artifact manifests both validated; downloaded
+  validation checked `599/599` artifacts.
+- No audit, boot, or autotune process remained after the run.
+
+The remote audit required one focused parser fix:
+
+```text
+0280f6d fix: discover AWS 64K kernel metadata from apt
+```
+
+Conclusion:
+
+```text
+phase21c0_remote_readonly_audit: passed
+ready_for_phase21c_real_boot_validation: false
+kernel_or_boot_state_modified: false
+```
+
 Phase 21C real boot changes remain future work.

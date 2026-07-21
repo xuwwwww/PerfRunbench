@@ -52,3 +52,16 @@ Phase 21C0 does not install or boot a 64K kernel. It can only qualify official
 AWS ARM64 64K package metadata and candidate config evidence when the distro
 repository exposes it. If metadata is unknown, the result remains blocked
 rather than guessed.
+
+The C7g remote read-only audit found official AWS ARM64 64K package metadata:
+
+```text
+package: linux-image-6.14.0-1018-aws-64k
+version: 6.14.0-1018.18~24.04.1
+qualification_state: metadata_qualified_not_installed
+```
+
+This does not create a 4K/64K performance comparison. Every 64K profile remains
+blocked until a future phase explicitly authorizes kernel installation,
+one-time boot selection, recovery validation, and protocol-matched
+measurements.

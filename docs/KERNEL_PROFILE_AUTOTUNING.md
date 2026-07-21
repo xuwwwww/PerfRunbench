@@ -106,3 +106,39 @@ Unknown bootloader, Secure Boot, lockdown, kernel config, 64K package metadata,
 initramfs generation, fallback kernel, snapshot, Serial Console, SSH health
 check, rollback command, or user authorization evidence remains an explicit
 blocker.
+
+## Phase 21C0 C7g Remote Read-Only Audit
+
+Phase 21C0 was also validated against a user-started C7g / Neoverse-V1 target
+using read-only inventory commands only. The audit identified the running AWS
+4K kernel as the known-good baseline:
+
+```text
+current_kernel_release: 6.17.0-1019-aws
+current_base_page_size: 4096
+bootloader: grub_uefi
+fallback_kernel_verified: true
+```
+
+It also identified official AWS ARM64 64K package metadata without installing
+or booting that kernel:
+
+```text
+package: linux-image-6.14.0-1018-aws-64k
+version: 6.14.0-1018.18~24.04.1
+qualification_state: metadata_qualified_not_installed
+source_state: repository_metadata_only
+```
+
+All modified boot profiles remained blocked because recovery prerequisites and
+one-time boot verification were not present in the private evidence. The audit
+confirmed:
+
+```text
+phase21c0_remote_readonly_audit: passed
+ready_for_phase21c_real_boot_validation: false
+kernel_or_boot_state_modified: false
+```
+
+No Phase 21C reboot, bootloader write, kernel installation, initramfs
+generation, or permanent default change was performed.

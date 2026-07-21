@@ -271,7 +271,22 @@ G5 64k-nohz-rcu-irq
 G6 64k-managed-irq-isolation
 ```
 
-Phase 21C remains blocked until a future private read-only remote audit clears
-the exact blocker matrix and the user explicitly authorizes real reboot
-sequences. Phase 21C0 does not install kernels, write bootloader state, modify
-GRUB or EFI, generate initramfs, reboot, or control AWS.
+The private read-only remote audit completed on a C7g / Neoverse-V1 target
+after a focused metadata parser fix:
+
+```text
+0280f6d fix: discover AWS 64K kernel metadata from apt
+phase21c0_remote_readonly_audit: passed
+current_kernel_release: 6.17.0-1019-aws
+current_base_page_size: 4096
+fallback_kernel_verified: true
+official_64k_candidate_found: true
+official_64k_candidate_state: metadata_qualified_not_installed
+downloaded_artifact_validation: 599/599 passed
+```
+
+Phase 21C remains blocked because recovery snapshot evidence, out-of-band
+recovery, one-time boot verification, post-boot SSH health checks, rollback
+commands, and explicit reboot authorization were not verified for this audit.
+Phase 21C0 does not install kernels, write bootloader state, modify GRUB or
+EFI, generate initramfs, reboot, or control AWS.

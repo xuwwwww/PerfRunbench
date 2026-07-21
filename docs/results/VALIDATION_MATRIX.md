@@ -15,7 +15,7 @@ Numbers from different targets or protocols must not be combined.
 | 21A | Local fake Linux roots | Synthetic `/proc`, `/sys`, cgroup, IRQ, block, and boot fixtures | Host system and kernel profile framework, leases, rollback, and boot-plan safety | Planning and fake E2E only; no AWS and no real host mutation | passed |
 | 21B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Reversible Linux host-system apply, measurement, rollback, cleanup, and artifact validation | Real measured guard validation; no positive candidate cleared the 5% noise band | passed |
 | 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
-| 21C0 | Local fake Linux roots | Synthetic boot, kernel, package, GRUB, recovery, and health fixtures | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, and future protocol plan | Local planning only; no AWS, no kernel install, no bootloader write, no reboot | passed |
+| 21C0 | Local fake Linux roots plus read-only Linux Arm64 C7g / Neoverse-V1 audit | Synthetic boot fixtures and read-only boot/kernel inventory | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, official 64K package metadata, and future protocol plan | Planning and read-only inventory only; no kernel install, no bootloader write, no reboot | passed |
 
 ## Current Evidence Boundaries
 
@@ -164,19 +164,27 @@ ranked against steady-state decode throughput.
 ## Phase 21C0 Boot Readiness Summary
 
 Phase 21C0 adds local read-only planning for future reboot-required kernel
-profiles.
+profiles and validates the inventory path with a read-only C7g audit.
 
 Outcome:
 
 ```text
 phase21c0_local_boot_readiness: passed
-ready_for_manual_c7g_start_for_readonly_audit: true
+phase21c0_remote_readonly_audit: passed
+remote_commit: 0280f6d70b88dade575e4db27299ca3e20b2433f
+current_kernel_release: 6.17.0-1019-aws
+current_base_page_size: 4096
+bootloader: grub_uefi
+fallback_kernel_verified: true
+official_64k_candidate_found: true
+official_64k_candidate_state: metadata_qualified_not_installed
+ready_for_phase21c_real_boot_validation: false
 kernel_or_boot_state_modified: false
-aws_accessed: false
 real_phase21c_started: false
+downloaded_artifact_validation: 599/599 passed
 ```
 
-The local fixture validation covers:
+The fixture validation covers:
 
 ```text
 G0 original-4k-default
@@ -189,3 +197,9 @@ G6 64k-managed-irq-isolation
 ```
 
 No performance claim exists for Phase 21C0.
+
+The remote read-only audit required one focused inventory fix:
+
+```text
+0280f6d fix: discover AWS 64K kernel metadata from apt
+```

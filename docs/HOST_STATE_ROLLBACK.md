@@ -108,3 +108,17 @@ known-good boot state before the next experimental profile starts.
 Phase 21C0 only validates this logic with fixtures and read-only inventory. It
 does not write GRUB, EFI variables, initramfs files, kernel packages, or kernel
 command lines.
+
+The C7g Phase 21C0 remote audit preserved this boundary. It inspected the
+running 4K kernel, fallback evidence, bootloader type, and official 64K package
+metadata, then left:
+
+```text
+kernel_or_boot_state_modified: false
+ready_for_phase21c_real_boot_validation: false
+```
+
+The result remained blocked because the private evidence did not verify the
+recovery snapshot marker, out-of-band recovery path, one-time boot clearing,
+post-boot SSH health check, rollback command, or user authorization for a real
+reboot sequence.
