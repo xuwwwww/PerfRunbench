@@ -188,3 +188,37 @@ The allowed public recommendation wording remains:
 Do not claim global optimality, cross-instance portability, private workload
 coverage, automatic cloud provisioning, or optimized-path usage without
 recorded build and runtime evidence.
+
+## Phase 19: CPU-Aware Native Build Autotuning
+
+Status: in progress on `feature/cpu-aware-build-autotuning`.
+
+Phase 19 makes CPU-specific compilation a first-class ArmTune dimension while
+preserving historical Phase 9 evidence as a separate protocol.
+
+Goals:
+
+- add CPU target, backend, optimization, and portability fields to build
+  profile evidence
+- support `upstream-default`, `portable-reference`, `native-current-cpu`,
+  `explicit-current-cpu`, `native-kleidiai`, and `native-kleidiai-lto`
+  profile IDs
+- require KleidiAI build and runtime backend evidence before
+  `enabled_and_evidenced`
+- keep decode and prefill comparison metrics separate
+- add native-binary portability guards independent from workload identity
+- validate the workflow on one low-resource T4g.small target without comparing
+  the result to C7g evidence
+
+Allowed Phase 19 wording:
+
+> Best observed eligible configuration under the tested CPU, model, runtime
+> source commit, compiler, and measurement protocol.
+
+Non-goals:
+
+- no change to `v0.2.0` release/tag
+- no BootTrace prompt or model qualification work
+- no new model downloads
+- no C7g access
+- no global Arm speedup claim

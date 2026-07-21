@@ -35,6 +35,7 @@ BUILD_TOP_LEVEL_KEYS = {
     "source_lock",
     "compiler_probes",
     "native_binary_scopes",
+    "model",
 }
 FORBIDDEN_COMMAND_KEYS = {"command", "shell", "shell_command", "prebuild_command", "postbuild_command"}
 
@@ -299,6 +300,8 @@ def _combined_origin(origins: list[str]) -> str:
 
 
 def _eligibility_state(*, build_status: str, completeness: str, kleidiai_status: str) -> str:
+    if build_status in {"built_runtime_unverified", "runtime_unverified"}:
+        return "built_runtime_unverified"
     if build_status != "completed" or completeness != "complete":
         return "build_failed"
     if kleidiai_status in {"requested_but_unverified", "requested_but_runtime_unverified", "build_failed"}:

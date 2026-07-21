@@ -33,3 +33,26 @@ is recorded as:
 
 See `docs/results/PHASE_15C_WINDOWS_X86_PYTORCH_VALIDATION.md` for the
 sanitized evidence summary.
+
+## Phase 19 - CPU-Aware Native Build Tuning
+
+Phase 19 shifts ArmTune build tuning from named profiles such as
+`arm-native` toward explicit CPU-aware build evidence:
+
+- one pinned upstream `llama.cpp` source commit per Phase 19 run
+- upstream default Release build as the reasonable baseline
+- portable reference build only when supported by the pinned source
+- `GGML_NATIVE=ON` native build with compile-command evidence
+- explicit CPU target only after a compiler probe succeeds
+- KleidiAI build profiles only when build and runtime backend evidence both
+  support the claim
+- optional LTO only after toolchain probing
+
+The design intentionally keeps historical Phase 9 C7g evidence separate from
+Phase 19 T4g evidence. A new `llama.cpp` source lock changes the benchmark
+protocol, so old and new percentages must not be combined.
+
+The selected public wording remains:
+
+> Best observed eligible configuration under the tested CPU, model, runtime
+> source commit, compiler, and measurement protocol.

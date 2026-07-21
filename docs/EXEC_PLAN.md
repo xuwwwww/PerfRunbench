@@ -33,22 +33,44 @@ The only product change made during Phase 15C was a focused correctness fix for
 hex CPU-affinity mask canonicalization. No model, dataset, benchmark backend,
 cloud automation, or system-scoped tuning feature was added.
 
-## Next Steps
+## Completed Release Scope
 
-Phase 16 prepares the v0.2 release candidate:
+Phase 16 through Phase 18 completed the v0.2 release validation, GitHub
+Release packaging, competition submission materials, and final demo rehearsal.
+The v0.2.0 tag and competition submission claims must not be modified
+retrospectively.
+
+## Phase 19: CPU-Aware Native Build Autotuning On Arm
+
+Phase 19 makes CPU-specific native compilation a first-class tuning dimension
+for Arm inference workloads:
 
 ```text
-fresh install
--> init
--> doctor
--> tune
--> run --auto cache miss
--> run --auto cache hit
--> run --best
--> cache operations
--> release CI matrix
+inspect Arm target
+-> lock a pinned llama.cpp source commit
+-> inspect compiler and CPU feature evidence
+-> create allowlisted build candidates
+-> verify build and backend evidence
+-> compare builds with a fixed benchmark protocol
+-> run bounded runtime search on the selected build
+-> confirm the complete configuration
+-> generate and verify a Performance Passport
+-> guard native-binary recommendation reuse
 ```
 
-Keep feature expansion stopped unless a release-blocking correctness issue is
-found. Submission work should focus on release-candidate validation, PR review,
-and CI verification.
+Boundaries:
+
+- Use a single existing low-resource T4g.small target for bounded validation.
+- Do not compare T4g numbers directly with C7g evidence.
+- Do not access the stopped paid C7g target.
+- Do not download new models or datasets.
+- Do not add BootTrace research or model qualification logic.
+- Do not claim global Arm speedup from one T4g.small session.
+
+Expected commits:
+
+```text
+feat: add CPU-aware native build profiles
+feat: guard native binary portability and backend evidence
+docs: record T4g CPU-aware build tuning
+```

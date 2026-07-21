@@ -123,10 +123,13 @@ autotuneai arm benchmark \
 Generate and inspect Arm build-profile evidence:
 
 ```bash
+autotuneai arm build-doctor \
+  --config configs/armtune/build_profiles.example.json
+
 autotuneai arm build-plan \
   --config configs/armtune/build_profiles.example.json
 
-autotuneai arm build-profile \
+autotuneai arm tune-build \
   --config configs/armtune/build_profiles.example.json
 ```
 
@@ -142,7 +145,7 @@ autotuneai arm optimize \
 Compare profiles and generate a Passport:
 
 ```bash
-autotuneai arm profile-compare \
+autotuneai arm compare-builds \
   --config configs/armtune/profile_comparison.example.json
 
 autotuneai arm passport \
@@ -229,11 +232,29 @@ speedup. The supported wording is:
 > Best observed eligible configuration under the tested Arm target, model,
 > inference workload, and measurement protocol.
 
+For CPU-aware native builds the claim boundary is narrower:
+
+> Best observed eligible configuration under the tested CPU, model, runtime
+> source commit, compiler, and measurement protocol.
+
+Native binaries keep a separate portability scope. A CPU-specific binary
+recommendation must validate architecture, required CPU features, CPU model
+policy, binary digest, and startup smoke before reuse on another target.
+KleidiAI is reported as `enabled_and_evidenced` only when both build evidence
+and runtime backend evidence are present.
+
 Detailed evidence is recorded in:
 
 ```text
 docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md
 docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md
+```
+
+Phase 19 CPU-aware build tuning design documents:
+
+```text
+docs/CPU_AWARE_BUILD_TUNING.md
+docs/NATIVE_BINARY_PORTABILITY.md
 ```
 
 ## Related Historical Experiment

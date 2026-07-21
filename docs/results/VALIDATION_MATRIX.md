@@ -10,6 +10,7 @@ Numbers from different targets or protocols must not be combined.
 | 15B | Linux Arm64 T4g.small / Neoverse-N1 class | Public synthetic PyTorch training | Real low-resource Arm PyTorch workflow | Do not compare with C7g | passed |
 | 15C | Windows x86_64 controller | Public synthetic PyTorch training | Local CLI, cache, drift, apply, and portability validation | Do not compare with Arm | passed |
 | 16 | Windows local clean venv plus GitHub Actions matrix | Dependency-free public fixtures | Release-candidate installed-wheel usability | Packaging and CLI usability, not performance | pending final CI |
+| 19 | Linux Arm64 T4g.small / Neoverse-N1 class | Existing small GGUF with pinned `llama.cpp` | CPU-aware native build tuning and native-binary portability guards | Single low-resource Arm target; do not compare with C7g | pending |
 
 ## Current Evidence Boundaries
 
@@ -24,6 +25,9 @@ Numbers from different targets or protocols must not be combined.
   refuses to launch when no usable recommendation is available.
 - `run --auto` may retune on cache miss or hard drift according to policy; exact
   cache reuse does not create a new tuning result.
+- CPU-specific binary reuse requires native-binary portability evidence in
+  addition to workload and environment identity. Neoverse-N1 and Neoverse-V1
+  CPU-model-bound binaries are not interchangeable by default.
 
 ## Phase 15C Summary
 

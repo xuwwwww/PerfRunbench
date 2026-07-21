@@ -734,3 +734,30 @@ and always canaries before launching.
 The Phase 13 layer does not add new Arm benchmark backends. ArmTune continues
 to own Arm target inspection, `llama.cpp` build/runtime evidence, and
 Arm-specific Performance Passport details.
+
+## Phase 19 CPU-Aware Build Tuning
+
+Phase 19 extends build profiles so CPU-specific compilation is measured and
+guarded as a first-class tuning dimension:
+
+```text
+source lock
+-> compiler and CPU-feature probes
+-> allowlisted build candidates
+-> build/runtime backend evidence
+-> fixed build-profile comparison
+-> selected-build runtime search
+-> native-binary portability guard
+-> Performance Passport
+```
+
+The build profile schema records CPU target policy, backend policy,
+optimization policy, effective compiler/linker flags, runtime backend
+evidence, native binary scope, and eligibility state. `GGML_CPU_KLEIDIAI=ON`
+does not imply KleidiAI use by itself; `enabled_and_evidenced` requires both
+build evidence and runtime backend evidence.
+
+Native binary compatibility is separate from workload identity. Before reuse,
+PerfRunbench validates architecture, required CPU features, CPU model policy,
+binary digest, and startup smoke where required. A Neoverse-N1 CPU-model-bound
+binary is not silently reused on Neoverse-V1 or x86_64.

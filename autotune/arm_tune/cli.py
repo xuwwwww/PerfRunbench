@@ -11,6 +11,7 @@ from autotune.arm_tune import SCHEMA_VERSION
 from autotune.arm_tune.build_profiles.builder import inspect_build, run_build_profile, write_build_plan
 from autotune.arm_tune.build_profiles.comparison import run_profile_comparison
 from autotune.arm_tune.build_profiles.definitions import available_profile_ids, get_profile_definition
+from autotune.arm_tune.build_profiles.native_runner import run_native_build_profiles
 from autotune.arm_tune.build_profiles.validation import (
     ALLOWED_BACKEND_POLICIES,
     ALLOWED_CPU_TARGET_POLICIES,
@@ -332,7 +333,24 @@ def _cmd_build_doctor(args: argparse.Namespace) -> int:
 
 
 def _cmd_tune_build(args: argparse.Namespace) -> int:
-    return _cmd_build_profile(args)
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "tune-build", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    output_dir = run_dir / "armtune" / "build_profile"
+    try:
+        result = run_native_build_profiles(config_path=args.config, run_id=manifest.run_id, output_dir=output_dir)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = 0 if any(profile.build_status == "completed" for profile in result.profiles) else 1
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_build_profile_summary(result))
+    return exit_code
 
 
 def _cmd_build_profile(args: argparse.Namespace) -> int:
