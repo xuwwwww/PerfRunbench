@@ -87,6 +87,7 @@ def toolchain_from_payload(payload: dict[str, Any] | None) -> ToolchainEvidence:
         compiler_id=str(payload.get("compiler_id", "unknown")),
         compiler_version=str(payload.get("compiler_version", "unknown")),
         cmake_version=str(payload.get("cmake_version", "unknown")),
+        linker_version=str(payload.get("linker_version", "unknown")),
         generator=str(payload.get("generator", "unknown")),
         build_type=str(payload.get("build_type", "Release")),
     )

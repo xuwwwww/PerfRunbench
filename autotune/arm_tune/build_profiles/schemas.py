@@ -14,6 +14,42 @@ class BuildProfileDefinition:
     description: str
     cmake_definitions: dict[str, str]
     kleidiai_requested: bool = False
+    cpu_target_policy: str = "upstream_default"
+    backend_policy: str = "default_cpu"
+    optimization_policy: str = "standard_release"
+    portability_scope: str = "architecture_bound"
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class NativeBinaryScope:
+    architecture: str
+    portability_state: str
+    source_commit: str = "unknown"
+    compiler_identity: str = "unknown"
+    effective_cpu_flags: list[str] = field(default_factory=list)
+    required_cpu_features: list[str] = field(default_factory=list)
+    cpu_model: str = "unknown"
+    cpu_family: str = "unknown"
+    binary_sha256: str = "unknown"
+    build_target_fingerprint: str = "unknown"
+    verified_target_fingerprints: list[str] = field(default_factory=list)
+    startup_smoke_required: bool = False
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class NativeBinaryReuseDecision:
+    compatibility_status: str
+    launch_allowed: bool
+    reasons: list[str] = field(default_factory=list)
+    required_startup_smoke: bool = False
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,6 +74,7 @@ class ToolchainEvidence:
     compiler_id: str = "unknown"
     compiler_version: str = "unknown"
     cmake_version: str = "unknown"
+    linker_version: str = "unknown"
     generator: str = "unknown"
     build_type: str = "Release"
     schema_version: str = SCHEMA_VERSION
@@ -53,6 +90,8 @@ class BinaryEvidence:
     manifest: BenchmarkFileManifest | None
     validation_status: str
     validation_message: str = ""
+    executable_architecture: str = "unknown"
+    executable_format: str = "unknown"
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,13 +108,22 @@ class BuildProfileEvidence:
     requested_definitions: dict[str, str]
     effective_cmake_cache: dict[str, str] = field(default_factory=dict)
     compile_command_evidence: list[dict[str, Any]] = field(default_factory=list)
+    effective_compiler_flags: list[str] = field(default_factory=list)
+    effective_linker_flags: list[str] = field(default_factory=list)
+    cpu_target_policy: str = "upstream_default"
+    backend_policy: str = "default_cpu"
+    optimization_policy: str = "standard_release"
     target_architecture: str = "unknown"
     binary: BinaryEvidence | None = None
+    native_binary_scope: NativeBinaryScope | None = None
     linked_library_evidence: list[str] = field(default_factory=list)
+    runtime_backend_evidence: dict[str, Any] = field(default_factory=dict)
     build_output: dict[str, Any] = field(default_factory=dict)
+    build_duration_seconds: float | None = None
     build_status: str = "not_run"
     completeness: str = "incomplete"
     kleidiai_status: str = "unavailable"
+    eligibility_state: str = "ineligible_provenance"
     result_origin: str = "unverified"
     created_at_utc: str = field(default_factory=utc_now)
     schema_version: str = SCHEMA_VERSION
@@ -130,6 +178,7 @@ class ProfileComparisonEntry:
     ttft_ms: MetricDistribution
     end_to_end_latency_ms: MetricDistribution
     failure_rate: float
+    metrics: dict[str, MetricDistribution] = field(default_factory=dict)
     failure_reasons: list[str] = field(default_factory=list)
     schema_version: str = SCHEMA_VERSION
 

@@ -58,6 +58,11 @@ def verify_passport(path: str | Path) -> PerformancePassportVerification:
     checked += 1
     if not isinstance(claims, dict) or claims.get("schema_version") != SCHEMA_VERSION:
         issues.append("benchmark_claims must be a versioned object")
+    build_evidence = payload.get("build_evidence")
+    if build_evidence is not None:
+        checked += 1
+        if not isinstance(build_evidence, dict) or build_evidence.get("schema_version") != SCHEMA_VERSION:
+            issues.append("build_evidence must be a versioned object when present")
     return PerformancePassportVerification(
         verification_status="passed" if not issues else "failed",
         checked_items=checked,

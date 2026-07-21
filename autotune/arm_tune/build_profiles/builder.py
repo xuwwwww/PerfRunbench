@@ -10,7 +10,9 @@ from autotune.arm_tune.benchmark.artifacts import artifact_record, write_artifac
 from autotune.arm_tune.build_profiles.definitions import available_profile_ids, get_profile_definition
 from autotune.arm_tune.build_profiles.evidence import kleidiai_status
 from autotune.arm_tune.build_profiles.inspection import inspect_binary, inspect_source_repo, toolchain_from_payload
+from autotune.arm_tune.build_profiles.portability import native_scope_from_payload
 from autotune.arm_tune.build_profiles.schemas import BuildProfileEvidence, BuildProfilePlan, BuildProfileRunResult
+from autotune.arm_tune.build_profiles.validation import validate_cmake_definitions, validate_compiler_argument_list, validate_profile_payload
 from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.schemas import BenchmarkArtifactManifest
 from autotune.arm_tune.targets.protocol import atomic_write_json
@@ -30,6 +32,9 @@ BUILD_TOP_LEVEL_KEYS = {
     "toolchain",
     "build",
     "linked_libraries",
+    "source_lock",
+    "compiler_probes",
+    "native_binary_scopes",
 }
 FORBIDDEN_COMMAND_KEYS = {"command", "shell", "shell_command", "prebuild_command", "postbuild_command"}
 
@@ -76,16 +81,33 @@ def run_build_profile(*, config_path: str | Path, run_id: str, output_dir: str |
         effective_cache.update(_string_dict(build_payload.get("effective_cmake_cache", {}), "build.effective_cmake_cache"))
         effective_cache.update(_string_dict(profile_payload.get("effective_cmake_cache", {}), f"profiles.{definition.profile_id}.effective_cmake_cache"))
         compile_evidence = _compile_evidence(profile_payload.get("compile_command_evidence"))
-        build_status = "completed" if binary.validation_status == "passed" else "failed"
-        completeness = "complete" if binary.validation_status == "passed" else "incomplete"
+        effective_compiler_flags = validate_compiler_argument_list(
+            profile_payload.get("effective_compiler_flags"),
+            label=f"profiles.{definition.profile_id}.effective_compiler_flags",
+        )
+        effective_linker_flags = validate_compiler_argument_list(
+            profile_payload.get("effective_linker_flags"),
+            label=f"profiles.{definition.profile_id}.effective_linker_flags",
+        )
+        build_status = str(profile_payload.get("build_status") or ("completed" if binary.validation_status == "passed" else "failed"))
+        completeness = "complete" if binary.validation_status == "passed" and build_status == "completed" else "incomplete"
         profile_linked = [*linked_libraries, *[str(item) for item in profile_payload.get("linked_libraries", []) if isinstance(item, str)]]
+        runtime_backend_evidence = _object_or_empty(
+            profile_payload.get("runtime_backend_evidence"),
+            f"profiles.{definition.profile_id}.runtime_backend_evidence",
+        )
         kleidi = kleidiai_status(
             definition=definition,
             build_status=build_status,
             effective_cmake_cache=effective_cache,
             compile_command_evidence=compile_evidence,
             linked_library_evidence=profile_linked,
+            runtime_backend_evidence=runtime_backend_evidence,
         )
+        native_scope = native_scope_from_payload(profile_payload.get("native_binary_scope"))
+        cpu_target_policy = str(profile_payload.get("cpu_target_policy", definition.cpu_target_policy))
+        backend_policy = str(profile_payload.get("backend_policy", definition.backend_policy))
+        optimization_policy = str(profile_payload.get("optimization_policy", definition.optimization_policy))
         profiles.append(
             BuildProfileEvidence(
                 run_id=run_id,
@@ -96,17 +118,26 @@ def run_build_profile(*, config_path: str | Path, run_id: str, output_dir: str |
                 requested_definitions=requested,
                 effective_cmake_cache=effective_cache,
                 compile_command_evidence=compile_evidence,
+                effective_compiler_flags=effective_compiler_flags,
+                effective_linker_flags=effective_linker_flags,
+                cpu_target_policy=cpu_target_policy,
+                backend_policy=backend_policy,
+                optimization_policy=optimization_policy,
                 target_architecture=plan.target_architecture,
                 binary=binary,
+                native_binary_scope=native_scope,
                 linked_library_evidence=profile_linked,
+                runtime_backend_evidence=runtime_backend_evidence,
                 build_output={
                     "schema_version": SCHEMA_VERSION,
                     "mode": BUILD_PROFILE_OPERATION,
                     "message": "No arbitrary build command was executed; existing build artifacts were inspected.",
                 },
+                build_duration_seconds=_optional_float(profile_payload.get("build_duration_seconds")),
                 build_status=build_status,
                 completeness=completeness,
                 kleidiai_status=kleidi,
+                eligibility_state=_eligibility_state(build_status=build_status, completeness=completeness, kleidiai_status=kleidi),
                 result_origin=plan.result_origin,
             )
         )
@@ -148,6 +179,13 @@ def _load_build_config(path: str | Path) -> dict[str, Any]:
     unknown = set(payload) - BUILD_TOP_LEVEL_KEYS
     if unknown:
         raise ArmTuneConfigError(f"unknown build profile config field(s): {sorted(unknown)}")
+    if isinstance(payload.get("build"), dict) and "effective_cmake_cache" in payload["build"]:
+        validate_cmake_definitions(payload["build"]["effective_cmake_cache"], label="build.effective_cmake_cache", allow_cache_extra=True)
+    raw_profiles = payload.get("profiles")
+    if isinstance(raw_profiles, list):
+        for item in raw_profiles:
+            if isinstance(item, dict):
+                validate_profile_payload(item)
     return dict(payload)
 
 
@@ -258,6 +296,23 @@ def _combined_origin(origins: list[str]) -> str:
     if unique == {"test_fixture"}:
         return "test_fixture"
     return "unverified"
+
+
+def _eligibility_state(*, build_status: str, completeness: str, kleidiai_status: str) -> str:
+    if build_status != "completed" or completeness != "complete":
+        return "build_failed"
+    if kleidiai_status in {"requested_but_unverified", "requested_but_runtime_unverified", "build_failed"}:
+        return "built_runtime_unverified"
+    return "built_and_verified"
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _finalize_artifacts(root: Path) -> dict[str, dict[str, Any]]:

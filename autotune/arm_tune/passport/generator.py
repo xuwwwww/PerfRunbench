@@ -33,6 +33,7 @@ def generate_passport(
         artifact_manifest_sha256=sha256_file(manifest_path) if manifest_path.exists() else "",
         benchmark_claims=_benchmark_claims(comparison),
         provenance_summary=_provenance_summary(comparison),
+        build_evidence=_build_evidence(comparison),
         limitations=_limitations(comparison, state),
     )
     root = Path(output_dir)
@@ -95,6 +96,33 @@ def _provenance_summary(comparison: dict[str, Any]) -> dict[str, Any]:
         "result_origin": comparison.get("result_origin"),
         "profile_count": len(comparison.get("profiles", [])) if isinstance(comparison.get("profiles"), list) else 0,
         "rejected_profile_count": len(comparison.get("rejected_profiles", [])) if isinstance(comparison.get("rejected_profiles"), list) else 0,
+    }
+
+
+def _build_evidence(comparison: dict[str, Any]) -> dict[str, Any]:
+    profiles = comparison.get("profiles", [])
+    if not isinstance(profiles, list):
+        profiles = []
+    build_profiles: list[dict[str, Any]] = []
+    for item in profiles:
+        if not isinstance(item, dict):
+            continue
+        build_profiles.append(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "profile_id": item.get("profile_id"),
+                "build_status": item.get("build_status"),
+                "kleidiai_status": item.get("kleidiai_status"),
+                "eligibility_status": item.get("eligibility_status"),
+                "metrics": sorted((item.get("metrics") or {}).keys()) if isinstance(item.get("metrics"), dict) else [],
+            }
+        )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "optional": True,
+        "profile_count": len(build_profiles),
+        "profiles": build_profiles,
+        "note": "Build evidence is optional and backward compatible; historical passports are not reinterpreted.",
     }
 
 
