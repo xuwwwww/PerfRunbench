@@ -701,7 +701,7 @@ def _fallback_kernel_candidate(reader: RootReader, release: str, arch: str, conf
 def _candidate_64k_kernel(reader: RootReader, arch: str, distro: dict[str, str]) -> KernelCandidate:
     metadata = _kernel_repository_metadata(reader)
     picked = next((item for item in metadata if _is_official_aws_arm64_64k(item, distro)), None)
-    config = _candidate_64k_config(reader)
+    config = _candidate_64k_config(reader, picked)
     blockers = []
     if picked is None:
         blockers.append("kernel_package_candidate_unknown")
@@ -729,8 +729,12 @@ def _candidate_64k_kernel(reader: RootReader, arch: str, distro: dict[str, str])
 
 def _kernel_repository_metadata(reader: RootReader) -> list[dict[str, str]]:
     fixture = reader.read_text("/run/perfrunbench-fixtures/kernel_repository_metadata")
-    if fixture == NOT_AVAILABLE:
-        fixture = _run_readonly(["apt-cache", "search", "--names-only", "linux-image"], reader)
+    if fixture != NOT_AVAILABLE:
+        return _parse_kernel_repository_fixture(fixture)
+    return _discover_apt_64k_kernel_metadata(reader)
+
+
+def _parse_kernel_repository_fixture(fixture: str) -> list[dict[str, str]]:
     records = []
     for line in fixture.splitlines():
         if not line.strip():
@@ -750,6 +754,58 @@ def _kernel_repository_metadata(reader: RootReader) -> list[dict[str, str]]:
     return records
 
 
+def _discover_apt_64k_kernel_metadata(reader: RootReader) -> list[dict[str, str]]:
+    search = _run_readonly(["apt-cache", "search", "--names-only", "linux-image.*aws.*64k"], reader)
+    records = []
+    seen: set[str] = set()
+    for line in search.splitlines():
+        package = line.split(" - ", 1)[0].strip().split()[0] if line.strip() else ""
+        if not package or package in seen or "linux-image" not in package or "aws" not in package or "64k" not in package:
+            continue
+        seen.add(package)
+        show = _run_readonly(["apt-cache", "show", package], reader)
+        if show == NOT_AVAILABLE:
+            records.append({"package": package, "version": NOT_AVAILABLE, "architecture": NOT_AVAILABLE, "origin": NOT_AVAILABLE, "release": _release_from_linux_image_package(package)})
+            continue
+        records.extend(_parse_apt_show_kernel_metadata(show, fallback_package=package))
+    return records
+
+
+def _parse_apt_show_kernel_metadata(text: str, *, fallback_package: str) -> list[dict[str, str]]:
+    records = []
+    current: dict[str, str] = {}
+    for line in [*text.splitlines(), ""]:
+        if not line.strip():
+            if current:
+                package = current.get("Package", fallback_package)
+                filename = current.get("Filename", "")
+                origin = current.get("Origin", "")
+                if not origin and filename.startswith("pool/main/"):
+                    origin = "ubuntu"
+                records.append(
+                    {
+                        "package": package,
+                        "version": current.get("Version", NOT_AVAILABLE),
+                        "architecture": current.get("Architecture", NOT_AVAILABLE),
+                        "origin": origin or NOT_AVAILABLE,
+                        "release": _release_from_linux_image_package(package),
+                    }
+                )
+                current = {}
+            continue
+        if ":" in line:
+            key, value = line.split(":", 1)
+            current[key.strip()] = value.strip()
+    return records
+
+
+def _release_from_linux_image_package(package: str) -> str:
+    prefix = "linux-image-"
+    if package.startswith(prefix) and re.search(r"\d", package):
+        return package.removeprefix(prefix)
+    return NOT_AVAILABLE
+
+
 def _is_official_aws_arm64_64k(item: dict[str, str], distro: dict[str, str]) -> bool:
     package = item.get("package", "").lower()
     arch = item.get("architecture", "").lower()
@@ -758,12 +814,27 @@ def _is_official_aws_arm64_64k(item: dict[str, str], distro: dict[str, str]) -> 
     return "linux-image" in package and "aws" in package and "64k" in package and arch == "arm64" and (origin in {"ubuntu", "official", distro_id} or origin == NOT_AVAILABLE.lower())
 
 
-def _candidate_64k_config(reader: RootReader) -> KernelConfigCapability:
+def _candidate_64k_config(reader: RootReader, picked: dict[str, str] | None = None) -> KernelConfigCapability:
     path = reader.path("/run/perfrunbench-fixtures/candidate_64k_kernel_config")
     if path.exists():
         text = _read_config_path(path)
         return KernelConfigCapability(source_path="/run/perfrunbench-fixtures/candidate_64k_kernel_config", digest=file_sha256(path), capabilities=_config_capabilities(text))
+    if picked and _is_64k_kernel_metadata(picked):
+        capabilities = {key: "unknown" for key in CONFIG_KEYS}
+        capabilities["CONFIG_ARM64_4K_PAGES"] = "unsupported"
+        capabilities["CONFIG_ARM64_64K_PAGES"] = "supported"
+        return KernelConfigCapability(
+            source_path="repository_metadata:aws-arm64-64k-package",
+            digest=stable_digest(picked),
+            capabilities=capabilities,
+        )
     return KernelConfigCapability(source_path=NOT_AVAILABLE, digest=NOT_AVAILABLE, capabilities={key: "unknown" for key in CONFIG_KEYS})
+
+
+def _is_64k_kernel_metadata(item: dict[str, str]) -> bool:
+    package = item.get("package", "").lower()
+    release = item.get("release", "").lower()
+    return "64k" in package or "64k" in release
 
 
 def _blocker_matrix(

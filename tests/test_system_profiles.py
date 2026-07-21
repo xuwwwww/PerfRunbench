@@ -12,6 +12,7 @@ from autotune.cli import main as autotune_main
 from autotune.recommendation.bundle import create_recommendation_bundle, validate_recommendation_bundle
 from autotune.recommendation.schemas import atomic_write_json
 from autotune.system_profiles.boot import build_boot_profile
+from autotune.system_profiles import boot_readiness as boot_readiness_module
 from autotune.system_profiles.boot_readiness import (
     audit_boot_readiness,
     build_one_time_boot_plan,
@@ -295,6 +296,35 @@ class SystemProfilesTest(unittest.TestCase):
             self.assertEqual(inventory.blocker_matrix["fallback_kernel_missing"]["state"], "clear")
             self.assertIn("user_authorization_missing", readiness["blockers"])
             self.assertFalse(readiness["kernel_or_boot_state_modified"])
+
+    def test_phase21c0_discovers_64k_candidate_from_apt_metadata(self) -> None:
+        def fake_readonly(args: list[str], reader: RootReader) -> str:
+            if args[:3] == ["apt-cache", "search", "--names-only"]:
+                return "linux-image-6.14.0-1018-aws-64k - Signed kernel image aws 64k\n"
+            if args[:2] == ["apt-cache", "show"]:
+                return "\n".join(
+                    [
+                        "Package: linux-image-6.14.0-1018-aws-64k",
+                        "Version: 6.14.0-1018.18~24.04.1",
+                        "Architecture: arm64",
+                        "Filename: pool/main/l/linux-signed-aws-6.14/linux-image-6.14.0-1018-aws-64k_6.14.0-1018.18~24.04.1_arm64.deb",
+                        "Size: 18828474",
+                        "Installed-Size: 18708",
+                        "",
+                    ]
+                )
+            return NOT_AVAILABLE
+
+        with mock.patch.object(boot_readiness_module, "_run_readonly", fake_readonly):
+            candidate = boot_readiness_module._candidate_64k_kernel(RootReader(), "aarch64", {"ID": "ubuntu"})
+
+        self.assertEqual(candidate.qualification_state, "metadata_qualified_not_installed")
+        self.assertEqual(candidate.package_name, "linux-image-6.14.0-1018-aws-64k")
+        self.assertEqual(candidate.package_version, "6.14.0-1018.18~24.04.1")
+        self.assertEqual(candidate.architecture, "arm64")
+        self.assertEqual(candidate.release, "6.14.0-1018-aws-64k")
+        self.assertEqual(candidate.config.source_path, "repository_metadata:aws-arm64-64k-package")
+        self.assertEqual(candidate.config.capabilities["CONFIG_ARM64_64K_PAGES"], "supported")
 
     def test_phase21c0_missing_evidence_stays_unknown_and_blocks_precisely(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
