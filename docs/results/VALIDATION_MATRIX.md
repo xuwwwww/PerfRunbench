@@ -15,6 +15,7 @@ Numbers from different targets or protocols must not be combined.
 | 21A | Local fake Linux roots | Synthetic `/proc`, `/sys`, cgroup, IRQ, block, and boot fixtures | Host system and kernel profile framework, leases, rollback, and boot-plan safety | Planning and fake E2E only; no AWS and no real host mutation | passed |
 | 21B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Reversible Linux host-system apply, measurement, rollback, cleanup, and artifact validation | Real measured guard validation; no positive candidate cleared the 5% noise band | passed |
 | 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
+| 21C0 | Local fake Linux roots | Synthetic boot, kernel, package, GRUB, recovery, and health fixtures | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, and future protocol plan | Local planning only; no AWS, no kernel install, no bootloader write, no reboot | passed |
 
 ## Current Evidence Boundaries
 
@@ -159,3 +160,32 @@ local_artifacts_checked: 327
 `cpuset-1h7w-irq-workqueue` regressed sharply. Storage cold-start and
 prefault evidence was labeled `protocol_baseline_missing` instead of being
 ranked against steady-state decode throughput.
+
+## Phase 21C0 Boot Readiness Summary
+
+Phase 21C0 adds local read-only planning for future reboot-required kernel
+profiles.
+
+Outcome:
+
+```text
+phase21c0_local_boot_readiness: passed
+ready_for_manual_c7g_start_for_readonly_audit: true
+kernel_or_boot_state_modified: false
+aws_accessed: false
+real_phase21c_started: false
+```
+
+The local fixture validation covers:
+
+```text
+G0 original-4k-default
+G1 4k-nohz-rcu-irq
+G2 4k-managed-irq-isolation
+G3 4k-domain-isolation
+G4 64k-default
+G5 64k-nohz-rcu-irq
+G6 64k-managed-irq-isolation
+```
+
+No performance claim exists for Phase 21C0.

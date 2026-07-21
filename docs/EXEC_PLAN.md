@@ -220,3 +220,58 @@ One real-host correctness fix was required:
 
 Phase 21C boot/kernel changes remain future work. Phase 21B2 performed only a
 read-only boot-readiness audit.
+
+## Phase 21C0: C7g Boot And Kernel Validation Readiness
+
+Phase 21C0 prepares safe future 4K/64K kernel validation without accessing AWS
+or modifying any real host.
+
+Git consolidation:
+
+```text
+origin_main_commit: 8e53cb9b597dd2fdca4bfdc42af30c5d40b8566c
+phase21b2_commit: 09e5809d05dda933c7c27b88b1222e067674090e
+pr6_head_before: 27c73e69ada9d3d5ba501de2151111f30c5d0bb3
+pr6_head_after: 09e5809d05dda933c7c27b88b1222e067674090e
+phase21c0_initial_commit: 09e5809d05dda933c7c27b88b1222e067674090e
+```
+
+Implemented local-only readiness:
+
+```text
+BootInventory
+BootRecoveryCapability
+KernelCandidate
+KernelConfigCapability
+OneTimeBootPlan
+PostBootHealthPolicy
+BootRollbackPlan
+BootExperimentResult
+```
+
+New read-only CLI:
+
+```text
+autotuneai system boot-doctor --json
+autotuneai system kernel-inventory --json
+autotuneai system boot-plan --profile <profile> --inventory <inventory.json>
+autotuneai system boot-plan verify --plan <plan.json>
+autotuneai system recovery-plan --inventory <inventory.json>
+```
+
+Phase 21C0 profile order:
+
+```text
+G0 original-4k-default
+G1 4k-nohz-rcu-irq
+G2 4k-managed-irq-isolation
+G3 4k-domain-isolation
+G4 64k-default
+G5 64k-nohz-rcu-irq
+G6 64k-managed-irq-isolation
+```
+
+Phase 21C remains blocked until a future private read-only remote audit clears
+the exact blocker matrix and the user explicitly authorizes real reboot
+sequences. Phase 21C0 does not install kernels, write bootloader state, modify
+GRUB or EFI, generate initramfs, reboot, or control AWS.

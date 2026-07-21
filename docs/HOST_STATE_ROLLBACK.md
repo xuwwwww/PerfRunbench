@@ -77,3 +77,34 @@ final normalized snapshot == original normalized snapshot
 If downloaded artifact validation detects a digest mismatch, the run is not
 documented as complete until the manifest ordering is repaired and the artifact
 set validates both remotely and after download.
+
+## Reboot-Required Profiles
+
+Phase 21C0 keeps reboot-required profiles outside the reversible lease model.
+The watchdog scope remains:
+
+```text
+reversible_non_boot_settings_only
+```
+
+Boot and kernel experiments require a separate transaction:
+
+```text
+read-only inventory
+-> recovery verification
+-> one-time boot plan
+-> explicit reboot authorization boundary
+-> post-boot health check
+-> benchmark
+-> one-time rollback boot
+-> original-state verification
+```
+
+No future boot profile may become the permanent default until a one-time boot
+has passed health checks, benchmark artifact validation, rollback, and final
+original-state verification. Experimental profiles must return to the original
+known-good boot state before the next experimental profile starts.
+
+Phase 21C0 only validates this logic with fixtures and read-only inventory. It
+does not write GRUB, EFI variables, initramfs files, kernel packages, or kernel
+command lines.

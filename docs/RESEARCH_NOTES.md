@@ -212,3 +212,30 @@ host_restored_to_original_state: true
 all_reversible_families_exhausted: true
 ready_for_phase21c_boot_kernel_validation: false
 ```
+
+## Phase 21C0 - C7g Boot And Kernel Validation Readiness
+
+Phase 21C0 translates the Phase 21B2 boot-readiness blocker into a concrete,
+versioned, read-only planning model. It is a local implementation and fixture
+validation phase only. AWS is not accessed and no kernel, GRUB, EFI,
+initramfs, kernel command line, or reboot state is modified.
+
+Key decisions:
+
+- Keep boot/kernel plans separate from reversible runtime system leases.
+- Require a complete recovery capability model before any future reboot.
+- Treat missing kernel config, Secure Boot, lockdown, bootloader, initramfs,
+  package metadata, or fallback evidence as unknown or blocked, never guessed.
+- Use one-time boot selection only; never change the permanent default before
+  a successful validation cycle.
+- Return to the original 4K known-good state between every experimental
+  profile.
+- Keep steady-state decode, cold model load, warm first request, and stability
+  protocols separate.
+
+The local fixture suite covers 4K and 64K inventory, fallback kernel
+qualification, duplicate command-line parameter refusal, one-time boot plan
+verification, recovery plan generation, post-boot health failure
+classification, and original-state fixture verification.
+
+Phase 21C real boot changes remain future work.
