@@ -16,6 +16,7 @@ Numbers from different targets or protocols must not be combined.
 | 21B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Reversible Linux host-system apply, measurement, rollback, cleanup, and artifact validation | Real measured guard validation; no positive candidate cleared the 5% noise band | passed |
 | 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
 | 21C0 | Local fake Linux roots plus read-only Linux Arm64 C7g / Neoverse-V1 audit | Synthetic boot fixtures and read-only boot/kernel inventory | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, official 64K package metadata, and future protocol plan | Planning and read-only inventory only; no kernel install, no bootloader write, no reboot | passed |
+| 21C1 | Linux Arm64 C7g / Neoverse-V1 | No benchmark workload | Same-kernel GRUB one-time boot rehearsal with serial-console recovery validation | Reboot safety evidence only; no kernel change and no performance claim | passed |
 
 ## Current Evidence Boundaries
 
@@ -203,3 +204,35 @@ The remote read-only audit required one focused inventory fix:
 ```text
 0280f6d fix: discover AWS 64K kernel metadata from apt
 ```
+
+## Phase 21C1 Same-Kernel Boot Rehearsal Summary
+
+Phase 21C1 performed exactly one authorized guest OS reboot through a GRUB
+one-time entry that resolved to the already running known-good kernel.
+
+Outcome:
+
+```text
+phase21c1_one_time_boot_rehearsal: passed
+recovery_snapshot_verified: true
+serial_or_out_of_band_recovery_verified: true
+serial_console_interactive_login_verified: true
+serial_console_sudo_verified: true
+current_kernel_release: 6.17.0-1019-aws
+current_base_page_size: 4096
+post_boot_kernel_unchanged: true
+post_boot_page_size_unchanged: true
+kernel_command_line_unchanged: true
+permanent_default_unchanged: true
+host_healthy_after_reboot: true
+downloaded_artifact_validation: 30/30 passed
+ready_for_phase21c_real_boot_validation: true
+performance_improvement_verified: false
+```
+
+GRUB consumed the one-time entry value but left an empty `next_entry=` key in
+`grubenv`; the key was removed with `grub-editenv - unset next_entry` and the
+final GRUB environment list matched the pre-arm state.
+
+No 64K kernel was installed or booted, no permanent boot default was changed,
+and no benchmark was run.

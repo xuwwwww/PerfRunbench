@@ -285,8 +285,44 @@ official_64k_candidate_state: metadata_qualified_not_installed
 downloaded_artifact_validation: 599/599 passed
 ```
 
-Phase 21C remains blocked because recovery snapshot evidence, out-of-band
-recovery, one-time boot verification, post-boot SSH health checks, rollback
-commands, and explicit reboot authorization were not verified for this audit.
 Phase 21C0 does not install kernels, write bootloader state, modify GRUB or
 EFI, generate initramfs, reboot, or control AWS.
+
+## Phase 21C1: C7g Same-Kernel One-Time Boot Rehearsal
+
+Phase 21C1 converts the Phase 21C0 boot-readiness blockers into one bounded
+same-kernel boot transaction. It is recovery and bootloader-safety evidence,
+not performance evidence.
+
+Completed:
+
+```text
+recovery_snapshot_or_ami_verified: true
+serial_or_out_of_band_recovery_verified: true
+serial_console_interactive_login_verified: true
+serial_console_sudo_verified: true
+serial_getty_persists_across_boot: true
+exactly_one_guest_reboot_performed: true
+current_kernel_release: 6.17.0-1019-aws
+current_base_page_size: 4096
+selected_one_time_entry: current known-good non-recovery 4K kernel
+post_boot_kernel_unchanged: true
+post_boot_page_size_unchanged: true
+kernel_command_line_unchanged: true
+permanent_default_unchanged: true
+host_healthy_after_reboot: true
+downloaded_artifact_validation: 30/30 passed
+phase21c1_one_time_boot_rehearsal: passed
+```
+
+GRUB left an empty `next_entry=` key after consuming the one-time value. The
+run cleared that empty key with `grub-editenv - unset next_entry` and verified
+the final GRUB environment list returned to the pre-arm state.
+
+Phase 21C1 did not install, remove, or boot a 64K kernel; did not alter EFI
+BootOrder; did not change the permanent GRUB default; and did not run
+performance benchmarks.
+
+The next Phase 21C step may attempt a real reboot-required kernel/profile only
+one profile at a time, starting from the restored known-good 4K state and using
+the validated serial-console recovery path.
