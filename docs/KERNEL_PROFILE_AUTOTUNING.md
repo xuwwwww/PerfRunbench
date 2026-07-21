@@ -143,13 +143,14 @@ kernel_or_boot_state_modified: false
 No Phase 21C reboot, bootloader write, kernel installation, initramfs
 generation, or permanent default change was performed.
 
-## Phase 21C2A Local Preparation
+## Phase 21C2A Real 4K Boot Isolation Validation
 
-Phase 21C2A narrows the next real boot experiment to the already installed
-known-good AWS 4K kernel only. It does not install or remove kernel packages,
-does not use a 64K kernel, and does not access AWS during local preparation.
+Phase 21C2A executed the real 4K boot-isolation experiment on the already
+installed known-good AWS 4K kernel. It did not install or remove kernel
+packages, did not use a 64K kernel, did not alter EFI BootOrder, and did not
+change the permanent GRUB default.
 
-Prepared 4K profile order:
+Executed 4K profile order:
 
 | label | profile | appended parameters |
 | --- | --- | --- |
@@ -158,13 +159,24 @@ Prepared 4K profile order:
 | G2 | `4k-managed-irq-isolation` | G1 parameters plus `isolcpus=managed_irq,2-7` |
 | G3 | `4k-domain-isolation` | G1 parameters plus `isolcpus=domain,managed_irq,2-7` |
 
-Experimental profiles are planned as isolated temporary GRUB custom entries.
-The original generated Ubuntu menu entry is not edited, `grub.cfg` is not
-hand-edited, and the permanent default must remain unchanged. Each experiment
-must start from G0, use at most one reboot, and return to G0 before another
-experimental profile is attempted.
+Experimental profiles used isolated temporary GRUB custom entries. The
+original generated Ubuntu menu entry was not edited, `grub.cfg` was regenerated
+through normal GRUB tooling rather than hand-edited, and the permanent default
+remained unchanged. Each measured profile started from verified G0 and returned
+to verified G0 before another experimental profile was attempted.
 
-The local planner validates CPU-list syntax, housekeeping CPUs `0-1`, workload
-CPUs `2-7`, no duplicate or conflicting kernel parameters, command-line size,
-and supported evidence for `CONFIG_NO_HZ_FULL`, `CONFIG_RCU_NOCB_CPU`, and
-`CONFIG_CPU_ISOLATION`. Unknown kernel-config evidence is a blocker.
+Measured result:
+
+```text
+G0_E2_decode_median: 13.52 tok/s
+G1_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G2_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G3_E3_decode_median: 12.59 tok/s, -6.88%, regressed
+remote_artifact_revalidation: 410/410 passed
+downloaded_artifact_revalidation: 410/410 passed
+original_4k_state_restored: true
+performance_improvement_verified: false
+```
+
+G1 and G2 remained inside the configured 5% noise band. G3 regressed and is not
+eligible as an optimization result.

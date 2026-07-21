@@ -327,24 +327,21 @@ The next Phase 21C step may attempt a real reboot-required kernel/profile only
 one profile at a time, starting from the restored known-good 4K state and using
 the validated serial-console recovery path.
 
-## Phase 21C2A: Real 4K Boot Isolation Local Preparation
+## Phase 21C2A: Real 4K Boot Isolation Validation
 
-Phase 21C2A begins from the exact Phase 21C1 evidence commit and prepares the
-guarded 4K boot-parameter experiment locally. AWS remains untouched during this
-preparation boundary.
+Phase 21C2A executed guarded 4K boot-parameter experiments on the existing C7g
+/ Neoverse-V1 target with the installed known-good AWS 4K kernel. It did not
+install or remove kernel packages, did not boot a 64K kernel, did not change
+EFI BootOrder, and did not change the permanent GRUB default.
 
 Git source record:
 
 ```text
-origin_main_commit: 8e53cb9b597dd2fdca4bfdc42af30c5d40b8566c
-phase21c1_commit: e26af1e59ddd267a316ab826cb367fbbd74ff025
-phase21c2a_initial_commit: e26af1e59ddd267a316ab826cb367fbbd74ff025
-phase21c1_remote_branch: origin/validation/phase21c0-boot-readiness
 phase21c2a_branch: validation/phase21c2a-4k-boot-isolation
-pr6_status: open draft
+source_commit: 4e5a11bc10906649bbe756a3094488c7d30824b9
 ```
 
-Prepared 4K profiles:
+Executed 4K profiles:
 
 ```text
 G0 original-4k-default
@@ -353,8 +350,9 @@ G2 4k-managed-irq-isolation
 G3 4k-domain-isolation
 ```
 
-The local implementation adds temporary-entry planning, boot-parameter guards,
-and E1/E2/E3 comparison identities:
+The implementation used temporary GRUB custom entries, boot-parameter guards,
+mandatory return to G0 before each next profile, and E1/E2/E3 comparison
+identities:
 
 ```text
 E1 full-capacity baseline: G0 CPUs 0-7, threads 8
@@ -365,17 +363,24 @@ E3 experimental profile: G1/G2/G3 CPUs 2-7, threads 6
 Only E2 versus E3 can support a causal boot-isolation percentage. E1 is a
 secondary product-capacity tradeoff.
 
-Current boundary:
+Result:
 
 ```text
-phase21c2a_local_preparation: passed
-ready_for_manual_c7g_start: true
-kernel_or_boot_state_modified: false
-aws_accessed: false
+G0_E2_decode_median: 13.52 tok/s
+G1_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G2_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G3_E3_decode_median: 12.59 tok/s, -6.88%, regressed
+remote_artifact_revalidation: 410/410 passed
+downloaded_artifact_revalidation: 410/410 passed
+original_4k_state_restored: true
+permanent_default_unchanged: true
+performance_improvement_verified: false
+latency_or_noise_improvement_verified: false
 ```
 
-Real execution starts only after the user manually starts C7g and provides the
-new private connection details. The next step must revalidate controller and
-remote source equality, two read-only host inventories, recovery markers,
-Serial Console access, fallback kernel, original 4K command line, and absence
-of stale temporary entries before any one-time boot profile is armed.
+The first G1 attempt exposed a temporary-entry kernel-path generation defect
+before measurement. Recovery used Serial Console to select the original Ubuntu
+entry, cleanup passed, the harness was corrected to preserve original GRUB
+kernel/initrd paths, and corrected G1/G2/G3 transactions restarted from
+verified G0. The failed pre-measurement boot is not included in performance
+comparisons.

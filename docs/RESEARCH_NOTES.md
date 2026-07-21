@@ -295,17 +295,18 @@ ready_for_phase21c_real_boot_validation: true
 performance_improvement_verified: false
 ```
 
-## Phase 21C2A - 4K Boot Isolation Local Preparation
+## Phase 21C2A - 4K Boot Isolation Validation
 
-Phase 21C2A prepares the first real 4K boot-parameter experiment but remains at
-the local boundary until the user manually starts C7g. AWS is not accessed
-during local preparation.
+Phase 21C2A executed the first real 4K boot-parameter experiment on the C7g /
+Neoverse-V1 target using the installed AWS 4K kernel. It remained a 4K-only
+experiment; 64K kernel installation and validation remain out of scope until a
+separate Phase 21C2B decision.
 
 Key decisions:
 
 - Limit this phase to the installed known-good AWS 4K kernel.
 - Keep 64K kernel installation and validation out of scope until Phase 21C2B.
-- Generate isolated temporary GRUB custom-entry plans instead of editing the
+- Generate isolated temporary GRUB custom entries instead of editing the
   generated Ubuntu menu entry.
 - Preserve all original kernel arguments and append only allowlisted
   parameters.
@@ -314,17 +315,22 @@ Key decisions:
 - Separate E1 full-capacity baseline from E2 matched causal baseline and E3
   experimental profile.
 
-The local fixture suite covers parameter preservation, duplicate/conflicting
-parameter refusal, malformed CPU lists, missing housekeeping CPUs, temporary
-entry cleanup, permanent-default refusal, experimental-entry non-reuse, G0
-return requirements, post-boot health failure classification, Serial Console
-policy preservation, and matched-baseline comparison guards.
+The real run exposed a pre-measurement temporary-entry path defect on the first
+G1 attempt. Serial Console recovery selected the original Ubuntu entry, cleanup
+returned the host to verified G0, and the corrected harness preserved the
+original GRUB kernel/initrd paths. Corrected G1/G2/G3 runs then completed.
 
-Current boundary:
+Result:
 
 ```text
-phase21c2a_local_preparation: passed
-kernel_or_boot_state_modified: false
-aws_accessed: false
+G0_E2_decode_median: 13.52 tok/s
+G1_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G2_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G3_E3_decode_median: 12.59 tok/s, -6.88%, regressed
+remote_artifact_revalidation: 410/410 passed
+downloaded_artifact_revalidation: 410/410 passed
+original_4k_state_restored: true
+permanent_default_unchanged: true
 performance_improvement_verified: false
+latency_or_noise_improvement_verified: false
 ```

@@ -17,7 +17,7 @@ Numbers from different targets or protocols must not be combined.
 | 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
 | 21C0 | Local fake Linux roots plus read-only Linux Arm64 C7g / Neoverse-V1 audit | Synthetic boot fixtures and read-only boot/kernel inventory | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, official 64K package metadata, and future protocol plan | Planning and read-only inventory only; no kernel install, no bootloader write, no reboot | passed |
 | 21C1 | Linux Arm64 C7g / Neoverse-V1 | No benchmark workload | Same-kernel GRUB one-time boot rehearsal with serial-console recovery validation | Reboot safety evidence only; no kernel change and no performance claim | passed |
-| 21C2A | Local fake Linux roots | Synthetic boot fixtures only | 4K one-time boot-parameter isolation planning, temporary-entry guards, and matched baseline identities | Local preparation only; no AWS access, no reboot, no bootloader write, no performance claim | pending real execution |
+| 21C2A | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | 4K one-time boot-parameter isolation, rollback, cleanup, matched baseline measurement, and artifact validation | Real measured guard validation; G1/G2 stayed inside the 5% noise band and G3 regressed | passed |
 
 ## Current Evidence Boundaries
 
@@ -238,9 +238,10 @@ final GRUB environment list matched the pre-arm state.
 No 64K kernel was installed or booted, no permanent boot default was changed,
 and no benchmark was run.
 
-## Phase 21C2A 4K Boot Isolation Local Preparation Summary
+## Phase 21C2A 4K Boot Isolation Validation Summary
 
-Phase 21C2A prepares guarded one-time 4K boot-parameter experiments:
+Phase 21C2A executed guarded one-time 4K boot-parameter experiments on the
+existing C7g / Neoverse-V1 target:
 
 ```text
 G0 original-4k-default
@@ -249,11 +250,11 @@ G2 4k-managed-irq-isolation
 G3 4k-domain-isolation
 ```
 
-The local plan adds isolated temporary GRUB custom-entry metadata, explicit
-removal verification, permanent-default refusal, maximum one reboot per
-experimental transaction, and mandatory return to G0 before another profile.
+The validation used isolated temporary GRUB custom entries, explicit removal
+verification, permanent-default refusal, mandatory return to G0 before another
+profile, and independent artifact revalidation.
 
-Comparison identities are fixed before real measurement:
+Comparison identities:
 
 ```text
 E1 full-capacity baseline: G0 CPUs 0-7, threads 8
@@ -261,15 +262,26 @@ E2 matched causal baseline: G0 CPUs 2-7, threads 6
 E3 experimental profile: G1/G2/G3 CPUs 2-7, threads 6
 ```
 
-Only E2 versus E3 can support a causal boot-isolation percentage. E1 is a
-secondary product-capacity tradeoff.
+Only E2 versus E3 was used for causal boot-isolation classification. E1 remains
+a secondary product-capacity tradeoff.
 
-Current boundary:
+Outcome:
 
 ```text
-phase21c2a_local_preparation: passed
-ready_for_manual_c7g_start: true
-kernel_or_boot_state_modified: false
-aws_accessed: false
+G0_E2_decode_median: 13.52 tok/s
+G1_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G2_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G3_E3_decode_median: 12.59 tok/s, -6.88%, regressed
+remote_artifact_revalidation: 410/410 passed
+downloaded_artifact_revalidation: 410/410 passed
+original_4k_state_restored: true
+permanent_default_unchanged: true
 performance_improvement_verified: false
+latency_or_noise_improvement_verified: false
 ```
+
+The first G1 attempt exposed a temporary-entry kernel-path generation defect
+before measurement. Recovery used Serial Console to select the original Ubuntu
+entry, the defect was corrected, cleanup passed, and corrected G1/G2/G3
+transactions restarted from verified G0. The failed pre-measurement boot is not
+included in performance comparisons.

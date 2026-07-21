@@ -125,9 +125,9 @@ reboot sequence.
 
 ## Temporary Boot Entries
 
-Phase 21C2A prepares experimental 4K boot profiles through an isolated
-temporary GRUB custom-entry plan. The generated plan must be inspected before a
-real reboot and must satisfy:
+Phase 21C2A executes experimental 4K boot profiles through isolated temporary
+GRUB custom entries. The generated plan must be inspected before a real reboot
+and must satisfy:
 
 ```text
 original generated Ubuntu menu entry: untouched
@@ -144,3 +144,11 @@ Cleanup requires removal or restoration of the temporary custom-entry file,
 `update-grub`, clearing any consumed one-time `next_entry`, and verifying the
 temporary entry ID is absent. If the host does not return exactly to the
 original known-good 4K state, the next experimental profile must not begin.
+
+The real Phase 21C2A run validated this recovery model. A pre-measurement G1
+temporary entry failed because the local harness generated the wrong kernel
+path. Serial Console was used to select the original Ubuntu entry, cleanup
+removed the temporary entry and `next_entry`, and G0 validation passed before
+corrected G1/G2/G3 measurements continued. Final validation confirmed the
+original 4K command line, kernel, page size, and permanent default were
+restored.
