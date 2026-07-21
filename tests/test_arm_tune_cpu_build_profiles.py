@@ -12,6 +12,7 @@ from autotune.arm_tune.build_profiles.comparison import run_profile_comparison
 from autotune.arm_tune.build_profiles.compiler import duplicate_effective_profiles, effective_signature, probe_compiler_target
 from autotune.arm_tune.build_profiles.portability import evaluate_native_binary_reuse
 from autotune.arm_tune.build_profiles.schemas import NativeBinaryScope
+from autotune.arm_tune.benchmark.artifact_validation import validate_artifact_manifest
 from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.passport.generator import generate_passport
 from autotune.arm_tune.passport.verification import verify_passport
@@ -270,6 +271,9 @@ class ArmTuneCpuBuildProfileTest(unittest.TestCase):
 
             self.assertEqual(passport.build_evidence["profile_count"], 1)
             self.assertEqual(verify_passport(json_path).verification_status, "passed")
+            self.assertEqual(validate_artifact_manifest(json_path.parent).validation_status, "passed")
+            self.assertTrue((json_path.parent / "artifact_manifest.json").exists())
+            self.assertTrue((json_path.parent / "artifact_validation.json").exists())
 
 
 def _build_config(root: Path, *, kleidiai_build: bool = False, kleidiai_runtime: bool = False) -> Path:

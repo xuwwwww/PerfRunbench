@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
+from autotune.arm_tune.benchmark.artifact_validation import validate_artifact_manifest
+from autotune.arm_tune.benchmark.artifacts import artifact_record, write_artifact_manifest
 from autotune.arm_tune.benchmark.hashes import sha256_file
 from autotune.arm_tune.passport.markdown import passport_markdown
 from autotune.arm_tune.passport.schemas import PerformancePassport
@@ -44,6 +46,18 @@ def generate_passport(
     markdown_path.write_text(passport_markdown(passport), encoding="utf-8", newline="\n")
     verification = verify_passport(json_path)
     atomic_write_json(root / "performance_passport_verification.json", verification.to_dict())
+    artifacts = {
+        "performance_passport_json": artifact_record(json_path, label="performance_passport_json", root=root),
+        "performance_passport_markdown": artifact_record(markdown_path, label="performance_passport_markdown", root=root),
+        "performance_passport_verification": artifact_record(
+            root / "performance_passport_verification.json",
+            label="performance_passport_verification",
+            root=root,
+        ),
+    }
+    write_artifact_manifest(root / "artifact_manifest.json", artifacts)
+    artifact_validation = validate_artifact_manifest(root)
+    atomic_write_json(root / "artifact_validation.json", artifact_validation.to_dict())
     return replace(passport), json_path, markdown_path
 
 
