@@ -12,6 +12,14 @@ from autotune.cli import main as autotune_main
 from autotune.recommendation.bundle import create_recommendation_bundle, validate_recommendation_bundle
 from autotune.recommendation.schemas import atomic_write_json
 from autotune.system_profiles.boot import build_boot_profile
+from autotune.system_profiles.boot_readiness import (
+    audit_boot_readiness,
+    build_one_time_boot_plan,
+    build_recovery_plan,
+    collect_boot_inventory,
+    fixture_boot_experiment_result,
+    verify_one_time_boot_plan,
+)
 from autotune.system_profiles.catalog import (
     PROHIBITED_PROFILE_IDS,
     collect_capabilities,
@@ -21,7 +29,7 @@ from autotune.system_profiles.catalog import (
 )
 from autotune.system_profiles.lease import _read_effective, _selected_bracketed_mode, apply_system_profile_plan, rollback_system_profile, verify_system_profile
 from autotune.system_profiles.protocols import list_protocols
-from autotune.system_profiles.schemas import NOT_AVAILABLE
+from autotune.system_profiles.schemas import NOT_AVAILABLE, SystemProfileError
 from autotune.system_profiles.snapshot import RootReader, _queue_masks, collect_host_state_snapshot
 
 
@@ -267,6 +275,179 @@ class SystemProfilesTest(unittest.TestCase):
             compare = _run_cli(["system", "compare", "--run-id", "fixture-run", "--json"])
             self.assertEqual(compare["score_combination"], "prohibited")
 
+    def test_phase21c0_inventory_qualifies_4k_fallback_and_64k_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+
+            inventory = collect_boot_inventory(root)
+            readiness = audit_boot_readiness(inventory)
+
+            self.assertEqual(inventory.current_base_page_size, "4096")
+            self.assertEqual(inventory.logical_cpus, 8)
+            self.assertEqual(inventory.bootloader, "grub_bios")
+            self.assertEqual(inventory.current_kernel.qualification_state, "qualified_known_good")
+            self.assertEqual(inventory.fallback_kernel.qualification_state, "qualified_fallback")
+            self.assertEqual(inventory.candidate_64k_kernel.qualification_state, "metadata_qualified_not_installed")
+            self.assertEqual(inventory.current_kernel_config.capabilities["CONFIG_NO_HZ_FULL"], "supported")
+            self.assertEqual(inventory.candidate_64k_kernel.config.capabilities["CONFIG_ARM64_64K_PAGES"], "supported")
+            self.assertEqual(inventory.blocker_matrix["fallback_kernel_missing"]["state"], "clear")
+            self.assertIn("user_authorization_missing", readiness["blockers"])
+            self.assertFalse(readiness["kernel_or_boot_state_modified"])
+
+    def test_phase21c0_missing_evidence_stays_unknown_and_blocks_precisely(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            (root / "boot/config-6.17.0-1019-aws").unlink()
+            (root / "boot/initrd.img-6.17.0-1018-aws").unlink()
+            (root / "lib/modules/6.17.0-1018-aws").rmdir()
+
+            inventory = collect_boot_inventory(root)
+
+            self.assertEqual(inventory.current_kernel_config.capabilities["CONFIG_NO_HZ_FULL"], "unknown")
+            self.assertEqual(inventory.current_kernel_config.capabilities["CONFIG_ARM64_4K_PAGES"], "unknown")
+            self.assertEqual(inventory.fallback_kernel.qualification_state, "blocked")
+            self.assertIn("fallback_files_incomplete", inventory.fallback_kernel.blockers)
+            self.assertEqual(inventory.blocker_matrix["kernel_config_support_unknown"]["state"], "blocked")
+            self.assertEqual(inventory.blocker_matrix["fallback_kernel_unverified"]["state"], "blocked")
+
+    def test_phase21c0_insufficient_boot_space_and_fallback_removal_block(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            (root / "run/perfrunbench-fixtures/boot_free_bytes").write_text("1024\n", encoding="utf-8")
+            (root / "run/perfrunbench-fixtures/dpkg_kernel_inventory").write_text(
+                "\n".join(
+                    [
+                        "linux-image-6.17.0-1019-aws\t6.17.0-1019.19\tarm64\tii",
+                        "linux-image-6.17.0-1018-aws\t6.17.0-1018.18\tarm64\trc",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            inventory = collect_boot_inventory(root)
+
+            self.assertEqual(inventory.blocker_matrix["insufficient_boot_partition_space"]["state"], "blocked")
+            self.assertIn("fallback_package_not_installed", inventory.fallback_kernel.blockers)
+            self.assertEqual(inventory.blocker_matrix["fallback_kernel_unverified"]["state"], "blocked")
+
+    def test_phase21c0_64k_running_kernel_and_unknown_bootloader_are_separate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            release = "6.17.0-1020-aws-64k"
+            config = (root / "run/perfrunbench-fixtures/candidate_64k_kernel_config").read_text(encoding="utf-8")
+            (root / "proc/sys/kernel/osrelease").write_text(f"{release}\n", encoding="utf-8")
+            (root / "proc/cmdline").write_text(f"BOOT_IMAGE=/boot/vmlinuz-{release} root=LABEL=cloudimg-rootfs ro\n", encoding="utf-8")
+            (root / "run/perfrunbench-fixtures/base_page_size").write_text("65536\n", encoding="utf-8")
+            (root / "boot/grub/grub.cfg").unlink()
+            (root / "boot/vmlinuz-6.17.0-1019-aws").unlink()
+            (root / "boot/initrd.img-6.17.0-1019-aws").unlink()
+            (root / "boot/config-6.17.0-1019-aws").unlink()
+            (root / "boot" / f"vmlinuz-{release}").write_text("", encoding="utf-8")
+            (root / "boot" / f"initrd.img-{release}").write_text("", encoding="utf-8")
+            (root / "boot" / f"config-{release}").write_text(config, encoding="utf-8")
+            (root / "lib/modules" / release).mkdir(parents=True, exist_ok=True)
+            (root / "run/perfrunbench-fixtures/dpkg_kernel_inventory").write_text(
+                "\n".join(
+                    [
+                        f"linux-image-{release}\t6.17.0-1020.20\tarm64\tii",
+                        "linux-image-6.17.0-1018-aws\t6.17.0-1018.18\tarm64\tii",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            inventory = collect_boot_inventory(root)
+
+            self.assertEqual(inventory.current_base_page_size, "65536")
+            self.assertEqual(inventory.current_kernel_flavor, "aws-64k")
+            self.assertEqual(inventory.current_kernel_config.capabilities["CONFIG_ARM64_64K_PAGES"], "supported")
+            self.assertEqual(inventory.blocker_matrix["bootloader_unknown"]["state"], "blocked")
+
+    def test_phase21c0_boot_profiles_and_safety_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root)
+            inventory = collect_boot_inventory(root)
+
+            baseline = build_one_time_boot_plan("original-4k-default", inventory)
+            nohz = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+            managed = build_one_time_boot_plan("4k-managed-irq-isolation", inventory)
+            domain = build_one_time_boot_plan("4k-domain-isolation", inventory)
+            default64 = build_one_time_boot_plan("64k-default", inventory)
+            nohz64 = build_one_time_boot_plan("64k-nohz-rcu-irq", inventory)
+
+            self.assertEqual(baseline.eligibility_state, "baseline_known_good")
+            self.assertIn("nohz_full=2-7", nohz.exact_candidate_command_line)
+            self.assertIn("rcu_nocbs=2-7", nohz.exact_candidate_command_line)
+            self.assertIn("irqaffinity=0-1", nohz.exact_candidate_command_line)
+            self.assertIn("user_authorization_missing", nohz.blockers)
+            self.assertIn("isolcpus=managed_irq,2-7", managed.exact_candidate_command_line)
+            self.assertTrue(domain.advanced_less_flexible)
+            self.assertEqual(default64.candidate_base_page_size, "65536")
+            self.assertIn("nohz_full=2-7", nohz64.exact_candidate_command_line)
+            self.assertEqual(verify_one_time_boot_plan(baseline.to_dict())["status"], "passed")
+
+            failed_health = fixture_boot_experiment_result(baseline, health_passed=False, original_state_restored=True)
+            restored = fixture_boot_experiment_result(baseline, health_passed=True, original_state_restored=True)
+            self.assertEqual(failed_health.status, "failed")
+            self.assertEqual(restored.status, "passed")
+
+    def test_phase21c0_rejects_duplicate_bad_cpu_and_missing_housekeeping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_phase21c0_boot_fixture(root, cmdline_suffix=" nohz_full=2-7")
+            inventory = collect_boot_inventory(root)
+
+            plan = build_one_time_boot_plan("4k-nohz-rcu-irq", inventory)
+
+            self.assertIn("duplicate_kernel_parameter:nohz_full", plan.blockers)
+            self.assertEqual(plan.exact_candidate_command_line.count("nohz_full="), 1)
+            with self.assertRaisesRegex(SystemProfileError, "malformed CPU range"):
+                build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, housekeeping_cpus="0-x", workload_cpus="2-7")
+            with self.assertRaisesRegex(SystemProfileError, "housekeeping CPU range must not be empty"):
+                build_one_time_boot_plan("4k-nohz-rcu-irq", inventory, housekeeping_cpus="", workload_cpus="2-7")
+
+    def test_phase21c0_cli_inventory_plan_verify_and_recovery_e2e(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            _write_phase21c0_boot_fixture(root)
+            inventory_path = Path(tmp) / "inventory.json"
+            plan_path = Path(tmp) / "plan.json"
+
+            doctor = _run_cli(["system", "boot-doctor", "--root", str(root), "--json"])
+            self.assertEqual(doctor["phase"], "21C0")
+            self.assertFalse(doctor["kernel_or_boot_state_modified"])
+
+            self.assertEqual(_run_cli_code(["system", "kernel-inventory", "--root", str(root), "--output", str(inventory_path), "--json"]), 0)
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            self.assertEqual(inventory["schema_version"], "1.0")
+            self.assertEqual(inventory["current_kernel_release"], "6.17.0-1019-aws")
+
+            self.assertEqual(
+                _run_cli_code([
+                    "system",
+                    "boot-plan",
+                    "--profile",
+                    "original-4k-default",
+                    "--inventory",
+                    str(inventory_path),
+                    "--output",
+                    str(plan_path),
+                    "--json",
+                ]),
+                0,
+            )
+            self.assertEqual(_run_cli_code(["system", "boot-plan", "verify", "--plan", str(plan_path), "--json"]), 0)
+            recovery = _run_cli(["system", "recovery-plan", "--inventory", str(inventory_path), "--json"])
+            self.assertIn("health_check_commands", recovery)
+            self.assertFalse(recovery["kernel_or_boot_state_modified"])
+
     def test_recommendation_bundle_rejects_dirty_host_profile_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             passport = Path(tmp) / "passport.json"
@@ -370,3 +551,80 @@ def _write_fixture_root(root: Path, *, kernel_config: bool = True, second_policy
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def _write_phase21c0_boot_fixture(root: Path, *, cmdline_suffix: str = "") -> None:
+    _write_fixture_root(root)
+    current_config = "\n".join(
+        [
+            "CONFIG_ARM64_4K_PAGES=y",
+            "# CONFIG_ARM64_64K_PAGES is not set",
+            "CONFIG_NO_HZ_FULL=y",
+            "CONFIG_RCU_NOCB_CPU=y",
+            "CONFIG_CPU_ISOLATION=y",
+            "CONFIG_CGROUPS=y",
+            "CONFIG_CPUSETS=y",
+            "CONFIG_IRQ_TIME_ACCOUNTING=y",
+            "CONFIG_SCHEDSTATS=y",
+            "CONFIG_HUGETLBFS=y",
+            "CONFIG_TRANSPARENT_HUGEPAGE=y",
+            "CONFIG_PERF_EVENTS=y",
+            "",
+        ]
+    )
+    fallback_config = current_config
+    candidate_config = current_config.replace("CONFIG_ARM64_4K_PAGES=y", "# CONFIG_ARM64_4K_PAGES is not set").replace(
+        "# CONFIG_ARM64_64K_PAGES is not set",
+        "CONFIG_ARM64_64K_PAGES=y",
+    )
+    files = {
+        "proc/cmdline": f"BOOT_IMAGE=/boot/vmlinuz-6.17.0-1019-aws root=LABEL=cloudimg-rootfs ro{cmdline_suffix}\n",
+        "boot/initrd.img-6.17.0-1019-aws": "",
+        "boot/initrd.img-6.17.0-1018-aws": "",
+        "boot/config-6.17.0-1019-aws": current_config,
+        "boot/config-6.17.0-1018-aws": fallback_config,
+        "boot/grub/grub.cfg": "\n".join(
+            [
+                "menuentry 'Ubuntu, with Linux 6.17.0-1019-aws' {",
+                "  linux /boot/vmlinuz-6.17.0-1019-aws",
+                "}",
+                "menuentry 'Ubuntu, with Linux 6.17.0-1018-aws' {",
+                "  linux /boot/vmlinuz-6.17.0-1018-aws",
+                "}",
+                "",
+            ]
+        ),
+        "boot/grub/grubenv": "saved_entry=Ubuntu, with Linux 6.17.0-1019-aws\n",
+        "sys/kernel/security/lockdown": "none\n",
+        "run/perfrunbench-fixtures/dpkg_kernel_inventory": "\n".join(
+            [
+                "linux-image-6.17.0-1019-aws\t6.17.0-1019.19\tarm64\tii",
+                "linux-image-6.17.0-1018-aws\t6.17.0-1018.18\tarm64\tii",
+                "",
+            ]
+        ),
+        "run/perfrunbench-fixtures/kernel_repository_metadata": "linux-image-aws-64k\t6.17.0-1020.20\tarm64\tUbuntu\t6.17.0-1020-aws-64k\n",
+        "run/perfrunbench-fixtures/candidate_64k_kernel_config": candidate_config,
+        "run/perfrunbench-fixtures/boot_free_bytes": str(1024 * 1024 * 1024) + "\n",
+        "run/perfrunbench-fixtures/root_free_bytes": str(32 * 1024 * 1024 * 1024) + "\n",
+        "run/perfrunbench-fixtures/root_filesystem_type": "ext4\n",
+        "run/perfrunbench-fixtures/boot_filesystem_type": "ext4\n",
+        "run/perfrunbench-fixtures/recovery_snapshot_marker": "verified\n",
+        "run/perfrunbench-fixtures/serial_console_verified": "verified\n",
+        "run/perfrunbench-fixtures/out_of_band_recovery_verified": "verified\n",
+        "run/perfrunbench-fixtures/volume_recovery_path_verified": "verified\n",
+        "run/perfrunbench-fixtures/manual_recovery_instructions_present": "present\n",
+        "run/perfrunbench-fixtures/one_time_boot_verified": "verified\n",
+        "run/perfrunbench-fixtures/ssh_post_boot_check": "defined\n",
+        "run/perfrunbench-fixtures/rollback_commands_defined": "defined\n",
+        "run/perfrunbench-fixtures/root_volume_identity": "recorded\n",
+        "run/perfrunbench-fixtures/initramfs_generation_verified": "verified\n",
+        "run/perfrunbench-fixtures/secure_boot_state": "disabled\n",
+        "run/perfrunbench-fixtures/default_boot_entry": "Ubuntu, with Linux 6.17.0-1019-aws\n",
+    }
+    for relative, content in files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8", newline="\n")
+    for release in ["6.17.0-1019-aws", "6.17.0-1018-aws"]:
+        (root / "lib/modules" / release).mkdir(parents=True, exist_ok=True)

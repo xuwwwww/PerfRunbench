@@ -130,6 +130,179 @@ class BootKernelProfile:
 
 
 @dataclass(frozen=True)
+class KernelConfigCapability:
+    source_path: str
+    digest: str
+    capabilities: dict[str, str]
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class KernelCandidate:
+    candidate_id: str
+    release: str
+    flavor: str
+    package_name: str
+    package_version: str
+    architecture: str
+    source_state: str
+    vmlinuz_path: str
+    initrd_path: str
+    modules_path: str
+    base_page_size: str
+    config: KernelConfigCapability
+    qualification_state: str
+    blockers: list[str] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BootRecoveryCapability:
+    snapshot_marker_state: str
+    recovery_snapshot_state: str
+    serial_console_state: str
+    out_of_band_recovery_state: str
+    fallback_kernel_state: str
+    fallback_kernel: str
+    root_volume_identity_state: str
+    volume_recovery_state: str
+    boot_menu_access_state: str
+    manual_recovery_instructions_state: str
+    one_time_boot_state: str
+    ssh_post_boot_check_state: str
+    rollback_command_state: str
+    user_authorization_state: str
+    maximum_health_check_timeout_seconds: int = 600
+    maximum_reboot_count: int = 1
+    blockers: list[str] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BootInventory:
+    current_kernel_package: str
+    current_kernel_release: str
+    current_kernel_flavor: str
+    current_base_page_size: str
+    current_boot_id: str
+    current_command_line: str
+    current_command_line_digest: str
+    current_default_boot_entry: str
+    known_good_fallback_entry: str
+    architecture: str
+    logical_cpus: int | str
+    distribution: dict[str, str]
+    bootloader: str
+    bootloader_evidence: dict[str, Any]
+    kernel_inventory: list[dict[str, Any]]
+    boot_files: dict[str, Any]
+    filesystem_inventory: dict[str, Any]
+    grub_environment: dict[str, Any]
+    efi_state: dict[str, Any]
+    initramfs_inventory: dict[str, Any]
+    secure_boot_state: str
+    lockdown_state: str
+    current_kernel_config: KernelConfigCapability
+    current_kernel: KernelCandidate
+    fallback_kernel: KernelCandidate
+    candidate_64k_kernel: KernelCandidate
+    recovery: BootRecoveryCapability
+    blocker_matrix: dict[str, dict[str, Any]]
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class PostBootHealthPolicy:
+    required_checks: list[str]
+    timeout_seconds: int
+    failure_action: str
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BootRollbackPlan:
+    rollback_commands: list[str]
+    fallback_mechanism: str
+    maximum_reboot_count: int
+    original_state_verification: list[str]
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class OneTimeBootPlan:
+    profile_id: str
+    description: str
+    profile_order: int
+    current_kernel_package: str
+    current_kernel_release: str
+    current_kernel_flavor: str
+    current_base_page_size: str
+    current_boot_id: str
+    current_command_line_digest: str
+    current_default_boot_entry: str
+    known_good_fallback_entry: str
+    candidate_kernel_package: str
+    candidate_kernel_release: str
+    candidate_vmlinuz_path: str
+    candidate_initrd_path: str
+    candidate_modules_path: str
+    candidate_base_page_size: str
+    candidate_kernel_config_digest: str
+    exact_candidate_command_line: str
+    one_time_boot_mechanism: str
+    fallback_mechanism: str
+    expected_post_boot_identity: dict[str, Any]
+    health_policy: PostBootHealthPolicy
+    ssh_recovery_policy: str
+    serial_console_recovery_policy: str
+    rollback_plan: BootRollbackPlan
+    maximum_reboot_count: int
+    authorization_state: str
+    eligibility_state: str
+    blockers: list[str] = field(default_factory=list)
+    advanced_less_flexible: bool = False
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class BootExperimentResult:
+    profile_id: str
+    status: str
+    plan_digest: str
+    boot_attempted: bool
+    reboot_performed: bool
+    kernel_or_boot_state_modified: bool
+    health_status: str
+    rollback_status: str
+    blockers: list[str] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
 class SystemTuningPlan:
     plan_id: str
     profile: HostSystemProfile
