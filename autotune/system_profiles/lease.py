@@ -238,7 +238,7 @@ def _is_bracketed_mode_path(path: Path) -> bool:
     return normalized in {
         "/sys/kernel/mm/transparent_hugepage/enabled",
         "/sys/kernel/mm/transparent_hugepage/defrag",
-    }
+    } or normalized.endswith("/queue/scheduler")
 
 
 def _selected_bracketed_mode(text: str) -> str:

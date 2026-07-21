@@ -19,7 +19,7 @@ from autotune.system_profiles.catalog import (
     list_profiles,
     staged_search_policy,
 )
-from autotune.system_profiles.lease import _selected_bracketed_mode, apply_system_profile_plan, rollback_system_profile, verify_system_profile
+from autotune.system_profiles.lease import _read_effective, _selected_bracketed_mode, apply_system_profile_plan, rollback_system_profile, verify_system_profile
 from autotune.system_profiles.protocols import list_protocols
 from autotune.system_profiles.schemas import NOT_AVAILABLE
 from autotune.system_profiles.snapshot import RootReader, _queue_masks, collect_host_state_snapshot
@@ -113,6 +113,14 @@ class SystemProfilesTest(unittest.TestCase):
     def test_bracketed_sysfs_modes_report_selected_effective_value(self) -> None:
         self.assertEqual(_selected_bracketed_mode("always [madvise] never"), "madvise")
         self.assertEqual(_selected_bracketed_mode("[always] madvise never"), "always")
+
+    def test_block_queue_scheduler_reports_selected_effective_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            scheduler = Path(tmp) / "sys/block/nvme0n1/queue/scheduler"
+            scheduler.parent.mkdir(parents=True)
+            scheduler.write_text("none [mq-deadline]\n", encoding="utf-8")
+
+            self.assertEqual(_read_effective(scheduler), "mq-deadline")
 
     def test_apply_refuses_real_system_without_fake_root(self) -> None:
         snapshot = collect_host_state_snapshot()
