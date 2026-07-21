@@ -12,6 +12,7 @@ Numbers from different targets or protocols must not be combined.
 | 16 | Windows local clean venv plus GitHub Actions matrix | Dependency-free public fixtures | Release-candidate installed-wheel usability | Packaging and CLI usability, not performance | pending final CI |
 | 19 | Linux Arm64 T4g.small / Neoverse-N1 class | No suitable existing model available; build evidence only | CPU-aware native build tuning guard validation | Build artifacts collected, but no benchmark or recommendation claim | insufficient evidence |
 | 20 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp | CPU-aware build/backend evidence, bounded runtime search, server timing, Passport, and artifact validation | Real measured workflow validation; build and runtime improvements stayed inside the 5% noise band | passed |
+| 21A | Local fake Linux roots | Synthetic `/proc`, `/sys`, cgroup, IRQ, block, and boot fixtures | Host system and kernel profile framework, leases, rollback, and boot-plan safety | Planning and fake E2E only; no AWS and no real host mutation | passed |
 
 ## Current Evidence Boundaries
 
@@ -87,3 +88,23 @@ Performance_Passport: verification passed, claim_eligibility_state ineligible_pr
 artifact_revalidation: 77/77 passed remotely and after download
 performance_improvement_verified: false
 ```
+
+## Phase 21A System/Kernel Framework Summary
+
+Phase 21A adds a guarded local framework for future Linux system and kernel
+autotuning:
+
+```text
+AWS_access: false
+real_host_mutation: false
+snapshot_model: HostStateSnapshot
+profile_catalog: capability-driven safe-system
+reversible_apply: fake-root only
+rollback: reverse-order exact restoration
+boot_profiles: planning only, no GRUB writes
+protocol_separation: enforced
+dirty_host_recommendation: ineligible
+```
+
+This phase does not provide a performance result. It prepares future C7g
+validation for reversible system profiles and reboot-required kernel profiles.

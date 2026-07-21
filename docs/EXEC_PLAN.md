@@ -121,3 +121,35 @@ The best evidence-valid build profile was `explicit-neoverse-v1`, but its
 decode median (`17.78 tok/s`) was only `0.395257%` above `upstream-default`
 (`17.71 tok/s`), inside the configured 5% noise band. Runtime search selected
 the baseline configuration with a confirmed decode median of `17.72 tok/s`.
+
+## Phase 21A: Host System And Kernel Profile Framework
+
+Phase 21A is local implementation, fake-root testing, and documentation only.
+AWS is not accessed and no remote host is modified.
+
+Git integration record:
+
+```text
+origin_main_commit: 8e53cb9b597dd2fdca4bfdc42af30c5d40b8566c
+phase20_commit: 9bc71d034f1cb7e986f7bf87a222335191e2c712
+phase21a_initial_commit: 9bc71d034f1cb7e986f7bf87a222335191e2c712
+phase20_pr_status: not_created_auth_unavailable
+```
+
+Phase 20 branch `validation/phase20-c7g-build-backend` was pushed without
+force. GitHub PR creation was attempted through `gh` and the GitHub connector;
+`gh` lacked authentication and the connector returned `403 Resource not
+accessible by integration`.
+
+Phase 21A scope:
+
+- versioned host state snapshots
+- capability-driven safe profile catalog
+- reversible fake-root leases and rollback
+- boot-kernel profile planning without bootloader writes
+- system benchmark protocol separation
+- optional host evidence binding for RecommendationBundle and Performance
+  Passport
+
+No performance result is produced in Phase 21A. System and kernel tuning remain
+future real-validation work.

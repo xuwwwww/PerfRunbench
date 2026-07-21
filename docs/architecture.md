@@ -27,6 +27,7 @@ controller CLI
 | `autotune.recommendation` | RecommendationBundle generation, validation, canary, lease, status, rollback, and cache integration. |
 | `autotune.training_adapter` | Dependency-free and PyTorch-backed bounded training slice adapter. |
 | `autotune.arm_tune` | Arm target inspection, SSH/local target orchestration, `llama.cpp` benchmarking, runtime search, build profiles, and Performance Passport evidence. |
+| `autotune.system_profiles` | Host state snapshots, Linux system-profile planning, reversible leases, rollback, protocol separation, and boot-profile planning using fake-root validation. |
 | `autotune.resource` | Run directories, process execution, monitoring, CPU affinity, resource budgets, and cleanup. |
 | `autotune.report` | Markdown and HTML report helpers. |
 
@@ -74,6 +75,24 @@ Phase 19 does not:
 - download new models or datasets
 - add BootTrace qualification logic
 - claim global Arm speedup from one target
+
+## Phase 21A Host System Profile Boundary
+
+The system-profile layer is separate from workload adapters. It owns:
+
+```text
+host snapshot
+-> capability report
+-> safe profile catalog
+-> lease-bound apply
+-> rollback verification
+-> protocol-specific evidence
+-> optional Passport/cache binding
+```
+
+Phase 21A validates this layer with fake Linux roots only. Real host mutation,
+AWS access, bootloader writes, and kernel installation are future validation
+work.
 
 ## Evidence Principles
 

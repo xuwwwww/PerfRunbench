@@ -103,3 +103,27 @@ Conclusion:
 phase20_c7g_build_backend_runtime_tuning: passed
 performance_improvement_verified: false
 ```
+
+## Phase 21A - Host System And Kernel Profile Framework
+
+Phase 21A adds a local fake-root framework for Linux system and kernel profile
+planning. It deliberately avoids AWS access and real host mutation.
+
+Key decisions:
+
+- Add `autotune.system_profiles` instead of extending the legacy
+  `autotune.system_tuner` sysctl helper in place.
+- Treat unavailable host interfaces as `not_available`, not false or zero.
+- Generate profiles from discovered capabilities instead of assuming CPUFreq,
+  cpuidle, cgroup v2 partitions, IRQ affinity, THP sizes, HugeTLB, RPS/XPS,
+  GRUB, or 64K kernels exist.
+- Keep system profiles protocol-specific across steady-state decode, cold
+  model load, warm first request, interactive server, and concurrent server.
+- Refuse real-system writes in Phase 21A unless a future phase adds explicit
+  opt-in.
+- Bind non-read-only changes to a lease and require reverse-order rollback.
+- Mark dirty host state as recommendation-ineligible.
+
+Phase 21A does not overturn Phase 20. Phase 20 showed no build/simple-runtime
+candidate outside the 5% noise band. System and kernel mechanisms remain
+unevaluated until Phase 21B/21C.

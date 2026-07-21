@@ -10,6 +10,7 @@ current release focus is **ArmTune**, an Arm AI inference subsystem for:
 - Performance Passport generation
 - Guarded recommendation show, validate, dry-run apply, canary, lease, and
   rollback
+- Optional Linux host system and kernel profile planning
 
 ArmTune is the Arm-focused counterpart to the generic PerfRunbench resource and
 recommendation infrastructure. `llama.cpp` is the first workload adapter, not
@@ -256,6 +257,19 @@ Phase 19 CPU-aware build tuning design documents:
 docs/CPU_AWARE_BUILD_TUNING.md
 docs/NATIVE_BINARY_PORTABILITY.md
 ```
+
+Phase 21A Linux system and kernel profile planning documents:
+
+```text
+docs/LINUX_SYSTEM_AUTOTUNING.md
+docs/KERNEL_PROFILE_AUTOTUNING.md
+docs/HOST_STATE_ROLLBACK.md
+docs/SYSTEM_BENCHMARK_PROTOCOLS.md
+docs/ARM_4K_64K_KERNEL_COMPARISON.md
+```
+
+Phase 21A is planning and fake-root validation only. It does not access AWS,
+does not modify a real host, and does not change the v0.2.0 release claims.
 
 ## Related Historical Experiment
 
