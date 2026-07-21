@@ -41,3 +41,31 @@ decode evidence.
 The only clear Phase 21B outcome outside the noise band was a regression for
 the reduced CPU-set affinity candidate. Positive deltas stayed inside the 5%
 noise band and were not promoted.
+
+## Phase 21B2 Protocol Boundary
+
+Phase 21B2 ranked only candidates using the same `steady_state_decode`
+protocol as `baseline-current`:
+
+```text
+binary: upstream-default llama-bench
+prompt_tokens: 512
+generation_tokens: 128
+baseline_repetitions: 5
+noise_band_percent: 5.0
+```
+
+`no-mmap`, explicit mmap, THP mmap modes, allocator arena limiting, cpuset
+partitions, and IRQ/workqueue isolation were compared only within that
+protocol. The largest positive steady-state delta was `no-mmap` at `+3.014%`,
+inside the noise band.
+
+Storage scheduler/read-ahead measurements used `cold_model_load`, and
+`prefault-warm` used `warm_page_cache_decode`. Those rows were labeled
+`protocol_baseline_missing` because they do not have a matching Phase 21B2
+baseline and must not be ranked against steady-state decode throughput.
+
+`llama-server` request timing was secondary `interactive_server` smoke
+evidence only. It validated request completion, nonempty output, stream
+parsing, TTFT/E2E recording, cleanup, and port release; it did not participate
+in candidate eligibility.

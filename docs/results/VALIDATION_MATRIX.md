@@ -14,6 +14,7 @@ Numbers from different targets or protocols must not be combined.
 | 20 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp | CPU-aware build/backend evidence, bounded runtime search, server timing, Passport, and artifact validation | Real measured workflow validation; build and runtime improvements stayed inside the 5% noise band | passed |
 | 21A | Local fake Linux roots | Synthetic `/proc`, `/sys`, cgroup, IRQ, block, and boot fixtures | Host system and kernel profile framework, leases, rollback, and boot-plan safety | Planning and fake E2E only; no AWS and no real host mutation | passed |
 | 21B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Reversible Linux host-system apply, measurement, rollback, cleanup, and artifact validation | Real measured guard validation; no positive candidate cleared the 5% noise band | passed |
+| 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
 
 ## Current Evidence Boundaries
 
@@ -132,3 +133,29 @@ local_artifacts_checked: 712
 
 `affinity-cpus-1-7` was a measured regression at `-10.493%`, because it
 reduced the workload CPU set and thread count from the eight-CPU baseline.
+
+## Phase 21B2 C7g Remaining System Summary
+
+Phase 21B2 completed the remaining reversible C7g families and preserved
+protocol boundaries.
+
+Outcome:
+
+```text
+candidate_count: 14
+baseline_decode_median_tok_s: 16.26
+best_positive_same_protocol_candidate: no-mmap at 16.75 tok/s
+best_positive_same_protocol_delta_percent: 3.014
+noise_band_percent: 5.0
+performance_improvement_verified: false
+host_restored_to_original_state: true
+all_reversible_families_exhausted: true
+remote_artifacts_checked: 327
+local_artifacts_checked: 327
+```
+
+`thp-always-mmap` exercised THP pages but remained inside the guard at
+`+1.630%`. `cpuset-1h7w`, `cpuset-2h6w`, and
+`cpuset-1h7w-irq-workqueue` regressed sharply. Storage cold-start and
+prefault evidence was labeled `protocol_baseline_missing` instead of being
+ranked against steady-state decode throughput.

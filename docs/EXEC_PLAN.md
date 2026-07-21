@@ -177,8 +177,46 @@ host_restored_to_original_state: true
 
 The best positive observed candidate was `thp-always` at `+0.344%` versus the
 baseline, inside the configured 5% noise band. It is not a recommendation.
-- optional host evidence binding for RecommendationBundle and Performance
-  Passport
 
-No performance result is produced in Phase 21A. System and kernel tuning remain
-future real-validation work.
+## Phase 21B2: Remaining C7g Reversible System Validation
+
+Phase 21B2 completed the remaining safe reversible real-host families that
+were intentionally left out of Phase 21B:
+
+```text
+cpuset partitions
+IRQ/workqueue isolation
+mmap/no-mmap and prefault protocols
+THP exercised with mmap evidence
+storage cold-start read-ahead and scheduler protocols
+HugeTLB consumer qualification
+jemalloc/mimalloc availability
+cpuidle capability
+perf-counter availability without security weakening
+boot-validation readiness audit
+```
+
+Current Phase 21B2 outcome:
+
+```text
+phase21b2_remaining_reversible_system_validation: passed
+performance_improvement_verified: false
+host_restored_to_original_state: true
+all_reversible_families_exhausted: true
+ready_for_phase21c_boot_kernel_validation: false
+```
+
+The strongest positive steady-state decode result was `no-mmap` at `+3.014%`,
+inside the configured 5% noise band. `thp-always-mmap` exercised THP pages but
+stayed at `+1.630%`. Reduced-CPU cpuset and IRQ/workqueue isolation regressed
+sharply. Cold-start storage and prefault evidence was preserved as
+protocol-specific data and was not ranked against the steady-state baseline.
+
+One real-host correctness fix was required:
+
+```text
+88a2cee fix: normalize bracketed block scheduler mode
+```
+
+Phase 21C boot/kernel changes remain future work. Phase 21B2 performed only a
+read-only boot-readiness audit.

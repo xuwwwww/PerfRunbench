@@ -50,3 +50,20 @@ permanent until a one-time boot has passed and rollback has been verified.
 ```text
 less_flexible_boot_isolation: true
 ```
+
+## Phase 21B2 Readiness Audit
+
+Phase 21B2 performed only a read-only boot-validation readiness audit on the
+C7g target. It did not begin Phase 21C and did not modify GRUB, install a
+kernel package, reboot, or write a bootloader configuration.
+
+The audit result remained:
+
+```text
+status: read_only_completed
+ready_for_phase21c_boot_kernel_validation: false
+```
+
+The blocking condition was lack of an explicit Phase 21C boot-change approval
+and out-of-band recovery path for that run. This is intentional; reversible
+runtime system validation must not silently become boot/kernel validation.

@@ -163,3 +163,52 @@ phase21b_c7g_reversible_system_validation: passed
 performance_improvement_verified: false
 host_restored_to_original_state: true
 ```
+
+## Phase 21B2 - Remaining C7g Reversible System Validation
+
+Phase 21B2 exhausted the remaining safe reversible C7g system families without
+entering Phase 21C boot/kernel changes.
+
+Key observations:
+
+- `no-mmap` reached `16.75 tok/s` decode median versus the `16.26 tok/s`
+  steady-state baseline, a `+3.014%` delta inside the 5% noise band.
+- `thp-always-mmap` proved actual THP use with
+  `max_anon_huge_pages_kb: 4483072`, but its `+1.630%` delta also stayed
+  inside the guard.
+- `cpuset-1h7w`, `cpuset-2h6w`, and `cpuset-1h7w-irq-workqueue` sharply
+  regressed this workload and were rejected.
+- Storage read-ahead and block scheduler measurements were preserved as
+  `cold_model_load` evidence and were not ranked against steady-state decode.
+- `prefault-warm` was preserved as `warm_page_cache_decode` evidence and was
+  not ranked against steady-state decode.
+- `jemalloc` and `mimalloc` were unavailable through system libraries and
+  non-persistent extraction.
+- HugeTLB was not qualified because no verified workload consumer or
+  `hugetlbfs` mapping path existed in the run.
+- Non-root `perf` remained denied by host security policy; root `perf stat`
+  was available without weakening security and a baseline perf collection
+  passed.
+- Secondary `llama-server` smoke completed, but its timing remained secondary
+  runtime evidence and did not affect eligibility.
+
+Phase 21B2 found one real-host correctness issue and fixed it:
+
+```text
+88a2cee fix: normalize bracketed block scheduler mode
+```
+
+The downloaded artifact revalidation also caught a private harness
+manifest-ordering issue before documentation. The finalizer was rerun with a
+stable final summary before manifest generation, and both remote and local
+manifest validation passed.
+
+Conclusion:
+
+```text
+phase21b2_remaining_reversible_system_validation: passed
+performance_improvement_verified: false
+host_restored_to_original_state: true
+all_reversible_families_exhausted: true
+ready_for_phase21c_boot_kernel_validation: false
+```

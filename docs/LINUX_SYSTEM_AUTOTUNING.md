@@ -2,9 +2,10 @@
 
 PerfRunbench Phase 21A adds a guarded Linux host-system profile framework.
 Phase 21B validates a bounded subset of reversible real-host mechanisms on a
-C7g / Neoverse-V1 Arm64 target. Phase 21B does not produce a verified
-performance improvement; it validates rollback, artifact, and noise-band guard
-behavior.
+C7g / Neoverse-V1 Arm64 target. Phase 21B2 exhausts the remaining safe
+reversible C7g families without entering boot/kernel changes. Neither phase
+produces a verified performance improvement; both validate rollback, artifact,
+protocol, and noise-band guard behavior.
 
 Phase 20 only exhausted the tested compiler and simple runtime candidates for
 one `llama.cpp` workload. It did not evaluate CPU frequency governors, cpusets,
@@ -23,11 +24,35 @@ vm-system-conservative
 thp-always
 ```
 
-The final result was:
+Phase 21B2 additionally executed or classified:
+
+```text
+cpuset-1h7w
+cpuset-2h6w
+cpuset-1h7w-irq-workqueue
+mmap-explicit
+no-mmap
+prefault-warm
+thp-always-mmap
+thp-madvise-mmap
+thp-never-mmap
+storage-readahead-higher
+storage-readahead-lower
+io-scheduler-mq-deadline
+allocator-glibc-bounded-arenas
+jemalloc / mimalloc availability
+HugeTLB consumer qualification
+cpuidle capability
+perf-counter availability without security weakening
+boot-validation readiness audit
+```
+
+The latest real-host result is:
 
 ```text
 performance_improvement_verified: false
 host_restored_to_original_state: true
+all_reversible_families_exhausted: true
 ```
 
 ## Default Flow
@@ -158,6 +183,8 @@ autotuneai system rollback \
 
 ## Claim Boundary
 
-Phase 21A is local implementation and fixture validation only. Phase 21B is
-real C7g reversible-system guard validation. It does not claim a performance
-improvement because no positive candidate cleared the configured 5% noise band.
+Phase 21A is local implementation and fixture validation only. Phase 21B and
+Phase 21B2 are real C7g reversible-system guard validations. They do not claim
+a performance improvement because no positive steady-state candidate cleared
+the configured 5% noise band. Cold-start storage and warm-prefault evidence
+remain protocol-specific and are not ranked as steady-state decode throughput.

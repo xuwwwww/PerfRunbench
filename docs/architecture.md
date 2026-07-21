@@ -90,9 +90,14 @@ host snapshot
 -> optional Passport/cache binding
 ```
 
-Phase 21A validates this layer with fake Linux roots only. Real host mutation,
-AWS access, bootloader writes, and kernel installation are future validation
-work.
+Phase 21A validates this layer with fake Linux roots only. Phase 21B and
+Phase 21B2 validate bounded reversible C7g real-host profiles with exact
+rollback, artifact revalidation, and protocol-specific ranking. They do not
+produce a performance recommendation because no positive same-protocol
+candidate cleared the configured noise band.
+
+Bootloader writes, kernel installation, reboot-required profiles, and 4K/64K
+kernel comparisons remain future Phase 21C validation work.
 
 ## Evidence Principles
 
