@@ -74,3 +74,15 @@ feat: add CPU-aware native build profiles
 feat: guard native binary portability and backend evidence
 docs: record T4g CPU-aware build tuning
 ```
+
+Current Phase 19 real T4g outcome:
+
+```text
+insufficient_evidence
+```
+
+The target produced build artifacts for `upstream-default` and
+`native-current-cpu`, but no suitable existing small GGUF model was available.
+The run therefore stopped before benchmark comparison, runtime search,
+Performance Passport, or recommendation apply. This is a guard outcome, not a
+performance result.

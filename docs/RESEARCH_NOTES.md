@@ -56,3 +56,16 @@ The selected public wording remains:
 
 > Best observed eligible configuration under the tested CPU, model, runtime
 > source commit, compiler, and measurement protocol.
+
+Real T4g follow-up:
+
+- pinned `llama.cpp` source: `b9999` /
+  `47c786924ad1ab7e91da2cdc72fcdb563780c2bd`
+- `gcc -mcpu=neoverse-n1` probe: supported, produced binary ran
+- `upstream-default` and `native-current-cpu` both built `llama-bench`
+- both builds were marked `built_runtime_unverified` because no suitable
+  existing small GGUF model was present on the target
+- artifact manifests validated remotely and after download
+- no benchmark, runtime search, Passport, or RecommendationBundle was produced
+
+This is an `insufficient_evidence` guard result, not a speedup claim.

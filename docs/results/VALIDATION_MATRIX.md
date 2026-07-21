@@ -10,7 +10,7 @@ Numbers from different targets or protocols must not be combined.
 | 15B | Linux Arm64 T4g.small / Neoverse-N1 class | Public synthetic PyTorch training | Real low-resource Arm PyTorch workflow | Do not compare with C7g | passed |
 | 15C | Windows x86_64 controller | Public synthetic PyTorch training | Local CLI, cache, drift, apply, and portability validation | Do not compare with Arm | passed |
 | 16 | Windows local clean venv plus GitHub Actions matrix | Dependency-free public fixtures | Release-candidate installed-wheel usability | Packaging and CLI usability, not performance | pending final CI |
-| 19 | Linux Arm64 T4g.small / Neoverse-N1 class | Existing small GGUF with pinned `llama.cpp` | CPU-aware native build tuning and native-binary portability guards | Single low-resource Arm target; do not compare with C7g | pending |
+| 19 | Linux Arm64 T4g.small / Neoverse-N1 class | No suitable existing model available; build evidence only | CPU-aware native build tuning guard validation | Build artifacts collected, but no benchmark or recommendation claim | insufficient evidence |
 
 ## Current Evidence Boundaries
 

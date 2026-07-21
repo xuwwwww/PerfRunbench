@@ -191,7 +191,8 @@ recorded build and runtime evidence.
 
 ## Phase 19: CPU-Aware Native Build Autotuning
 
-Status: in progress on `feature/cpu-aware-build-autotuning`.
+Status: insufficient evidence on the real T4g target; code and guard
+infrastructure remain valid.
 
 Phase 19 makes CPU-specific compilation a first-class ArmTune dimension while
 preserving historical Phase 9 evidence as a separate protocol.
@@ -222,3 +223,12 @@ Non-goals:
 - no new model downloads
 - no C7g access
 - no global Arm speedup claim
+
+Real T4g note:
+
+```text
+build_run_id: 20260721_024332_303417
+outcome: insufficient_evidence
+reason: no suitable existing small GGUF model was available, and Phase 19
+  prohibited downloading a replacement model
+```
