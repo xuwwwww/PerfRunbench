@@ -14,6 +14,14 @@ from autotune.system_profiles.boot_readiness import (
     verify_one_time_boot_plan,
 )
 from autotune.system_profiles.catalog import collect_capabilities, create_plan, list_profiles, staged_search_policy
+from autotune.system_profiles.kernel_64k import (
+    build_grub_default_plan,
+    build_kernel_cleanup_plan,
+    build_kernel_experiment_plan,
+    build_kernel_package_transaction_plan,
+    verify_kernel_experiment_plan,
+    verify_kernel_package_transaction_plan,
+)
 from autotune.system_profiles.lease import apply_system_profile_plan, rollback_system_profile, verify_system_profile
 from autotune.system_profiles.protocols import list_protocols
 from autotune.system_profiles.schemas import HostStateSnapshot, SystemProfileError
@@ -125,6 +133,41 @@ def _build_parser() -> argparse.ArgumentParser:
     recovery.add_argument("--inventory")
     recovery.add_argument("--output")
     recovery.set_defaults(handler=_cmd_recovery_plan)
+
+    package_plan = subparsers.add_parser("kernel-package-plan")
+    _root_json(package_plan)
+    package_plan.add_argument("package_plan_action", nargs="?", choices=["verify"])
+    package_plan.add_argument("--profile", default="aws-arm64-64k")
+    package_plan.add_argument("--inventory")
+    package_plan.add_argument("--apt-simulation")
+    package_plan.add_argument("--plan")
+    package_plan.add_argument("--output")
+    package_plan.set_defaults(handler=_cmd_kernel_package_plan)
+
+    default_plan = subparsers.add_parser("grub-default-plan")
+    _root_json(default_plan)
+    default_plan.add_argument("--inventory", required=True)
+    default_plan.add_argument("--safe-entry", required=True)
+    default_plan.add_argument("--output")
+    default_plan.set_defaults(handler=_cmd_grub_default_plan)
+
+    experiment_plan = subparsers.add_parser("kernel-experiment-plan")
+    _root_json(experiment_plan)
+    experiment_plan.add_argument("experiment_plan_action", nargs="?", choices=["verify"])
+    experiment_plan.add_argument("--profile")
+    experiment_plan.add_argument("--inventory")
+    experiment_plan.add_argument("--plan")
+    experiment_plan.add_argument("--completed-profile", action="append", default=[])
+    experiment_plan.add_argument("--allow-domain-isolation-interaction", action="store_true")
+    experiment_plan.add_argument("--output")
+    experiment_plan.set_defaults(handler=_cmd_kernel_experiment_plan)
+
+    cleanup_plan = subparsers.add_parser("kernel-cleanup-plan")
+    _root_json(cleanup_plan)
+    cleanup_plan.add_argument("--before", required=True)
+    cleanup_plan.add_argument("--after", required=True)
+    cleanup_plan.add_argument("--output")
+    cleanup_plan.set_defaults(handler=_cmd_kernel_cleanup_plan)
 
     compare = subparsers.add_parser("compare")
     compare.add_argument("--run-id", required=True)
@@ -273,6 +316,64 @@ def _cmd_boot_plan(args: argparse.Namespace) -> int:
 def _cmd_recovery_plan(args: argparse.Namespace) -> int:
     inventory = boot_inventory_from_dict(load_json(args.inventory)) if args.inventory else collect_boot_inventory(args.root)
     payload = build_recovery_plan(inventory)
+    if args.output:
+        atomic_write_json(args.output, payload)
+    _print(payload, json_output=True)
+    return 0
+
+
+def _cmd_kernel_package_plan(args: argparse.Namespace) -> int:
+    if args.package_plan_action == "verify":
+        if not args.plan:
+            raise SystemProfileError("kernel-package-plan verify requires --plan")
+        payload = verify_kernel_package_transaction_plan(load_json(args.plan))
+        _print(payload, json_output=True)
+        return 0 if payload["status"] == "passed" else 1
+    if not args.inventory:
+        raise SystemProfileError("kernel-package-plan requires --inventory")
+    simulation_text = Path(args.apt_simulation).read_text(encoding="utf-8") if args.apt_simulation else ""
+    payload = build_kernel_package_transaction_plan(
+        load_json(args.inventory),
+        apt_simulation_text=simulation_text,
+        profile_id=args.profile,
+    ).to_dict()
+    if args.output:
+        atomic_write_json(args.output, payload)
+    _print(payload, json_output=True)
+    return 0
+
+
+def _cmd_grub_default_plan(args: argparse.Namespace) -> int:
+    payload = build_grub_default_plan(load_json(args.inventory), safe_entry=args.safe_entry).to_dict()
+    if args.output:
+        atomic_write_json(args.output, payload)
+    _print(payload, json_output=True)
+    return 0 if payload["status"] != "blocked" else 1
+
+
+def _cmd_kernel_experiment_plan(args: argparse.Namespace) -> int:
+    if args.experiment_plan_action == "verify":
+        if not args.plan:
+            raise SystemProfileError("kernel-experiment-plan verify requires --plan")
+        payload = verify_kernel_experiment_plan(load_json(args.plan))
+        _print(payload, json_output=True)
+        return 0 if payload["status"] == "passed" else 1
+    if not args.profile or not args.inventory:
+        raise SystemProfileError("kernel-experiment-plan requires --profile and --inventory")
+    payload = build_kernel_experiment_plan(
+        args.profile,
+        load_json(args.inventory),
+        allow_domain_isolation_interaction=args.allow_domain_isolation_interaction,
+        completed_profiles=args.completed_profile,
+    )
+    if args.output:
+        atomic_write_json(args.output, payload)
+    _print(payload, json_output=True)
+    return 0
+
+
+def _cmd_kernel_cleanup_plan(args: argparse.Namespace) -> int:
+    payload = build_kernel_cleanup_plan(load_json(args.before), load_json(args.after)).to_dict()
     if args.output:
         atomic_write_json(args.output, payload)
     _print(payload, json_output=True)

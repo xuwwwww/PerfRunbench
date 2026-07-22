@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from autotune.recommendation.schemas import file_sha256, stable_digest
+from autotune.system_profiles.kernel_64k import parse_grub_menu_entries, qualify_generated_grub_entry
 from autotune.system_profiles.schemas import (
     BootExperimentResult,
     BootInventory,
@@ -613,8 +614,17 @@ def _detect_bootloader(reader: RootReader) -> tuple[str, dict[str, Any]]:
         kind = "direct_efi_stub"
     else:
         kind = "unknown"
-    menu_entries = _grub_menu_entries(reader) if grub_cfg else _systemd_boot_entries(reader)
-    return kind, {"grub_cfg_present": grub_cfg, "efi_present": efi, "systemd_boot_present": systemd_boot, "menu_entries": menu_entries}
+    menu_entry_details = _grub_menu_entry_details(reader) if grub_cfg else []
+    menu_entries = [item["title"] for item in menu_entry_details] if grub_cfg else _systemd_boot_entries(reader)
+    grub_cfg_path = reader.path("/boot/grub/grub.cfg")
+    return kind, {
+        "grub_cfg_present": grub_cfg,
+        "efi_present": efi,
+        "systemd_boot_present": systemd_boot,
+        "menu_entries": menu_entries,
+        "menu_entry_details": menu_entry_details,
+        "grub_cfg_digest": file_sha256(grub_cfg_path) if grub_cfg_path.exists() else NOT_AVAILABLE,
+    }
 
 
 def _grub_menu_entries(reader: RootReader) -> list[str]:
@@ -622,6 +632,13 @@ def _grub_menu_entries(reader: RootReader) -> list[str]:
     if text == NOT_AVAILABLE:
         return []
     return [match.group(1) for match in re.finditer(r"^\s*menuentry ['\"]([^'\"]+)['\"]", text, flags=re.MULTILINE)]
+
+
+def _grub_menu_entry_details(reader: RootReader) -> list[dict[str, Any]]:
+    text = reader.read_text("/boot/grub/grub.cfg")
+    if text == NOT_AVAILABLE:
+        return []
+    return [entry.to_dict() for entry in parse_grub_menu_entries(text)]
 
 
 def _systemd_boot_entries(reader: RootReader) -> list[str]:
@@ -762,6 +779,7 @@ def _recovery_capability(reader: RootReader, snapshot: Any, bootloader: str, fal
 
 def _current_kernel_candidate(reader: RootReader, release: str, flavor: str, arch: str, page_size: str, config: KernelConfigCapability, packages: list[dict[str, Any]], boot_files: dict[str, Any], initramfs: dict[str, Any]) -> KernelCandidate:
     package = _package_for_release(packages, release)
+    generated = _generated_entry_paths(reader, release, require_initrd=True)
     blockers = []
     if package.get("package") == NOT_AVAILABLE:
         blockers.append("kernel_package_owner_unknown")
@@ -771,6 +789,7 @@ def _current_kernel_candidate(reader: RootReader, release: str, flavor: str, arc
         blockers.append("kernel_files_incomplete")
     if config.source_path == NOT_AVAILABLE:
         blockers.append("kernel_config_support_unknown")
+    blockers.extend(generated["issues"])
     return KernelCandidate(
         candidate_id="current",
         release=release,
@@ -779,8 +798,8 @@ def _current_kernel_candidate(reader: RootReader, release: str, flavor: str, arc
         package_version=package.get("version", NOT_AVAILABLE),
         architecture=package.get("architecture", arch),
         source_state="currently_booted",
-        vmlinuz_path=f"/boot/vmlinuz-{release}" if release != NOT_AVAILABLE else NOT_AVAILABLE,
-        initrd_path=f"/boot/initrd.img-{release}" if release != NOT_AVAILABLE else NOT_AVAILABLE,
+        vmlinuz_path=generated["linux_path"],
+        initrd_path=generated["initrd_path"],
         modules_path=f"/lib/modules/{release}" if release != NOT_AVAILABLE else NOT_AVAILABLE,
         base_page_size=page_size,
         config=config,
@@ -791,6 +810,7 @@ def _current_kernel_candidate(reader: RootReader, release: str, flavor: str, arc
 
 def _fallback_kernel_candidate(reader: RootReader, release: str, arch: str, config: KernelConfigCapability, packages: list[dict[str, Any]], boot_files: dict[str, Any], initramfs: dict[str, Any], current_release: str) -> KernelCandidate:
     package = _package_for_release(packages, release)
+    generated = _generated_entry_paths(reader, release, require_initrd=True)
     blockers = []
     if release == NOT_AVAILABLE or release == current_release:
         blockers.append("fallback_kernel_missing")
@@ -802,6 +822,7 @@ def _fallback_kernel_candidate(reader: RootReader, release: str, arch: str, conf
         blockers.append("fallback_files_incomplete")
     if config.source_path == NOT_AVAILABLE:
         blockers.append("kernel_config_support_unknown")
+    blockers.extend(generated["issues"])
     page_size = _page_size_from_config(config)
     return KernelCandidate(
         candidate_id="fallback",
@@ -811,14 +832,37 @@ def _fallback_kernel_candidate(reader: RootReader, release: str, arch: str, conf
         package_version=package.get("version", NOT_AVAILABLE),
         architecture=package.get("architecture", arch),
         source_state="installed_fallback",
-        vmlinuz_path=f"/boot/vmlinuz-{release}" if release != NOT_AVAILABLE else NOT_AVAILABLE,
-        initrd_path=f"/boot/initrd.img-{release}" if release != NOT_AVAILABLE else NOT_AVAILABLE,
+        vmlinuz_path=generated["linux_path"],
+        initrd_path=generated["initrd_path"],
         modules_path=f"/lib/modules/{release}" if release != NOT_AVAILABLE else NOT_AVAILABLE,
         base_page_size=page_size,
         config=config,
         qualification_state="qualified_fallback" if not blockers else "blocked",
         blockers=blockers,
     )
+
+
+def _generated_entry_paths(reader: RootReader, release: str, *, require_initrd: bool) -> dict[str, Any]:
+    if release == NOT_AVAILABLE:
+        return {"linux_path": NOT_AVAILABLE, "initrd_path": NOT_AVAILABLE, "issues": ["generated_kernel_entry_missing"]}
+    text = reader.read_text("/boot/grub/grub.cfg")
+    if text == NOT_AVAILABLE:
+        return {
+            "linux_path": NOT_AVAILABLE,
+            "initrd_path": NOT_AVAILABLE,
+            "issues": ["generated_grub_config_missing"],
+        }
+    qualification = qualify_generated_grub_entry(
+        [entry.to_dict() for entry in parse_grub_menu_entries(text)],
+        kernel_release=release,
+        require_initrd=require_initrd,
+    )
+    entry = qualification.get("entry", {})
+    return {
+        "linux_path": entry.get("linux_path", NOT_AVAILABLE),
+        "initrd_path": entry.get("initrd_path", NOT_AVAILABLE),
+        "issues": list(qualification.get("issues", [])),
+    }
 
 
 def _candidate_64k_kernel(reader: RootReader, arch: str, distro: dict[str, str]) -> KernelCandidate:
@@ -1066,6 +1110,8 @@ def _temporary_grub_entry_plan(profile_id: str, inventory: BootInventory, candid
         "backup_path": f"{custom_entry_path}.perfrunbench-backup",
         "candidate_vmlinuz_path": linux_path,
         "candidate_initrd_path": initrd_path,
+        "path_source": "generated_grub_menu_entry",
+        "path_guess_allowed": False,
         "linux_arguments": linux_arguments,
         "root_argument": _root_argument(command_line),
         "appended_parameters": additions,
@@ -1126,6 +1172,10 @@ def _verify_temporary_grub_entry_plan(temporary: Any) -> list[str]:
         issues.append("temporary_entry_vmlinuz_missing")
     if not temporary.get("candidate_initrd_path") or temporary.get("candidate_initrd_path") == NOT_AVAILABLE:
         issues.append("temporary_entry_initrd_missing")
+    if temporary.get("path_source") != "generated_grub_menu_entry":
+        issues.append("temporary_entry_not_based_on_generated_grub_entry")
+    if temporary.get("path_guess_allowed") is not False:
+        issues.append("guessed_kernel_path_allowed")
     if not temporary.get("root_argument") or temporary.get("root_argument") == NOT_AVAILABLE:
         issues.append("temporary_entry_root_argument_missing")
     transaction = temporary.get("transaction_requirements", {})
@@ -1204,15 +1254,14 @@ def _root_argument(command_line: str) -> str:
 
 
 def _render_grub_menuentry(*, title: str, entry_id: str, linux_path: str, initrd_path: str, linux_arguments: str) -> str:
-    return "\n".join(
-        [
-            f"menuentry '{title}' --id '{entry_id}' {{",
-            f"    linux {linux_path} {linux_arguments}".rstrip(),
-            f"    initrd {initrd_path}",
-            "}",
-            "",
-        ]
-    )
+    lines = [
+        f"menuentry '{title}' --id '{entry_id}' {{",
+        f"    linux {linux_path} {linux_arguments}".rstrip(),
+    ]
+    if initrd_path != NOT_AVAILABLE:
+        lines.append(f"    initrd {initrd_path}")
+    lines.extend(["}", ""])
+    return "\n".join(lines)
 
 
 def _phase21c2a_cpu_layout_blockers(inventory: BootInventory, housekeeping: str, workload: str) -> list[str]:
@@ -1285,7 +1334,7 @@ def _profile_args(profile_id: str, inventory: BootInventory, housekeeping: str, 
     if profile_id == "4k-managed-irq-isolation":
         return [f"nohz_full={workload}", f"rcu_nocbs={workload}", f"irqaffinity={housekeeping}", f"isolcpus=managed_irq,{workload}"]
     if profile_id.endswith("managed-irq-isolation"):
-        return [f"isolcpus=managed_irq,{workload}"]
+        return [f"nohz_full={workload}", f"rcu_nocbs={workload}", f"irqaffinity={housekeeping}", f"isolcpus=managed_irq,{workload}"]
     if profile_id == "4k-domain-isolation":
         return [f"nohz_full={workload}", f"rcu_nocbs={workload}", f"irqaffinity={housekeeping}", f"isolcpus=domain,managed_irq,{workload}"]
     return []

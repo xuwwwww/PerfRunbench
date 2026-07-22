@@ -309,6 +309,155 @@ class BootExperimentResult:
 
 
 @dataclass(frozen=True)
+class KernelPackageInventory:
+    distribution_release: str
+    architecture: str
+    configured_repositories: list[dict[str, Any]]
+    installed_kernel_packages: list[dict[str, Any]]
+    package_manager_state: str
+    boot_free_bytes: int | str
+    root_free_bytes: int | str
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class KernelPackageCandidate:
+    profile_id: str
+    meta_package: str
+    image_package: str
+    modules_packages: list[str]
+    header_packages: list[str]
+    candidate_version: str
+    package_architecture: str
+    package_origins: list[str]
+    trust_source: str
+    download_size_bytes: int | str
+    installed_size_bytes: int | str
+    expected_release: str
+    expected_page_size: str
+    qualification_state: str
+    blockers: list[str] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class KernelPackageRollbackPlan:
+    remove_packages: list[str]
+    preserve_packages: list[str]
+    forbidden_commands: list[str]
+    dpkg_recovery_commands: list[str]
+    final_original_state_verification: list[str]
+    package_cache_cleanup_policy: str
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class KernelPackageTransactionPlan:
+    profile_id: str
+    package_inventory: KernelPackageInventory
+    candidate: KernelPackageCandidate
+    apt_simulation: dict[str, Any]
+    dependency_changes: dict[str, list[str]]
+    packages_newly_installed: list[str]
+    packages_upgraded: list[str]
+    packages_removed: list[str]
+    packages_held: list[str]
+    expected_artifacts: dict[str, str]
+    expected_grub_entries: list[str]
+    expected_page_size: str
+    real_install_command: list[str]
+    rollback_plan: KernelPackageRollbackPlan
+    eligibility_state: str
+    blockers: list[str] = field(default_factory=list)
+    kernel_or_boot_state_modified: bool = False
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class KernelPackageTransactionResult:
+    plan_digest: str
+    status: str
+    install_attempted: bool
+    kernel_or_boot_state_modified: bool
+    installed_packages: list[str]
+    removed_packages: list[str]
+    issues: list[str] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class GrubDefaultResolution:
+    status: str
+    configuration_text_digest: str
+    grub_environment_digest: str
+    saved_entry: str
+    next_entry: str
+    generated_menu_order: list[str]
+    resolved_default_entry_id: str
+    resolved_default_kernel: str
+    configuration_text_unchanged: bool
+    resolved_default_boot_target_unchanged: bool
+    safety_pin_required: bool
+    safety_pin_plan: dict[str, Any]
+    blockers: list[str] = field(default_factory=list)
+    kernel_or_boot_state_modified: bool = False
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class KernelArtifactInventory:
+    kernel_release: str
+    vmlinuz_path: str
+    initrd_path: str
+    config_path: str
+    system_map_path: str
+    modules_path: str
+    package_ownership: dict[str, str]
+    page_size_expectation: str
+    qualification_state: str
+    blockers: list[str] = field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
+class KernelPackageCleanupResult:
+    status: str
+    removed_packages: list[str]
+    preserved_packages: list[str]
+    removed_artifacts: list[str]
+    residual_artifacts: list[str]
+    package_inventory_restored: bool
+    grub_state_restored: bool
+    issues: list[str] = field(default_factory=list)
+    kernel_or_boot_state_modified: bool = False
+    schema_version: str = SCHEMA_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return to_plain(self)
+
+
+@dataclass(frozen=True)
 class SystemTuningPlan:
     plan_id: str
     profile: HostSystemProfile
