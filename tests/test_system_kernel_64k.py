@@ -17,6 +17,7 @@ from autotune.system_profiles.kernel_64k import (
     build_kernel_package_transaction_plan,
     parse_grub_menu_entries,
     qualify_generated_grub_entry,
+    render_temporary_grub_entry_from_generated,
     validate_phase21c2b_comparison,
     verify_kernel_experiment_plan,
     verify_kernel_package_transaction_plan,
@@ -62,6 +63,37 @@ class SystemKernel64KTest(unittest.TestCase):
         malformed = "menuentry 'bad' --id 'bad' {\n  linux\n}\n"
         malformed_result = qualify_generated_grub_entry(parse_grub_menu_entries(malformed), kernel_release="6.17.0-1019-aws", require_initrd=True)
         self.assertIn("generated_kernel_entry_missing", malformed_result["issues"])
+
+    def test_temporary_entry_preserves_generated_initrdfail_conditional(self) -> None:
+        text = "\n".join(
+            [
+                "menuentry 'Ubuntu' --id 'Ubuntu' {",
+                "    recordfail",
+                "    search --no-floppy --fs-uuid --set=root 1111-2222",
+                "    if [ \"${initrdfail}\" = 1 ]; then",
+                "    echo 'GRUB_FORCE_PARTUUID set, initrdless boot failed. Attempting with initrd.'",
+                "    linux /vmlinuz-6.17.0-1019-aws-64k root=PARTUUID=abc ro",
+                "    initrd /initrd.img-6.17.0-1019-aws-64k",
+                "    else",
+                "    linux /vmlinuz-6.17.0-1019-aws-64k root=PARTUUID=abc ro initrd=\\EFI\\ubuntu\\initrd.img-6.17.0-1019-aws-64k",
+                "    fi",
+                "}",
+            ]
+        )
+        entry = parse_grub_menu_entries(text)[0]
+
+        rendered = render_temporary_grub_entry_from_generated(
+            title="PerfRunbench Phase 21C2B 64k-nohz",
+            entry_id="perfrunbench-phase21c2b-64k-nohz",
+            source_entry=entry,
+            linux_arguments="root=PARTUUID=abc ro nohz_full=2-7 rcu_nocbs=2-7 irqaffinity=0-1",
+        )
+
+        self.assertIn("if [ \"${initrdfail}\" = 1 ]; then", rendered)
+        self.assertIn("else", rendered)
+        self.assertIn("    fi", rendered)
+        self.assertEqual(rendered.count("nohz_full=2-7"), 2)
+        self.assertIn("initrd /initrd.img-6.17.0-1019-aws-64k", rendered)
 
     def test_phase21c2a_plan_uses_generated_root_relative_path_not_boot_guess(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

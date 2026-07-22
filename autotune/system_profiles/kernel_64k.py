@@ -165,13 +165,26 @@ def render_temporary_grub_entry_from_generated(
     entry = _coerce_entry(source_entry)
     if not entry.linux_path:
         raise SystemProfileError("source GRUB entry has no parsed linux path")
-    lines = [f"menuentry '{title}' --id '{entry_id}' {{"]
-    lines.extend(f"    {line}" for line in entry.loader_prelude)
-    lines.append(f"    {entry.linux_command} {entry.linux_path} {linux_arguments}".rstrip())
-    if entry.initrd_path != NOT_AVAILABLE:
-        lines.append(f"    {entry.initrd_command} {entry.initrd_path}".rstrip())
-    lines.extend(["}", ""])
-    return "\n".join(lines)
+    source_lines = entry.block_text.splitlines()
+    if not source_lines:
+        raise SystemProfileError("source GRUB entry has no block text")
+    rendered = [f"menuentry '{title}' --id '{entry_id}' {{"]
+    linux_replaced = False
+    for raw_line in source_lines[1:]:
+        stripped = raw_line.strip()
+        if stripped.startswith(("linux ", "linuxefi ")):
+            parts = stripped.split(maxsplit=2)
+            if len(parts) < 2:
+                raise SystemProfileError("source GRUB entry has malformed linux line")
+            command, path = parts[0], parts[1]
+            rendered.append(f"    {command} {path} {linux_arguments}".rstrip())
+            linux_replaced = True
+        else:
+            rendered.append(raw_line)
+    if not linux_replaced:
+        raise SystemProfileError("source GRUB entry has no linux line to replace")
+    rendered.append("")
+    return "\n".join(rendered)
 
 
 def build_kernel_package_transaction_plan(
