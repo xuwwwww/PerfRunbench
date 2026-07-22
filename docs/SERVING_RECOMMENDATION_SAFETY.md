@@ -58,3 +58,30 @@ preflight
 ```
 
 A failed cleanup makes subsequent results ineligible.
+
+## Phase 21D1 Validation
+
+Phase 21D1 created two eligible loopback RecommendationBundle entries for
+`interactive-short` concurrency 4:
+
+```text
+maximum_throughput: bb4ce9fdbdf96138
+interactive_latency: 30a00122420a0b6b
+```
+
+The validation also recorded:
+
+```text
+run_best_performs_search: false
+workload_drift: hard_drift
+concurrency_drift: hard_drift
+binary_digest_drift: hard_drift
+model_digest_drift: hard_drift
+capability_digest_drift: hard_drift
+loopback_to_remote_network: hard_drift
+cleanup_passed: true
+```
+
+No recommendation was created for `balanced_multi_user`, `shared_prefix`, or
+`memory_constrained` because those classes lacked a complete eligible fresh
+confirmation in this run.

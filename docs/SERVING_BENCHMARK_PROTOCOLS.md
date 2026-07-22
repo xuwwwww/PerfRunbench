@@ -76,3 +76,25 @@ no worse than 5%, zero failures, and quality pass.
 Capacity candidates may be eligible when they support a higher safe concurrency
 or context size inside the declared latency SLO. They are capacity results, not
 raw speedup claims.
+
+## Phase 21D1 Loopback Protocol
+
+Phase 21D1 used a target-local loopback protocol:
+
+```text
+client_cpu_set: CPU 0
+server_cpu_set: CPUs 1-7
+traffic_mode: closed-loop
+server_candidate_startup_limit: 24
+measured_http_request_limit: 600
+```
+
+The confirmed `interactive-short` concurrency-4 result used 50 measured
+requests per side for each eligible class, zero request failures, zero quality
+failures, and client CPU utilization below 1% of one CPU. The recommendations
+are loopback recommendations only; Phase 21D2 must produce fresh
+remote-network baselines and confirmations before any remote-client claim.
+
+Phase 21D1 did not create eligible capacity, shared-prefix, or
+balanced-multi-user recommendations. A screening point estimate without fresh
+confirmation remains ineligible.

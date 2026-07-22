@@ -427,3 +427,43 @@ serving_result_origin: test_fixture for fake E2Es
 ```
 
 The first real serving phase is Phase 21D1 on a manually started C7g target.
+
+## Phase 21D1 - Real C7g Loopback Serving
+
+Phase 21D1 validated that workload-aware serving search can produce
+protocol-scoped recommendations on the real C7g target without changing the
+host system state.
+
+Key findings:
+
+- `llama-server` b9999 exposed parallel slots, continuous batching, thread,
+  batch, micro-batch, context, mmap/mlock, prompt-cache, KV-cache,
+  flash-attention, metrics, and slots endpoints.
+- The eligible loopback topology isolated the local load generator on CPU 0
+  and the server on CPUs 1-7.
+- `slots4-cont-on` produced confirmed `interactive-short` concurrency-4
+  improvements for both throughput and TTFT p95.
+- Thread reductions, no-mmap, and batch/micro-batch changes did not produce an
+  eligible recommendation.
+- `slots2-kv-q8` was rejected at startup because V-cache quantization required
+  flash-attention evidence that was not qualified for this CPU serving run.
+- Shared-prefix showed only a screening point estimate and remained ineligible
+  without fresh confirmation.
+
+Confirmed loopback results:
+
+```text
+maximum_throughput:
+  baseline_output_tok_s: 16.390
+  candidate_output_tok_s: 27.470
+  improvement: +67.602%
+
+interactive_latency:
+  baseline_TTFT_p95_ms: 3362.692
+  candidate_TTFT_p95_ms: 300.476
+  improvement: +91.064% lower TTFT p95
+```
+
+The result is useful evidence that serving queueing/slot configuration matters
+for multi-request loopback traffic. It is not evidence of remote-network
+behavior, and it does not replace Phase 21D2.

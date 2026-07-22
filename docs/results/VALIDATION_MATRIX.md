@@ -20,6 +20,7 @@ Numbers from different targets or protocols must not be combined.
 | 21C2A | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | 4K one-time boot-parameter isolation, rollback, cleanup, matched baseline measurement, and artifact validation | Real measured guard validation; G1/G2 stayed inside the 5% noise band and G3 regressed | passed |
 | 21C2B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | Official Ubuntu AWS ARM64 64K kernel transaction, G4/G5/G6/G7 one-time boots, matched measurements, package cleanup, and artifact validation | Real measured guard validation; 64K page-size and isolation differences stayed inside the 5% noise band except G7, which regressed | passed |
 | 21D0 | Local fixtures only | Synthetic serving workload fixtures | Workload-aware `llama-server` serving models, load generator, staged search policy, Pareto output, safety guards, and future network plans | Local preparation only; no AWS, no remote host, no real serving measurement | passed |
+| 21D1 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real loopback serving search with local client on CPU 0 and server on CPUs 1-7 | Eligible loopback-only recommendations for `interactive-short` concurrency 4; not remote-network evidence | passed |
 
 ## Current Evidence Boundaries
 
@@ -350,3 +351,28 @@ plan-only CLI fake E2Es
 
 This is not a 64K performance result. A future real phase must start from a
 manually started C7g target and create fresh same-session 4K and 64K baselines.
+
+## Phase 21D1 C7g Loopback Serving Summary
+
+Phase 21D1 validated real workload-aware serving search on the C7g target while
+preserving the restored 4K host state.
+
+Outcome:
+
+```text
+server_startups: 18 / 24
+measured_http_requests: 569 / 600
+eligible_recommendations: 2
+maximum_throughput: interactive-short c4, slots4-cont-on, +67.602% output tok/s
+interactive_latency: interactive-short c4, slots4-cont-on, +91.064% lower TTFT p95
+balanced_multi_user: no eligible recommendation
+shared_prefix: no eligible recommendation
+memory_constrained: no eligible recommendation
+remote_artifact_revalidation: 170/170 passed
+downloaded_artifact_revalidation: 170/170 passed
+host_restored_to_original_state: true
+```
+
+The recommendations are bound to loopback topology, workload, concurrency,
+binary digest, model digest, and server capability digest. They must not be
+reused as Phase 21D2 remote-client evidence.

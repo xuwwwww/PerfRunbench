@@ -1,9 +1,9 @@
 # Workload-Aware Serving Autotuning
 
-Phase 21D0 prepares PerfRunbench for workload-aware `llama-server` tuning. It
-does not measure a real server result. Real C7g execution starts only in
-Phase 21D1 after the target is manually started and private connection details
-are supplied outside tracked files.
+Phase 21D0 prepared PerfRunbench for workload-aware `llama-server` tuning.
+Phase 21D1 then validated the first real C7g loopback serving search. Loopback
+evidence is still topology-specific: it must not be reused as remote-network
+evidence.
 
 ## Scope Shift
 
@@ -94,3 +94,30 @@ autotuneai serve cleanup
 
 `serve run` and `serve search` require `--fixture` in Phase 21D0. Real server
 execution is intentionally blocked until Phase 21D1.
+
+## Phase 21D1 Real Loopback Result
+
+Phase 21D1 used the pinned `llama-server` binary and existing Qwen2.5-7B
+Q4_K_M model on a Linux Arm64 C7g / Neoverse-V1 target.
+
+```text
+target: Linux aarch64 / Neoverse-V1 / 8 logical CPUs
+kernel: 6.17.0-1019-aws
+page_size: 4096
+server_startups: 18 / 24
+measured_http_requests: 569 / 600
+capability_digest: 46c690b0a2c9aa6e1adc49dd26bf9cb2b7bbc9017b79af46a82a8e59a155a612
+artifact_revalidation: 170/170 passed remotely and after download
+```
+
+Eligible loopback recommendations:
+
+| class | workload | concurrency | profile | observed result |
+| --- | --- | ---: | --- | --- |
+| `maximum_throughput` | `interactive-short` | 4 | `slots4-cont-on` | output throughput `16.390 -> 27.470 tok/s`, `+67.602%` |
+| `interactive_latency` | `interactive-short` | 4 | `slots4-cont-on` | TTFT p95 `3362.692 -> 300.476 ms`, `+91.064%` lower latency |
+
+These are not universal server settings. They are bound to the tested binary,
+model, server capability digest, workload, concurrency, and loopback topology.
+`balanced_multi_user`, `shared_prefix`, and `memory_constrained` produced no
+eligible recommendation in Phase 21D1.

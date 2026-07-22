@@ -504,3 +504,30 @@ detected before the affected experimental reboot:
 10a2f02 fix: preserve generated GRUB conditionals in 64K boot entries
 f2175f6 fix: parse tab-separated GRUB linux commands
 ```
+
+## Phase 21D1: C7g Loopback Serving Validation
+
+Phase 21D1 completed the first real workload-aware `llama-server` loopback
+serving search on the existing C7g / Neoverse-V1 target.
+
+```text
+branch: validation/phase21d1-c7g-loopback-serving
+source_under_test: 51a304a6ce83ac5aab4a984b8fc0558e90f8e554
+server_startups: 18 / 24
+measured_http_requests: 569 / 600
+remote_artifact_revalidation: 170/170 passed
+downloaded_artifact_revalidation: 170/170 passed
+host_restored_to_original_state: true
+```
+
+Eligible loopback recommendations were created only for
+`interactive-short` concurrency 4:
+
+```text
+maximum_throughput: slots4-cont-on, +67.602% aggregate output tok/s
+interactive_latency: slots4-cont-on, +91.064% lower TTFT p95
+```
+
+These are not remote-network results and are not universal serving defaults.
+Phase 21D2 must use a fresh remote-client topology and cannot reuse Phase 21D1
+loopback recommendations as network evidence.

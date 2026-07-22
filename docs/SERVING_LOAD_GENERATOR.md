@@ -44,3 +44,22 @@ to invent queue delay.
 
 Phase 21D0 validates deterministic fixture modes only. It does not start a real
 `llama-server`, does not contact AWS, and does not modify machine-wide state.
+
+## Phase 21D1 Loopback Evidence
+
+Phase 21D1 exercised the real target-local load generator against a pinned
+`llama-server` binary. The load generator process was pinned to CPU 0 while the
+server process was pinned to CPUs 1-7.
+
+```text
+measured_http_requests: 569
+server_startups: 18
+request_artifacts: JSONL per workload/concurrency block
+streaming_TTFT: recorded
+server_reported_tokens: required
+client_overload_guard: passed
+```
+
+The confirmed recommendations used zero request retries and zero measured
+request failures. Client-observed timing remains loopback timing and is not
+mixed with future remote-client timing.
