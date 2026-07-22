@@ -467,3 +467,33 @@ interactive_latency:
 The result is useful evidence that serving queueing/slot configuration matters
 for multi-request loopback traffic. It is not evidence of remote-network
 behavior, and it does not replace Phase 21D2.
+
+## Phase 21D2A - Remote Network Local Preparation
+
+Phase 21D2A formalized the two-host remote-client serving plan without touching
+AWS or either target.
+
+Prepared contract:
+
+- C7g / Neoverse-V1 remains the future `llama-server` target.
+- T4g / Neoverse-N1 class is the future deterministic remote load generator.
+- `slots4-cont-on` is the first profile to confirm under remote-client
+  topology.
+- The server uses full capacity because the load generator is no longer pinned
+  to a local C7g CPU.
+- Loopback RecommendationBundles become hard drift under
+  `c7g_server_t4g_remote_client`.
+- Client-observed TTFT and E2E are the primary remote-topology timings.
+- Unsynchronized server and client wall clocks are not subtracted.
+- IRQ, RPS, XPS, and listen-backlog profiles stay skipped until observed
+  network-bottleneck evidence exists.
+
+Local validation preserved:
+
+```text
+aws_accessed: false
+remote_accessed: false
+real_server_measured: false
+network_state_modified: false
+ready_for_phase21d2b_real_remote_network_validation: true
+```

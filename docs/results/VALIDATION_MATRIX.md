@@ -21,6 +21,7 @@ Numbers from different targets or protocols must not be combined.
 | 21C2B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | Official Ubuntu AWS ARM64 64K kernel transaction, G4/G5/G6/G7 one-time boots, matched measurements, package cleanup, and artifact validation | Real measured guard validation; 64K page-size and isolation differences stayed inside the 5% noise band except G7, which regressed | passed |
 | 21D0 | Local fixtures only | Synthetic serving workload fixtures | Workload-aware `llama-server` serving models, load generator, staged search policy, Pareto output, safety guards, and future network plans | Local preparation only; no AWS, no remote host, no real serving measurement | passed |
 | 21D1 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real loopback serving search with local client on CPU 0 and server on CPUs 1-7 | Eligible loopback-only recommendations for `interactive-short` concurrency 4; not remote-network evidence | passed |
+| 21D2A | Local fixtures and plan-only CLI | Synthetic serving network plan | Dual-host C7g-server/T4g-client orchestration contract, remote timing policy, hard-drift guard, and network-bottleneck gate | Local preparation only; AWS stopped, no remote access, no real serving measurement | passed |
 
 ## Current Evidence Boundaries
 
@@ -376,3 +377,29 @@ host_restored_to_original_state: true
 The recommendations are bound to loopback topology, workload, concurrency,
 binary digest, model digest, and server capability digest. They must not be
 reused as Phase 21D2 remote-client evidence.
+
+## Phase 21D2A Remote-Network Local Preparation Summary
+
+Phase 21D2A did not access AWS or either target. It prepares Phase 21D2B to
+start from a fresh two-host topology:
+
+```text
+server_role: C7g / Neoverse-V1 / Linux Arm64 / 8 logical CPUs
+client_role: T4g / Neoverse-N1 class / Linux Arm64 / 2 logical CPUs
+required_profile: slots4-cont-on
+server_cpu_policy: full_capacity_server_cpu_set_no_local_load_generator_reservation
+loopback_to_remote_network: hard_drift
+network_tuning_gate: skip_irq_rps_xps_until_network_bottleneck_is_observed
+aws_accessed: false
+remote_accessed: false
+```
+
+The prepared Phase 21D2B path is:
+
+```text
+confirm slots4-cont-on
+measure full-capacity remote serving
+classify server/client/network bottleneck
+test IRQ/RPS/XPS only when network bottleneck evidence exists
+report remote-network recommendation or inconclusive result
+```

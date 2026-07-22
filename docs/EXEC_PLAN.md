@@ -531,3 +531,41 @@ interactive_latency: slots4-cont-on, +91.064% lower TTFT p95
 These are not remote-network results and are not universal serving defaults.
 Phase 21D2 must use a fresh remote-client topology and cannot reuse Phase 21D1
 loopback recommendations as network evidence.
+
+## Phase 21D2A: Remote-Network Local Preparation
+
+Phase 21D2A prepares the dual-host orchestration contract while AWS remains
+stopped:
+
+```text
+aws_accessed: false
+remote_accessed: false
+real_server_measured: false
+network_state_modified: false
+```
+
+Implemented locally:
+
+- versioned dual-host network plan for C7g server plus T4g remote load
+  generator
+- server/client role preflight requirements
+- strict source-match and clean-worktree requirements for both hosts
+- private connection detail policy for ignored evidence/config only
+- client-observed remote timing policy
+- loopback-to-remote hard-drift recommendation boundary
+- `slots4-cont-on` as the first remote-client profile to confirm
+- full-capacity remote serving server CPU policy
+- IRQ/RPS/XPS/listen-backlog gate that remains skipped unless network
+  bottleneck evidence is observed
+
+Phase 21D2B may start only after both instances are manually made available and
+private connection details are supplied outside tracked files. It must first
+confirm `slots4-cont-on` and measure full-capacity remote serving. Network
+profiles are tested only if that run shows a network bottleneck.
+
+Future phases:
+
+```text
+Phase 21D2B: C7g llama-server with T4g remote load generation
+Phase 21D3: final recommendation, Performance Passport, PR, and product demo
+```

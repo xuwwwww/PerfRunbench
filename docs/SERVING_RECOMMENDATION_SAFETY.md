@@ -37,6 +37,25 @@ Loopback recommendations cannot be reused as proof of remote-network
 improvement. Shared-prefix recommendations apply only to the shared-prefix
 workload identity.
 
+## Remote-Client Drift
+
+Phase 21D1 RecommendationBundles are bound to the `loopback` topology. When the
+current topology is `c7g_server_t4g_remote_client`, reuse validation must
+return hard drift and must not launch `run --best` from the loopback bundle.
+
+Phase 21D2B requires fresh remote-client evidence:
+
+- fresh remote-client baseline
+- fresh remote-client candidate confirmation
+- matching server binary, model, capability, workload, and protocol digests
+- matching server and client topology fingerprints
+- artifact validation on each host and after download
+
+Network-specific RecommendationBundles require network-bottleneck evidence
+before IRQ, RPS, XPS, listen-backlog, or other network profile changes become
+eligible. A runtime-only result can still be recommended or reported
+inconclusive without running network profiles.
+
 ## Cleanup
 
 Real serving candidates must follow:

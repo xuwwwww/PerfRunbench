@@ -107,6 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     network = subparsers.add_parser("network-plan", help="Create the future Phase 21D2 remote-network plan only.")
     network.add_argument("--output", default="results/serving/phase21d2_network_plan.json")
+    network.add_argument("--json", action="store_true")
     network.set_defaults(handler=_cmd_network_plan)
 
     cleanup = subparsers.add_parser("cleanup", help="Read-only cleanup guidance for serving experiments.")
@@ -248,8 +249,18 @@ def _cmd_pareto(args: argparse.Namespace) -> int:
 
 def _cmd_network_plan(args: argparse.Namespace) -> int:
     plan = create_phase21d2_network_plan()
-    path = atomic_write_json(args.output, plan.to_dict())
+    payload = plan.to_dict()
+    path = atomic_write_json(args.output, payload)
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
     print(f"network_plan_path: {path}")
+    print("phase: 21D2A")
+    print(f"topology: {plan.orchestration.topology_id}")
+    print(f"required_profile: {plan.orchestration.required_profile}")
+    print(f"aws_accessed: {str(plan.orchestration.aws_accessed).lower()}")
+    print(f"remote_accessed: {str(plan.orchestration.remote_accessed).lower()}")
+    print(f"network_tuning_gate: {plan.network_bottleneck_gate.default_decision}")
     print("loopback_results_excluded_from_remote_claims: true")
     return 0
 

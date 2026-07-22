@@ -107,8 +107,25 @@ class ServingAutotuneTest(unittest.TestCase):
 
         self.assertTrue(plan.loopback_results_excluded_from_remote_claims)
         self.assertEqual(plan.topology, "c7g_server_t4g_remote_load_generator_planned")
+        self.assertEqual(plan.orchestration.phase, "21D2A")
+        self.assertFalse(plan.orchestration.aws_accessed)
+        self.assertFalse(plan.orchestration.remote_accessed)
+        self.assertEqual(plan.orchestration.required_profile, "slots4-cont-on")
+        self.assertEqual(plan.orchestration.server_role.expected_cpu_class, "neoverse_v1")
+        self.assertEqual(plan.orchestration.server_role.expected_logical_cpus, 8)
+        self.assertEqual(plan.orchestration.client_role.expected_cpu_class, "neoverse_n1")
+        self.assertEqual(plan.orchestration.client_role.expected_logical_cpus, 2)
         self.assertTrue(all(profile.reversible for profile in plan.irq_profiles))
         self.assertTrue(any("listen_overflow_or_backlog_saturation" in profile.evidence_required for profile in plan.queue_profiles))
+        self.assertEqual(
+            plan.network_bottleneck_gate.default_decision,
+            "skip_irq_rps_xps_until_network_bottleneck_is_observed",
+        )
+        self.assertIn("blind_rps_or_xps_change", plan.network_bottleneck_gate.forbidden_without_evidence)
+        self.assertEqual(
+            plan.recommendation_reuse_policy["phase21d1_loopback_recommendations"],
+            "hard_drift_for_remote_network_topology",
+        )
 
     def test_lifecycle_preflight_refuses_occupied_port_and_stale_server(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
@@ -146,6 +163,27 @@ class ServingAutotuneTest(unittest.TestCase):
         failed = {guard["field"] for guard in result["guard_results"] if guard["status"] == "failed"}
         self.assertIn("serving_workload_id", failed)
         self.assertIn("server_capability_digest", failed)
+
+    def test_serving_reuse_guard_rejects_loopback_bundle_on_remote_network(self) -> None:
+        bundle = {
+            "schema_version": "1.0",
+            "server_binary_digest": "binary",
+            "model_digest": "model",
+            "serving_workload_id": "interactive-short",
+            "traffic_mode": "closed-loop",
+            "concurrency": 4,
+            "network_profile": {"schema_version": "1.0", "topology": "loopback"},
+            "server_capability_digest": "capability",
+            "runtime_identity": {"schema_version": "1.0", "architecture": "aarch64", "kernel_identity": "4k"},
+        }
+        current = dict(bundle)
+        current["network_profile"] = {"schema_version": "1.0", "topology": "c7g_server_t4g_remote_client"}
+
+        result = validate_serving_reuse(bundle, current)
+
+        self.assertEqual(result["status"], "failed")
+        network_guard = next(guard for guard in result["guard_results"] if guard["field"] == "network_topology")
+        self.assertEqual(network_guard["reason"], "hard_drift")
 
     def test_cli_doctor_plan_search_pareto_and_network_fake_e2e(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -231,9 +269,24 @@ class ServingAutotuneTest(unittest.TestCase):
                 )
 
             network_path = root / "network_plan.json"
-            with redirect_stdout(io.StringIO()):
+            network_output = io.StringIO()
+            with redirect_stdout(network_output):
                 self.assertEqual(main(["serve", "network-plan", "--output", str(network_path)]), 0)
             self.assertTrue(network_path.exists())
+            network_payload = json.loads(network_path.read_text(encoding="utf-8"))
+            self.assertEqual(network_payload["orchestration"]["phase"], "21D2A")
+            self.assertFalse(network_payload["orchestration"]["aws_accessed"])
+            self.assertFalse(network_payload["orchestration"]["remote_accessed"])
+            self.assertIn("required_profile: slots4-cont-on", network_output.getvalue())
+            serialized_network = json.dumps(network_payload)
+            self.assertNotRegex(serialized_network, r"\b\d{1,3}(\.\d{1,3}){3}\b")
+            self.assertNotIn(".pem", serialized_network)
+            self.assertNotIn("PRIVATE KEY", serialized_network)
+
+            network_json_output = io.StringIO()
+            with redirect_stdout(network_json_output):
+                self.assertEqual(main(["serve", "network-plan", "--output", str(root / "network_plan_json.json"), "--json"]), 0)
+            self.assertIn('"topology_id": "c7g_server_t4g_remote_client"', network_json_output.getvalue())
 
     def test_compare_refuses_mixed_workload_protocols(self) -> None:
         with TemporaryDirectory() as temp_dir:

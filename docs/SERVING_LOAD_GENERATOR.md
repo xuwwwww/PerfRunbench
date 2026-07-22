@@ -63,3 +63,21 @@ client_overload_guard: passed
 The confirmed recommendations used zero request retries and zero measured
 request failures. Client-observed timing remains loopback timing and is not
 mixed with future remote-client timing.
+
+## Phase 21D2 Remote Client
+
+Phase 21D2A prepares the remote-client mode without running it. In Phase 21D2B
+the load generator runs on the T4g client and the server runs on C7g. The load
+generator must preserve:
+
+- client identity and resource saturation evidence
+- scheduled, submitted, first-token, and completed monotonic timestamps
+- request JSONL and raw response digests
+- network counter snapshots from the client side
+- explicit `client_observed` timing labels
+
+The server may preserve internal timing and slot metrics, but those timestamps
+must remain separate unless a future protocol establishes clock
+synchronization. The first real remote run confirms `slots4-cont-on` and
+full-capacity serving before any IRQ, RPS, XPS, or listen-backlog profile is
+considered.

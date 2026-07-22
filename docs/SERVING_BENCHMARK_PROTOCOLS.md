@@ -98,3 +98,37 @@ remote-network baselines and confirmations before any remote-client claim.
 Phase 21D1 did not create eligible capacity, shared-prefix, or
 balanced-multi-user recommendations. A screening point estimate without fresh
 confirmation remains ineligible.
+
+## Phase 21D2 Remote-Client Protocol
+
+Phase 21D2B will use a two-host protocol:
+
+```text
+server: C7g / Neoverse-V1 running pinned llama-server
+client: T4g / Neoverse-N1 class running the deterministic load generator
+topology: c7g_server_t4g_remote_client
+primary profile: slots4-cont-on
+server_cpu_policy: full_capacity_server_cpu_set_no_local_load_generator_reservation
+```
+
+The first remote-client measurement must confirm `slots4-cont-on` and measure
+full-capacity remote serving. It must not reuse Phase 21D1 loopback
+recommendations as remote-network evidence.
+
+Client-observed TTFT and E2E latency are primary for the remote-client
+topology. Server-side timestamps and internal timings are useful supporting
+evidence, but PerfRunbench must not subtract unsynchronized client and server
+wall clocks.
+
+IRQ affinity, RPS, XPS, listen backlog, or other network profiles remain
+skipped unless the remote run first records network-bottleneck evidence:
+
+- client-observed latency regression for the same workload shape
+- server CPU not saturated while the client observes delay
+- client CPU not saturated
+- retransmits, drops, listen overflow, or backlog saturation
+- RX/TX queue or softirq hotspot
+- before/after counters from both hosts
+
+Without that evidence, the valid Phase 21D2B outcome is a remote-client
+recommendation or an inconclusive result from the serving runtime profile only.

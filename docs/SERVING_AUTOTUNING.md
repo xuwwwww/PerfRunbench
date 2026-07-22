@@ -95,6 +95,33 @@ autotuneai serve cleanup
 `serve run` and `serve search` require `--fixture` in Phase 21D0. Real server
 execution is intentionally blocked until Phase 21D1.
 
+## Phase 21D2A Remote-Network Preparation
+
+Phase 21D2A keeps AWS and remote hosts stopped and prepares the two-host
+remote-client contract:
+
+```text
+C7g server target -> pinned llama-server
+T4g remote client -> deterministic load generator
+required serving profile -> slots4-cont-on
+server CPU policy -> full capacity; no local load-generator CPU reservation
+network tuning -> skipped unless a network bottleneck is observed
+```
+
+`autotuneai serve network-plan --json` emits the versioned local plan. The plan
+records server/client roles, source-state requirements, artifact policy,
+privacy policy, timing policy, and the Phase 21D2B execution order. It is still
+plan-only and reports:
+
+```text
+aws_accessed: false
+remote_accessed: false
+```
+
+Loopback RecommendationBundles from Phase 21D1 are hard drift for the
+`c7g_server_t4g_remote_client` topology. Phase 21D2B must create a fresh
+remote-client baseline and confirmation before any remote-network claim.
+
 ## Phase 21D1 Real Loopback Result
 
 Phase 21D1 used the pinned `llama-server` binary and existing Qwen2.5-7B
