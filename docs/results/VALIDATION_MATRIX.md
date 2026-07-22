@@ -19,6 +19,7 @@ Numbers from different targets or protocols must not be combined.
 | 21C1 | Linux Arm64 C7g / Neoverse-V1 | No benchmark workload | Same-kernel GRUB one-time boot rehearsal with serial-console recovery validation | Reboot safety evidence only; no kernel change and no performance claim | passed |
 | 21C2A | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | 4K one-time boot-parameter isolation, rollback, cleanup, matched baseline measurement, and artifact validation | Real measured guard validation; G1/G2 stayed inside the 5% noise band and G3 regressed | passed |
 | 21C2B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | Official Ubuntu AWS ARM64 64K kernel transaction, G4/G5/G6/G7 one-time boots, matched measurements, package cleanup, and artifact validation | Real measured guard validation; 64K page-size and isolation differences stayed inside the 5% noise band except G7, which regressed | passed |
+| 21D0 | Local fixtures only | Synthetic serving workload fixtures | Workload-aware `llama-server` serving models, load generator, staged search policy, Pareto output, safety guards, and future network plans | Local preparation only; no AWS, no remote host, no real serving measurement | passed |
 
 ## Current Evidence Boundaries
 
@@ -36,6 +37,9 @@ Numbers from different targets or protocols must not be combined.
 - CPU-specific binary reuse requires native-binary portability evidence in
   addition to workload and environment identity. Neoverse-N1 and Neoverse-V1
   CPU-model-bound binaries are not interchangeable by default.
+- Serving RecommendationBundles are bound to workload, traffic mode,
+  concurrency class, server capability digest, binary/model digests, and
+  loopback or remote-network topology.
 
 ## Phase 15C Summary
 

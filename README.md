@@ -187,6 +187,36 @@ autotuneai recommendation rollback \
   --bundle .autotuneai/recommendations/<bundle_id>.json
 ```
 
+## Serving Autotuning Preparation
+
+Workload-aware serving tuning is separate from the fixed single-request
+`llama-bench` protocol. Phase 21D0 adds local, fixture-backed preparation for
+future `llama-server` loopback and remote-client validation:
+
+```bash
+autotuneai serve doctor --json
+autotuneai serve workload show interactive-short --json
+autotuneai serve plan \
+  --workload interactive-short \
+  --traffic closed-loop \
+  --concurrency 4
+autotuneai serve search \
+  --workload interactive-short \
+  --candidate-cap 8 \
+  --fixture
+autotuneai serve pareto --experiment results/serving/search
+autotuneai serve network-plan
+```
+
+`serve run` and `serve search` require `--fixture` in Phase 21D0. Real C7g
+serving execution starts only in Phase 21D1 after the target is manually
+started and private connection details are supplied outside tracked files.
+
+Serving recommendations are named by workload class, such as
+`interactive_latency`, `balanced_multi_user`, `maximum_throughput`,
+`shared_prefix`, and `memory_constrained`. PerfRunbench does not collapse
+unrelated serving metrics into one universal score.
+
 ## Real Arm Evidence Snapshot
 
 The current measured Arm evidence is a preliminary single-target result on a
@@ -340,6 +370,9 @@ autotune/
                   result records.
   arm_tune/       Arm target inspection, llama.cpp adapter, search, profiles,
                   Passport, and workload-neutral correctness hooks.
+  serving/        Workload-aware llama-server capability discovery, traffic
+                  profiles, deterministic load generation, Pareto search,
+                  network plans, and serving recommendation guards.
   recommendation/ Generic RecommendationBundle generation, validation, guarded
                   apply, canary, lease, promote, and rollback.
   resource/       Run directories, process execution, monitoring, CPU affinity,

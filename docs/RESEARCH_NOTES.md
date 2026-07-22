@@ -396,3 +396,34 @@ affected experimental boot:
 
 The final host was restored to the original 4K kernel, PAGE_SIZE 4096,
 restored default semantics, no residual 64K packages, and clean dpkg state.
+
+## Phase 21D0 - Serving Autotuning Preparation
+
+Phase 21D0 intentionally stops searching the completed fixed single-request
+kernel/profile space. The next optimization surface is workload-aware serving:
+multiple users, queueing, slots, batching, context capacity, prompt reuse, and
+network-client behavior.
+
+Important decisions:
+
+- Do not publish a universal "best server configuration".
+- Keep throughput, latency, capacity, shared-prefix, and remote-network claims
+  separate.
+- Discover exact supported server options from the pinned binary and startup
+  evidence. Unsupported concepts remain `not_available`.
+- Generate candidates only for supported options.
+- Treat shared-prefix cache wins as shared-prefix-workload-specific.
+- Treat capacity improvements as capacity results, not raw speedups.
+- Require per-request JSONL evidence and no measured retry.
+- Keep loopback and remote-client timing semantics separate.
+
+Phase 21D0 is local and fixture-backed only:
+
+```text
+aws_accessed: false
+remote_accessed: false
+real_server_measured: false
+serving_result_origin: test_fixture for fake E2Es
+```
+
+The first real serving phase is Phase 21D1 on a manually started C7g target.

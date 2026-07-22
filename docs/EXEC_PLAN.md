@@ -212,6 +212,48 @@ stayed at `+1.630%`. Reduced-CPU cpuset and IRQ/workqueue isolation regressed
 sharply. Cold-start storage and prefault evidence was preserved as
 protocol-specific data and was not ranked against the steady-state baseline.
 
+## Phase 21D0: Workload-Aware llama-server Autotuning Preparation
+
+Phase 21D0 starts a new serving workload scope. It does not continue searching
+the completed fixed single-request kernel profiles.
+
+Git integration record:
+
+```text
+origin_main_commit: 8e53cb9b597dd2fdca4bfdc42af30c5d40b8566c
+phase21c2b_commit: 1c073fac7b63ad95392f8c70976eaa6584211b43
+phase21d0_initial_commit: 1c073fac7b63ad95392f8c70976eaa6584211b43
+pr6_status: open_draft
+```
+
+Scope:
+
+- local implementation and fixture validation only
+- no AWS access
+- no remote host access
+- no kernel, boot, package, network, sysctl, or machine-wide mutation
+- no real serving performance result
+
+Implemented plan:
+
+```text
+exact server capability discovery strategy
+standard workload profiles
+deterministic load generator
+staged bounded serving candidate policy
+throughput / latency / capacity guards
+Pareto output
+network plan-only model
+serving Passport and RecommendationBundle extension points
+```
+
+Future phases:
+
+```text
+Phase 21D1: C7g llama-server loopback load generation
+Phase 21D2: C7g llama-server with T4g remote load generation and bounded network validation
+```
+
 One real-host correctness fix was required:
 
 ```text

@@ -27,6 +27,7 @@ controller CLI
 | `autotune.recommendation` | RecommendationBundle generation, validation, canary, lease, status, rollback, and cache integration. |
 | `autotune.training_adapter` | Dependency-free and PyTorch-backed bounded training slice adapter. |
 | `autotune.arm_tune` | Arm target inspection, SSH/local target orchestration, `llama.cpp` benchmarking, runtime search, build profiles, and Performance Passport evidence. |
+| `autotune.serving` | Workload-aware `llama-server` capability discovery, traffic profiles, deterministic load generation, Pareto selection, network plans, and serving recommendation guards. |
 | `autotune.system_profiles` | Host state snapshots, Linux system-profile planning, reversible leases, rollback, protocol separation, and boot-profile planning using fake-root validation. |
 | `autotune.resource` | Run directories, process execution, monitoring, CPU affinity, resource budgets, and cleanup. |
 | `autotune.report` | Markdown and HTML report helpers. |
@@ -99,6 +100,29 @@ candidate cleared the configured noise band.
 Bootloader writes, kernel installation, reboot-required profiles, and 4K/64K
 kernel comparisons remain future Phase 21C validation work.
 
+## Phase 21D Serving Path
+
+Serving optimization is a new workload scope after the fixed single-request
+kernel/profile search completed for the current C7g target:
+
+```mermaid
+flowchart LR
+    caps[Server capability discovery] --> workloads[Workload and traffic profiles]
+    workloads --> loadgen[Deterministic load generator]
+    loadgen --> evidence[Per-request JSONL evidence]
+    evidence --> metrics[Throughput, latency, fairness, resource metrics]
+    metrics --> search[Staged bounded search]
+    search --> pareto[Pareto frontier]
+    pareto --> recs[Named serving recommendations]
+    recs --> passport[Serving Passport extension]
+    passport --> safety[Hard-drift and cleanup guards]
+```
+
+Phase 21D0 is local implementation and fixture validation only. It does not
+access AWS, does not start a real server, and does not modify network or
+machine-wide state. Loopback and remote-client results remain separate future
+protocols.
+
 ## Evidence Principles
 
 - Fixture, mocked, and CI-runner values remain fixtures.
@@ -107,4 +131,6 @@ kernel comparisons remain future Phase 21C validation work.
 - Parser failures are never converted into zero-valued metrics.
 - Build-profile, runtime-search, and complete-configuration improvements are
   separate protocols and must not be added together.
+- Serving throughput, latency, capacity, shared-prefix, and remote-network
+  claims are separate protocols and recommendation classes.
 
