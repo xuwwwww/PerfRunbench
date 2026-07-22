@@ -837,11 +837,17 @@ def _write_phase21c0_boot_fixture(root: Path, *, cmdline_suffix: str = "") -> No
         "boot/config-6.17.0-1018-aws": fallback_config,
         "boot/grub/grub.cfg": "\n".join(
             [
-                "menuentry 'Ubuntu, with Linux 6.17.0-1019-aws' {",
-                "  linux /boot/vmlinuz-6.17.0-1019-aws",
+                "menuentry 'Ubuntu, with Linux 6.17.0-1019-aws' --id 'gnulinux-6.17.0-1019-aws-advanced-root' {",
+                "  insmod gzio",
+                "  search --no-floppy --fs-uuid --set=root 1111-2222",
+                "  linux /boot/vmlinuz-6.17.0-1019-aws root=LABEL=cloudimg-rootfs ro",
+                "  initrd /boot/initrd.img-6.17.0-1019-aws",
                 "}",
-                "menuentry 'Ubuntu, with Linux 6.17.0-1018-aws' {",
-                "  linux /boot/vmlinuz-6.17.0-1018-aws",
+                "menuentry 'Ubuntu, with Linux 6.17.0-1018-aws' --id 'gnulinux-6.17.0-1018-aws-advanced-root' {",
+                "  insmod gzio",
+                "  search --no-floppy --fs-uuid --set=root 1111-2222",
+                "  linux /boot/vmlinuz-6.17.0-1018-aws root=LABEL=cloudimg-rootfs ro",
+                "  initrd /boot/initrd.img-6.17.0-1018-aws",
                 "}",
                 "",
             ]
