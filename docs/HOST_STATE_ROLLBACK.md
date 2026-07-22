@@ -184,3 +184,25 @@ The temporary G0 safety-pin plan is separate from the reversible system-profile
 lease model. It may be used only as a future recovery safeguard after explicit
 authorization, must pin a stable verified G0 entry, and must be restored
 byte-for-byte after validation.
+
+## Phase 21C2B 64K Cleanup Evidence
+
+Phase 21C2B performed real cleanup after the authorized 64K validation. Only
+the six packages introduced by the qualified 64K transaction were purged;
+`autoremove` was not used.
+
+```text
+packages_removed: 6
+residual_64k_boot_artifacts: none
+residual_64k_modules_directory: none
+dpkg_audit: clean
+final_kernel: 6.17.0-1019-aws
+final_page_size: 4096
+temporary_grub_entries_removed: true
+next_entry_removed: true
+permanent_default_restored: true
+package_state_restored: true
+```
+
+The temporary G0 safety-pin files were restored after package cleanup. Final
+remote residual checks found no benchmark/server processes and no test ports.

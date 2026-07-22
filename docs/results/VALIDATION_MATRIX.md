@@ -18,6 +18,7 @@ Numbers from different targets or protocols must not be combined.
 | 21C0 | Local fake Linux roots plus read-only Linux Arm64 C7g / Neoverse-V1 audit | Synthetic boot fixtures and read-only boot/kernel inventory | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, official 64K package metadata, and future protocol plan | Planning and read-only inventory only; no kernel install, no bootloader write, no reboot | passed |
 | 21C1 | Linux Arm64 C7g / Neoverse-V1 | No benchmark workload | Same-kernel GRUB one-time boot rehearsal with serial-console recovery validation | Reboot safety evidence only; no kernel change and no performance claim | passed |
 | 21C2A | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | 4K one-time boot-parameter isolation, rollback, cleanup, matched baseline measurement, and artifact validation | Real measured guard validation; G1/G2 stayed inside the 5% noise band and G3 regressed | passed |
+| 21C2B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | Official Ubuntu AWS ARM64 64K kernel transaction, G4/G5/G6/G7 one-time boots, matched measurements, package cleanup, and artifact validation | Real measured guard validation; 64K page-size and isolation differences stayed inside the 5% noise band except G7, which regressed | passed |
 
 ## Current Evidence Boundaries
 
@@ -302,6 +303,30 @@ package_cleanup_plan_ready: true
 ready_for_manual_c7g_start: true
 kernel_or_boot_state_modified: false
 aws_accessed: false
+```
+
+## Phase 21C2B C7g 64K Kernel Validation
+
+Phase 21C2B performed the guarded real 4K-versus-64K C7g validation described
+in `docs/results/PHASE_21C2B_C7G_64K_KERNEL_VALIDATION.md`.
+
+```text
+final_source_commit: f2175f69e37e2d826237d395a04b1c04db40e786
+original_kernel: 6.17.0-1019-aws
+candidate_64k_kernel: 6.17.0-1019-aws-64k
+H1_4k_full_decode_median: 17.46 tok/s
+H3_64k_full_decode_median: 17.55 tok/s
+H2_4k_matched_decode_median: 13.63 tok/s
+H4_64k_matched_decode_median: 13.64 tok/s
+G5_H5_decode_median: 13.61 tok/s
+G6_H5_decode_median: 13.67 tok/s
+G7_H5_decode_median: 12.63 tok/s
+page_size_performance_improvement_verified: false
+64k_isolation_improvement_verified: false
+original_4k_state_restored: true
+package_state_restored: true
+permanent_default_restored: true
+ready_to_stop_c7g: true
 ```
 
 Coverage:

@@ -363,3 +363,36 @@ Key decisions:
 
 No AWS, kernel package, GRUB, EFI, initramfs, or reboot state was touched during
 this local preparation phase.
+
+## Phase 21C2B - Real 64K Validation
+
+The real C7g 64K validation showed that installing and booting the official
+Ubuntu AWS ARM64 64K kernel is feasible and reversible under the guarded
+protocol. It did not show a steady-state decode, server-latency, cold-load, or
+64K isolation improvement outside the 5% decision band.
+
+Observed decode medians:
+
+```text
+H1 4K full: 17.46 tok/s
+H3 64K full: 17.55 tok/s
+H2 4K matched: 13.63 tok/s
+H4 64K matched: 13.64 tok/s
+G5 H5: 13.61 tok/s
+G6 H5: 13.67 tok/s
+G7 H5: 12.63 tok/s
+```
+
+G7 regressed by `-7.405%` versus H4, consistent with the earlier 4K
+domain-isolation risk signal.
+
+The run also exposed two GRUB rendering edge cases that were fixed before any
+affected experimental boot:
+
+- Ubuntu generated entries can include `initrdfail` conditionals; temporary
+  entries must preserve the whole generated block structure.
+- Generated `linux` commands may be tab-separated, so renderer logic must parse
+  by command token rather than searching only for `"linux "`.
+
+The final host was restored to the original 4K kernel, PAGE_SIZE 4096,
+restored default semantics, no residual 64K packages, and clean dpkg state.

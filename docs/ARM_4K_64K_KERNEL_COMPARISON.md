@@ -116,3 +116,20 @@ G7 (`64k-domain-isolation-interaction`) is marked as advanced because the
 analogous 4K domain isolation profile regressed. It needs separate real-phase
 authorization and cannot be eligible for automatic recommendation by request
 alone.
+
+## Phase 21C2B Real Results
+
+Phase 21C2B executed fresh same-session C7g measurements for all planned
+identities. Old Phase 21C2A values were not reused as denominators.
+
+| comparison | baseline | candidate | delta | classification |
+| --- | --- | --- | ---: | --- |
+| Page-size full-capacity | H1 4K full `17.46 tok/s` | H3 64K full `17.55 tok/s` | +0.515% | inconclusive |
+| Page-size matched six-CPU | H2 4K matched `13.63 tok/s` | H4 64K matched `13.64 tok/s` | +0.073% | inconclusive |
+| 64K nohz/RCU/IRQ | H4 `13.64 tok/s` | G5 H5 `13.61 tok/s` | -0.220% | inconclusive |
+| 64K managed IRQ | H4 `13.64 tok/s` | G6 H5 `13.67 tok/s` | +0.220% | inconclusive |
+| 64K domain interaction | H4 `13.64 tok/s` | G7 H5 `12.63 tok/s` | -7.405% | regressed |
+
+Server and cold-load protocols remained separate from steady-state decode.
+Neither protocol showed a verified improvement outside the configured 5%
+decision band.

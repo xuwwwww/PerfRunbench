@@ -421,3 +421,44 @@ Next real Phase 21C2B remains blocked until the user manually starts the C7g
 target and supplies private connection details. The real phase must use fresh
 same-session 4K and 64K baselines and must not reuse Phase 21C2A measurements
 as denominators.
+
+## Phase 21C2B: C7g 4K Versus 64K Kernel Validation
+
+Phase 21C2B executed the guarded real 64K validation on the C7g target. It
+installed the official Ubuntu AWS ARM64 64K kernel package transaction, used a
+temporary G0 default safety pin, booted G4/G5/G6/G7 through one-time GRUB
+selection, restored G0 after every profile, and removed exactly the introduced
+packages.
+
+```text
+branch: validation/phase21c2b-c7g-64k-real
+final_source_commit: f2175f69e37e2d826237d395a04b1c04db40e786
+original_kernel: 6.17.0-1019-aws
+candidate_64k_kernel: 6.17.0-1019-aws-64k
+artifact_manifest_revalidation: 621/621 passed
+```
+
+Results:
+
+```text
+H1_4k_full_decode_median: 17.46 tok/s
+H3_64k_full_decode_median: 17.55 tok/s
+H2_4k_matched_decode_median: 13.63 tok/s
+H4_64k_matched_decode_median: 13.64 tok/s
+G5_H5_decode_median: 13.61 tok/s
+G6_H5_decode_median: 13.67 tok/s
+G7_H5_decode_median: 12.63 tok/s
+page_size_performance_improvement_verified: false
+64k_isolation_improvement_verified: false
+original_4k_state_restored: true
+package_state_restored: true
+ready_to_stop_c7g: true
+```
+
+Two GRUB renderer fixes were committed during the phase after defects were
+detected before the affected experimental reboot:
+
+```text
+10a2f02 fix: preserve generated GRUB conditionals in 64K boot entries
+f2175f6 fix: parse tab-separated GRUB linux commands
+```

@@ -133,3 +133,24 @@ System-noise evidence for six-CPU comparisons records context switches,
 migrations, interrupts and softirqs on CPUs `2-7`, scheduler tick/noise
 evidence, coefficient of variation, and latency tails. Lower noise alone is not
 a throughput claim.
+
+## Phase 21C2B Protocol Outcomes
+
+Phase 21C2B executed the H1-H5 protocol identities on the C7g target. The
+steady-state decode protocol used two warm-ups, seven measured repetitions,
+fixed prompt/generation counts, fixed binary/model digests, fixed CPU masks,
+and a 5% noise band.
+
+The measured steady-state classifications were:
+
+```text
+H1 versus H3 page-size full-capacity: inconclusive
+H2 versus H4 page-size matched six-CPU: inconclusive
+H4 versus G5 H5 64K isolation: inconclusive
+H4 versus G6 H5 64K isolation: inconclusive
+H4 versus G7 H5 domain interaction: regressed
+```
+
+`llama-server` latency and cold model-load measurements remained separate
+protocols. Their point estimates were not combined with steady-state decode
+results and did not establish a verified 64K improvement.

@@ -218,3 +218,29 @@ boot into the verified G0 kernel.
 G7 is an advanced interaction candidate because Phase 21C2A showed 4K domain
 isolation regressed. It requires separate explicit authorization and can run
 only after G4, G5, and G6 each boot successfully and return to exact G0.
+
+## Phase 21C2B Real 64K Validation
+
+Phase 21C2B executed the prepared flow on the C7g target using the official
+Ubuntu AWS ARM64 64K package transaction. The run installed only the qualified
+64K package set, used a temporary G0 safety pin for ordinary boots, booted
+G4/G5/G6/G7 through one-time GRUB entries, and then removed exactly the
+introduced packages.
+
+```text
+original_kernel: 6.17.0-1019-aws
+candidate_64k_kernel: 6.17.0-1019-aws-64k
+package_transaction_new_packages: 6
+package_transaction_upgrades: 0
+package_transaction_removals: 0
+final_kernel: 6.17.0-1019-aws
+final_page_size: 4096
+package_cleanup: passed
+```
+
+The temporary-entry renderer was fixed during this phase to preserve generated
+Ubuntu GRUB `initrdfail` conditionals and tab-separated `linux` commands. Both
+defects were detected before any affected experimental reboot occurred.
+
+The 64K page-size comparisons were inconclusive within the configured 5% noise
+band, while G7 domain-isolation interaction regressed and remains ineligible.
