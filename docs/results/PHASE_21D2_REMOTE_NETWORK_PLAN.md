@@ -81,3 +81,25 @@ Every network mutation must be lease-bound and exactly reversible.
 By default Phase 21D2B skips IRQ, RPS, XPS, and listen-backlog changes until
 the full-capacity remote-serving run shows a network bottleneck rather than a
 server CPU, client CPU, model/runtime, or request-shape limit.
+
+## Phase 21D2B Completion
+
+Phase 21D2B subsequently executed this topology with C7g as the server and T4g
+as the remote client. It confirmed `slots4-cont-on` with fresh remote-client
+evidence and did not reuse the Phase 21D1 loopback recommendation.
+
+```text
+source_commit: b46460ee989baf54ebbeff6275ac9fb0bf866f3f
+measured_requests_total: 608
+paired_block_pairs: 6
+remote_slots4_throughput_improvement_verified: true
+remote_slots4_latency_improvement_verified: true
+full_capacity_remote_recommendation_created: true
+network_tuning_skipped_due_to_no_bottleneck: true
+artifact_validation: passed
+dual_host_restored: true
+```
+
+No IRQ, RPS, XPS, backlog, or other network setting was modified because the
+required network-bottleneck evidence was absent. See
+`docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`.

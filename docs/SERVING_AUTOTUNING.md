@@ -122,6 +122,40 @@ Loopback RecommendationBundles from Phase 21D1 are hard drift for the
 `c7g_server_t4g_remote_client` topology. Phase 21D2B must create a fresh
 remote-client baseline and confirmation before any remote-network claim.
 
+## Phase 21D2B Real Remote-Client Result
+
+Phase 21D2B used C7g as the `llama-server` target and T4g as the remote load
+generator over a direct private network path. The run confirmed `slots4-cont-on`
+on the remote-client topology and measured three paired J2 seven-CPU blocks
+plus three paired J1 full-eight-CPU blocks.
+
+```text
+source_commit: b46460ee989baf54ebbeff6275ac9fb0bf866f3f
+measured_requests_total: 608
+paired_block_pairs: 6
+retries: 0
+request_failures: 0
+quality_failures: 0
+network_tuning_status: network_tuning_not_executed_evidence_absent
+artifact_validation: passed
+dual_host_restored: true
+```
+
+Eligible remote-client `slots4-cont-on` recommendations were observed for:
+
+| stage | workload | result |
+| --- | --- | --- |
+| J2 seven CPU | `interactive-short` | output throughput `15.334 -> 28.295 tok/s`, `+84.529%`; TTFT p95 `3389.856 -> 300.557 ms` |
+| J1 full eight CPU | `interactive-short` | output throughput `17.032 -> 31.355 tok/s`, `+84.092%`; TTFT p95 `3055.682 -> 271.088 ms` |
+| J1 full eight CPU | `decode-heavy` | output throughput `17.046 -> 31.790 tok/s`, `+86.490%`; TTFT p95 `10126.795 -> 202.424 ms` |
+| J1 full eight CPU | `prefill-heavy` | output throughput `16.563 -> 28.054 tok/s`, `+69.375%`; TTFT p95 `3967.424 -> 341.693 ms` |
+
+The recommendation remains scoped to the tested server, remote client,
+topology, model, binary, workload set, concurrency 4, and protocol. It is not
+combined with the Phase 21D1 loopback result or any `llama-bench` measurement.
+Network IRQ/RPS/XPS tuning was not executed because the prerequisite
+network-bottleneck evidence was absent.
+
 ## Phase 21D1 Real Loopback Result
 
 Phase 21D1 used the pinned `llama-server` binary and existing Qwen2.5-7B

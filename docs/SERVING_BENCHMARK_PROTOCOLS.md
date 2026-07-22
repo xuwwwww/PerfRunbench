@@ -101,7 +101,7 @@ confirmation remains ineligible.
 
 ## Phase 21D2 Remote-Client Protocol
 
-Phase 21D2B will use a two-host protocol:
+Phase 21D2B used a two-host protocol:
 
 ```text
 server: C7g / Neoverse-V1 running pinned llama-server
@@ -111,9 +111,17 @@ primary profile: slots4-cont-on
 server_cpu_policy: full_capacity_server_cpu_set_no_local_load_generator_reservation
 ```
 
-The first remote-client measurement must confirm `slots4-cont-on` and measure
-full-capacity remote serving. It must not reuse Phase 21D1 loopback
+The first remote-client measurement confirmed `slots4-cont-on` and measured
+full-capacity remote serving. It did not reuse Phase 21D1 loopback
 recommendations as remote-network evidence.
+
+```text
+measured_requests_total: 608
+paired_block_pairs: 6
+request_failures: 0
+quality_failures: 0
+direct_private_network_path: true
+```
 
 Client-observed TTFT and E2E latency are primary for the remote-client
 topology. Server-side timestamps and internal timings are useful supporting
@@ -132,3 +140,5 @@ skipped unless the remote run first records network-bottleneck evidence:
 
 Without that evidence, the valid Phase 21D2B outcome is a remote-client
 recommendation or an inconclusive result from the serving runtime profile only.
+Phase 21D2B followed this rule and skipped IRQ/RPS/XPS/backlog tuning because
+network-bottleneck evidence was absent.

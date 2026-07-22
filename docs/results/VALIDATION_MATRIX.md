@@ -22,6 +22,7 @@ Numbers from different targets or protocols must not be combined.
 | 21D0 | Local fixtures only | Synthetic serving workload fixtures | Workload-aware `llama-server` serving models, load generator, staged search policy, Pareto output, safety guards, and future network plans | Local preparation only; no AWS, no remote host, no real serving measurement | passed |
 | 21D1 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real loopback serving search with local client on CPU 0 and server on CPUs 1-7 | Eligible loopback-only recommendations for `interactive-short` concurrency 4; not remote-network evidence | passed |
 | 21D2A | Local fixtures and plan-only CLI | Synthetic serving network plan | Dual-host C7g-server/T4g-client orchestration contract, remote timing policy, hard-drift guard, and network-bottleneck gate | Local preparation only; AWS stopped, no remote access, no real serving measurement | passed |
+| 21D2B | Linux Arm64 C7g / Neoverse-V1 server plus Linux Arm64 T4g / Neoverse-N1 class remote client | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real direct-private-path remote serving validation for `slots4-cont-on` | Eligible remote-client recommendations for concurrency 4; network tuning skipped because bottleneck evidence was absent | passed |
 
 ## Current Evidence Boundaries
 
@@ -403,3 +404,40 @@ classify server/client/network bottleneck
 test IRQ/RPS/XPS only when network bottleneck evidence exists
 report remote-network recommendation or inconclusive result
 ```
+
+## Phase 21D2B C7g/T4g Remote Serving Summary
+
+Phase 21D2B validated the real two-host remote-client topology using C7g as
+the server and T4g as the deterministic lightweight client. The run used direct
+private-path HTTP traffic, deterministic randomized block order, fresh
+`llama-server` restart for every block, zero request retries, zero failures,
+and client-observed TTFT/E2E timing.
+
+Outcome:
+
+```text
+source_commit: b46460ee989baf54ebbeff6275ac9fb0bf866f3f
+measured_requests_total: 608
+paired_block_pairs: 6
+remote_slots4_throughput_improvement_verified: true
+remote_slots4_latency_improvement_verified: true
+full_capacity_remote_recommendation_created: true
+network_tuning_skipped_due_to_no_bottleneck: true
+client_bottleneck_detected: false
+downloaded_artifact_validation: 598/598 passed
+dual_host_restored: true
+```
+
+Eligible same-protocol comparisons:
+
+```text
+J2 interactive-short: 15.334 -> 28.295 output tok/s, +84.529%
+J1 interactive-short: 17.032 -> 31.355 output tok/s, +84.092%
+J1 decode-heavy: 17.046 -> 31.790 output tok/s, +86.490%
+J1 prefill-heavy: 16.563 -> 28.054 output tok/s, +69.375%
+```
+
+The recommendation is scoped to the tested C7g server, T4g remote client,
+direct private topology, model, binary, workload set, concurrency 4, and
+protocol. It must not be combined with Phase 21D1 loopback results or with
+single-request `llama-bench` measurements.
