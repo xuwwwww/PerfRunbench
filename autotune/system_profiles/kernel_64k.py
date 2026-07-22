@@ -172,8 +172,8 @@ def render_temporary_grub_entry_from_generated(
     linux_replaced = False
     for raw_line in source_lines[1:]:
         stripped = raw_line.strip()
-        if stripped.startswith(("linux ", "linuxefi ")):
-            parts = stripped.split(maxsplit=2)
+        parts = stripped.split(maxsplit=2)
+        if parts and parts[0] in {"linux", "linuxefi"}:
             if len(parts) < 2:
                 raise SystemProfileError("source GRUB entry has malformed linux line")
             command, path = parts[0], parts[1]

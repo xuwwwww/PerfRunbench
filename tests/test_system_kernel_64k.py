@@ -72,10 +72,10 @@ class SystemKernel64KTest(unittest.TestCase):
                 "    search --no-floppy --fs-uuid --set=root 1111-2222",
                 "    if [ \"${initrdfail}\" = 1 ]; then",
                 "    echo 'GRUB_FORCE_PARTUUID set, initrdless boot failed. Attempting with initrd.'",
-                "    linux /vmlinuz-6.17.0-1019-aws-64k root=PARTUUID=abc ro",
+                "    linux\t/vmlinuz-6.17.0-1019-aws-64k root=PARTUUID=abc ro",
                 "    initrd /initrd.img-6.17.0-1019-aws-64k",
                 "    else",
-                "    linux /vmlinuz-6.17.0-1019-aws-64k root=PARTUUID=abc ro initrd=\\EFI\\ubuntu\\initrd.img-6.17.0-1019-aws-64k",
+                "    linux\t/vmlinuz-6.17.0-1019-aws-64k root=PARTUUID=abc ro initrd=\\EFI\\ubuntu\\initrd.img-6.17.0-1019-aws-64k",
                 "    fi",
                 "}",
             ]
