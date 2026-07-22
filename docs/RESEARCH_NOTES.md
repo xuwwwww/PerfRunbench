@@ -334,3 +334,32 @@ permanent_default_unchanged: true
 performance_improvement_verified: false
 latency_or_noise_improvement_verified: false
 ```
+
+## Phase 21C2B0 - 64K Local Preparation
+
+Phase 21C2B0 stops before remote access and prepares the future 64K validation
+boundary locally.
+
+Key decisions:
+
+- Generated GRUB menu entries are the source of truth for kernel and initrd
+  paths. The implementation must not synthesize `/boot/vmlinuz-*` or
+  `/boot/initrd-*` from a release string.
+- GRUB root/search/module preparation commands are preserved from the source
+  generated entry when rendering temporary entries.
+- The official AWS ARM64 64K package candidate is qualified through repository
+  metadata and apt simulation. The real phase may install only the exact
+  qualified version and dependencies from the simulation.
+- Package plans reject kernel removal, unrelated upgrades, bootloader
+  replacement, unsigned packages, architecture changes, dependency conflicts,
+  and insufficient disk evidence.
+- GRUB configuration text equality is not enough. The planner separately
+  records whether the resolved ordinary boot target remains the verified G0
+  kernel.
+- A guarded G0 safety pin is allowed only as a future recovery safeguard. It is
+  not applied in Phase 21C2B0.
+- G7 is gated separately because the analogous 4K domain-isolation candidate
+  regressed in Phase 21C2A.
+
+No AWS, kernel package, GRUB, EFI, initramfs, or reboot state was touched during
+this local preparation phase.

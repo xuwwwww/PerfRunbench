@@ -180,3 +180,41 @@ performance_improvement_verified: false
 
 G1 and G2 remained inside the configured 5% noise band. G3 regressed and is not
 eligible as an optimization result.
+
+## Phase 21C2B0 64K Local Preparation
+
+Phase 21C2B0 prepares future official Ubuntu AWS ARM64 64K validation without
+accessing AWS, installing packages, editing GRUB, changing EFI state,
+generating initramfs, or rebooting a machine.
+
+New plan-only commands:
+
+```text
+autotuneai system kernel-package-plan --profile aws-arm64-64k --inventory <inventory.json>
+autotuneai system kernel-package-plan verify --plan <plan.json>
+autotuneai system grub-default-plan --inventory <inventory.json> --safe-entry <entry-id>
+autotuneai system kernel-experiment-plan --profile <G4|G5|G6|G7> --inventory <inventory.json>
+autotuneai system kernel-experiment-plan verify --plan <plan.json>
+autotuneai system kernel-cleanup-plan --before <before.json> --after <after.json>
+```
+
+The 64K package transaction model requires an apt simulation and rejects kernel
+removal, unrelated upgrades, bootloader replacement, unsigned packages,
+architecture changes, dependency conflicts, and insufficient disk evidence. The
+future real install command must use the exact package version qualified during
+preflight.
+
+Generated GRUB entries are now parsed as source evidence. Temporary entries
+must preserve the exact parsed `linux` path, `initrd` path, and root/search
+preparation lines. Hardcoded guesses such as constructing `/boot/vmlinuz-*`
+from a kernel release are ineligible.
+
+Installing a newer kernel can change the resolved ordinary boot target without
+changing the original GRUB configuration text. Phase 21C2B0 therefore plans a
+guarded G0 safety pin, but does not apply it. Real 64K validation remains
+blocked unless either the existing default or the safety pin guarantees ordinary
+boot into the verified G0 kernel.
+
+G7 is an advanced interaction candidate because Phase 21C2A showed 4K domain
+isolation regressed. It requires separate explicit authorization and can run
+only after G4, G5, and G6 each boot successfully and return to exact G0.

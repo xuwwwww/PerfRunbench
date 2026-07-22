@@ -384,3 +384,40 @@ entry, cleanup passed, the harness was corrected to preserve original GRUB
 kernel/initrd paths, and corrected G1/G2/G3 transactions restarted from
 verified G0. The failed pre-measurement boot is not included in performance
 comparisons.
+
+## Phase 21C2B0: Local Preparation For C7g 64K Kernel Validation
+
+Phase 21C2B0 is local implementation, fixture testing, package transaction
+planning, boot-plan validation, recovery planning, and documentation only.
+
+Boundary:
+
+```text
+aws_accessed: false
+kernel_or_boot_state_modified: false
+kernel_installed: false
+grub_or_efi_modified: false
+machine_rebooted: false
+```
+
+Implemented:
+
+- exact generated GRUB menu-entry parser for kernel and initrd paths
+- hard rejection of guessed `/boot/vmlinuz-*` temporary-entry paths
+- official AWS ARM64 64K package transaction plan model
+- apt simulation safety policy
+- resolved-default safety distinction from configuration-text equality
+- guarded G0 safety-pin plan model
+- G4/G5/G6/G7 experiment plan model
+- H1/H2/H3/H4/H5 comparison identities
+- exact package cleanup plan model
+- plan-only CLI commands for package, default, experiment, and cleanup plans
+
+Phase 21C2B0 prepares future real validation. It does not authorize or perform
+kernel installation, GRUB writes, initramfs generation, EFI changes, reboot, or
+AWS access.
+
+Next real Phase 21C2B remains blocked until the user manually starts the C7g
+target and supplies private connection details. The real phase must use fresh
+same-session 4K and 64K baselines and must not reuse Phase 21C2A measurements
+as denominators.

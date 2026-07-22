@@ -152,3 +152,35 @@ removed the temporary entry and `next_entry`, and G0 validation passed before
 corrected G1/G2/G3 measurements continued. Final validation confirmed the
 original 4K command line, kernel, page size, and permanent default were
 restored.
+
+## Kernel Package Rollback
+
+Phase 21C2B0 adds plan-only rollback coverage for future official AWS ARM64 64K
+package transactions. The rollback plan removes only the exact package set
+introduced by the transaction. It explicitly does not run `apt autoremove`, does
+not remove the running 4K kernel, does not remove the fallback kernel, and does
+not change repository configuration.
+
+Final restoration for a future real 64K session requires:
+
+```text
+running original 4K kernel
+PAGE_SIZE 4096
+original command line
+original resolved permanent default
+original /etc/default/grub bytes
+original grubenv state
+no next_entry, including no empty next_entry key
+no temporary 64K experimental entries
+no residual 64K kernel package
+no residual 64K modules directory
+fallback kernel intact
+no package-manager lock
+no broken dpkg state
+no benchmark or server process
+```
+
+The temporary G0 safety-pin plan is separate from the reversible system-profile
+lease model. It may be used only as a future recovery safeguard after explicit
+authorization, must pin a stable verified G0 entry, and must be restored
+byte-for-byte after validation.

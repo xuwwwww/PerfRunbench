@@ -96,3 +96,40 @@ Phase 21C2A keeps protocols separate:
 
 Throughput, latency, system-noise, and cold-load outcomes must not be combined
 into one score or one improvement percentage.
+
+## Phase 21C2B 64K Protocol Plan
+
+Future 64K validation must keep page-size, isolation, cold-load, server, memory,
+and noise evidence separated.
+
+Steady-state decode:
+
+```text
+two warmups
+seven measured repetitions
+deterministic randomized order within valid paired comparisons
+three-second cooldown
+fixed CPU placement and thread count
+noise_band_percent: 5.0
+```
+
+Cold model load is a separate page-size protocol and records process
+start-to-model-ready time, major/minor faults, bytes read, peak RSS, page-cache
+state, kernel release, and PAGE_SIZE. It must not be ranked against warm decode
+throughput.
+
+Warm first request / server evidence records request completion, nonempty
+output, stream parsing, TTFT median/p95, E2E median/p95, output tokens/s, RSS,
+failures, cleanup, and port release. It is secondary unless the protocol itself
+is the configured objective.
+
+Memory and page-size evidence must record `getconf PAGE_SIZE`, kernel config,
+process `KernelPageSize`, process `MMUPageSize`, RSS/PSS when available, page
+table memory, faults, mappings, THP evidence, HugeTLB evidence, `vmstat`, and
+slab/page-table counters when available. A result must not attribute a
+difference to TLB behavior without actual counter evidence.
+
+System-noise evidence for six-CPU comparisons records context switches,
+migrations, interrupts and softirqs on CPUs `2-7`, scheduler tick/noise
+evidence, coefficient of variation, and latency tails. Lower noise alone is not
+a throughput claim.

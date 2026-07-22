@@ -84,3 +84,35 @@ for a boot-isolation speedup percentage.
 
 Phase 21C2B remains the earliest possible phase for installing, booting, or
 measuring a 64K kernel.
+
+## Phase 21C2B0 Local Preparation
+
+Phase 21C2B0 does not install or boot a 64K kernel. It prepares the local
+guardrails needed before a future real C7g 64K session:
+
+- exact official AWS ARM64 64K package transaction planning
+- apt simulation safety checks
+- generated GRUB entry parsing
+- resolved default boot target checks
+- temporary G0 safety-pin planning
+- G4/G5/G6/G7 one-time experiment plans
+- exact package cleanup planning
+- fake end-to-end rollback and failure plans
+
+Future real Phase 21C2B must use fresh same-session baselines:
+
+| identity | role | PAGE_SIZE | CPUs | threads |
+| --- | --- | --- | --- | --- |
+| H1 | 4K full-capacity baseline | 4096 | `0-7` | 8 |
+| H2 | 4K matched six-CPU baseline | 4096 | `2-7` | 6 |
+| H3 | 64K full-capacity baseline | 65536 | `0-7` | 8 |
+| H4 | 64K matched six-CPU baseline | 65536 | `2-7` | 6 |
+| H5 | 64K isolated six-CPU profile | 65536 | `2-7` | 6 |
+
+Causal comparisons are limited to H1 versus H3, H2 versus H4, and H4 versus
+H5. Old Phase 21C2A results must not be reused as denominators.
+
+G7 (`64k-domain-isolation-interaction`) is marked as advanced because the
+analogous 4K domain isolation profile regressed. It needs separate real-phase
+authorization and cannot be eligible for automatic recommendation by request
+alone.

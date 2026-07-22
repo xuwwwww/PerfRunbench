@@ -285,3 +285,39 @@ before measurement. Recovery used Serial Console to select the original Ubuntu
 entry, the defect was corrected, cleanup passed, and corrected G1/G2/G3
 transactions restarted from verified G0. The failed pre-measurement boot is not
 included in performance comparisons.
+
+## Phase 21C2B0 64K Local Preparation Summary
+
+Phase 21C2B0 prepares future official AWS ARM64 64K validation without remote
+access or host mutation.
+
+Outcome:
+
+```text
+phase21c2b0_64k_local_preparation: passed
+g1_grub_path_regression_guarded: true
+package_transaction_plan_ready: true
+safe_g0_default_plan_ready: true
+package_cleanup_plan_ready: true
+ready_for_manual_c7g_start: true
+kernel_or_boot_state_modified: false
+aws_accessed: false
+```
+
+Coverage:
+
+```text
+generated GRUB path parsing
+guessed kernel path rejection
+official 64K package transaction planning
+apt simulation safety checks
+resolved-default safety checks
+G0 safety-pin planning
+G4/G5/G6/G7 experiment planning
+H1/H2/H3/H4/H5 comparison identities
+exact package cleanup planning
+plan-only CLI fake E2Es
+```
+
+This is not a 64K performance result. A future real phase must start from a
+manually started C7g target and create fresh same-session 4K and 64K baselines.
