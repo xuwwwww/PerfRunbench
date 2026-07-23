@@ -187,11 +187,11 @@ autotuneai recommendation rollback \
   --bundle .autotuneai/recommendations/<bundle_id>.json
 ```
 
-## Serving Autotuning Preparation
+## Serving Autotuning
 
 Workload-aware serving tuning is separate from the fixed single-request
-`llama-bench` protocol. Phase 21D0 adds local, fixture-backed preparation for
-future `llama-server` loopback and remote-client validation:
+`llama-bench` protocol. v0.3 packages the validated `llama-server`
+remote-client recommendation flow while preserving fixture mode for public CI:
 
 ```bash
 autotuneai serve doctor --json
@@ -206,16 +206,60 @@ autotuneai serve search \
   --fixture
 autotuneai serve pareto --experiment results/serving/search
 autotuneai serve network-plan
+autotuneai serve recommend \
+  --workload interactive-short \
+  --concurrency 4 \
+  --recommendation-class maximum_throughput_remote
+autotuneai serve run \
+  --best \
+  --workload interactive-short \
+  --concurrency 4 \
+  --dry-run
 ```
 
-`serve run` and `serve search` require `--fixture` in Phase 21D0. Real C7g
-serving execution starts only in Phase 21D1 after the target is manually
-started and private connection details are supplied outside tracked files.
+`serve run --best` loads an existing validated serving recommendation and does
+not search. The public dry-run path reports the selected profile, expected
+command shape, drift checks, memory/context preflight, port preflight, canary
+requirement, and cleanup plan without launching a private server.
 
-Serving recommendations are named by workload class, such as
-`interactive_latency`, `balanced_multi_user`, `maximum_throughput`,
-`shared_prefix`, and `memory_constrained`. PerfRunbench does not collapse
-unrelated serving metrics into one universal score.
+Validated remote serving recommendation classes:
+
+- `maximum_throughput_remote`
+- `interactive_latency_remote`
+
+No balanced, shared-prefix, memory-constrained, or remote-network tuning
+recommendation is created without qualifying evidence. PerfRunbench does not
+collapse unrelated serving metrics into one universal score.
+
+Validated remote serving evidence:
+
+| workload | baseline output tok/s | `slots4-cont-on` output tok/s | throughput delta | baseline TTFT p95 ms | `slots4-cont-on` TTFT p95 ms | TTFT p95 reduction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `interactive-short` | `17.032` | `31.355` | `+84.092%` | `3055.682` | `271.088` | `91.128%` |
+| `decode-heavy` | `17.046` | `31.790` | `+86.490%` | `10126.795` | `202.424` | `98.001%` |
+| `prefill-heavy` | `16.563` | `28.054` | `+69.375%` | `3967.424` | `341.693` | `91.388%` |
+
+The validated topology was a C7g / Neoverse-V1 server and a T4g /
+Neoverse-N1-class remote client over a direct private network path at
+concurrency 4. The run recorded `608` measured requests, zero retries, zero
+request failures, zero quality failures, passed artifact validation, and
+dual-host cleanup.
+
+Network tuning is explicitly not recommended:
+
+```text
+network_tuning_status: network_tuning_not_executed_evidence_absent
+```
+
+Detailed serving evidence and demo material:
+
+```text
+docs/results/VALIDATED_PERFORMANCE_SUMMARY.md
+docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md
+docs/demo/SERVING_AUTOTUNING_DEMO.md
+docs/demo/SERVING_AUTOTUNING_COMMANDS.md
+docs/demo/SERVING_AUTOTUNING_TALK_TRACK.md
+```
 
 ## Real Arm Evidence Snapshot
 

@@ -1,0 +1,97 @@
+# PerfRunbench Validated Performance Summary
+
+This summary separates measured performance results, guard evidence, and
+unsupported or inconclusive mechanisms. Numbers from different targets,
+protocols, or workload shapes must not be combined into a single speedup.
+
+## Headline
+
+PerfRunbench did not verify a compiler flag, backend flag, kernel profile,
+page-size profile, allocator profile, or machine-wide Linux tuning profile
+outside the configured guard for the fixed single-stream `llama-bench`
+protocol.
+
+The verified performance result is workload-aware serving autotuning:
+`slots4-cont-on` improved remote-client `llama-server` throughput and p95 TTFT
+for the tested C7g server, T4g remote-client topology, Qwen2.5-7B Q4_K_M model,
+pinned binary, concurrency 4, and direct private network path.
+
+Recommended wording:
+
+```text
+Best observed eligible serving configuration under the tested C7g server,
+T4g remote-client topology, Qwen2.5-7B Q4_K_M model, pinned llama-server
+binary, workload, concurrency, and measurement protocol.
+```
+
+## Validated Matrix
+
+| Area | Validated scope | Result | Claim boundary |
+| --- | --- | --- | --- |
+| Compiler/build profiles | C7g / Neoverse-V1, Qwen2.5-7B Q4_K_M, fixed `llama-bench` build-profile protocol | Earlier Phase 9 showed `portable-baseline` 10.825 tok/s, `arm-native` 17.530 tok/s, `arm-optimized` 17.380 tok/s; later guarded Phase 20 build/backend comparison did not verify a fresh difference outside the 5% noise band | Do not claim universal compiler/backend superiority |
+| Backend evidence | Pinned `llama.cpp` binaries and startup evidence | KleidiAI or other optimized paths are recorded only when enabled and evidenced; requested flags alone are not sufficient | Host capability is separate from runtime backend evidence |
+| Runtime threads/search | C7g, fixed `llama-bench` bounded runtime search | Phase 9 search baseline 13.630 tok/s to selected 17.480 tok/s, observed +28.246515% under that protocol; later Phase 20 CPU-aware run stayed inside noise | Protocol-specific only; do not combine with build-profile numbers |
+| Reversible system tuning | C7g real host, one reversible family at a time | Phase 21B and 21B2 exhausted safe reversible families; no positive same-protocol candidate cleared the 5% noise band | Guard evidence, not a speedup |
+| mmap / mlock / prefault | C7g real host, reversible checks | `no-mmap` best same-protocol point was +3.014%, inside the 5% guard; mlock/prefault lacked qualified positive evidence | No recommendation |
+| Allocators | C7g real host, non-persistent extraction when available | No allocator profile produced eligible same-protocol evidence outside guard | No recommendation |
+| THP / HugeTLB | C7g real host, bounded reversible checks | THP was exercised but stayed inside guard; HugeTLB consumer qualification did not create an eligible recommendation | No recommendation |
+| Storage cold-start | C7g real host, cold-start-oriented profiles | Evidence was separated as cold-start/protocol-specific and not ranked against steady-state decode throughput | Diagnostic only |
+| 4K boot isolation | C7g one-time 4K boot-parameter experiments | G1/G2 stayed inside guard; G3 regressed | No boot-isolation recommendation |
+| 4K versus 64K kernel | C7g official Ubuntu AWS ARM64 64K validation | 4K versus 64K full and matched comparisons stayed inside the 5% noise band | No page-size recommendation |
+| 64K isolation | C7g official 64K kernel plus isolation profiles | G5/G6 stayed inside guard; G7 regressed | No 64K isolation recommendation |
+| Loopback serving | C7g local client/server loopback, `interactive-short` concurrency 4 | `slots4-cont-on` improved loopback output throughput by +67.602% and p95 TTFT by +91.064% | Loopback-only; not remote-network evidence |
+| Remote serving | C7g server, T4g remote client, direct private path, concurrency 4 | `slots4-cont-on` improved remote output throughput by +69.375% to +86.490% across the three J1 workloads, with p95 TTFT reductions above 91% | Validated remote-client serving recommendation |
+| Remote network tuning | C7g/T4g read-only network bottleneck evidence | No client or network bottleneck was observed, so IRQ/RPS/XPS/backlog tuning was not executed | No network recommendation |
+
+## Remote Serving Result
+
+All rows compare baseline versus `slots4-cont-on` within the same target,
+workload, topology, concurrency, binary, model, and protocol.
+
+| Stage | Workload | Baseline output tok/s | Candidate output tok/s | Throughput delta | Baseline TTFT p95 ms | Candidate TTFT p95 ms | TTFT p95 reduction |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| J2 seven CPU control | `interactive-short` | 15.334 | 28.295 | +84.529% | 3389.856 | 300.557 | 91.134% |
+| J1 full eight CPU | `interactive-short` | 17.032 | 31.355 | +84.092% | 3055.682 | 271.088 | 91.128% |
+| J1 full eight CPU | `decode-heavy` | 17.046 | 31.790 | +86.490% | 10126.795 | 202.424 | 98.001% |
+| J1 full eight CPU | `prefill-heavy` | 16.563 | 28.054 | +69.375% | 3967.424 | 341.693 | 91.388% |
+
+Remote serving protocol checks:
+
+```text
+measured_requests_total: 608
+paired_block_pairs: 6
+retries: 0
+request_failures: 0
+quality_failures: 0
+client_bottleneck_detected: false
+network_tuning_status: network_tuning_not_executed_evidence_absent
+artifact_validation: passed
+dual_host_restored: true
+```
+
+## Recommendation Classes
+
+Eligible public serving recommendation classes:
+
+- `maximum_throughput_remote`
+- `interactive_latency_remote`
+
+Eligible workloads:
+
+- `interactive-short`, concurrency 4
+- `decode-heavy`, concurrency 4
+- `prefill-heavy`, concurrency 4
+
+Not created because evidence did not qualify:
+
+- balanced multi-user recommendation
+- shared-prefix recommendation
+- memory-constrained recommendation
+- remote network tuning recommendation
+
+## Evidence Documents
+
+- `docs/results/PHASE_21D1_C7G_LOOPBACK_SERVING_VALIDATION.md`
+- `docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`
+- `docs/results/VALIDATION_MATRIX.md`
+

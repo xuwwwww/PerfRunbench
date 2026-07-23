@@ -118,10 +118,17 @@ flowchart LR
     passport --> safety[Hard-drift and cleanup guards]
 ```
 
-Phase 21D0 is local implementation and fixture validation only. It does not
-access AWS, does not start a real server, and does not modify network or
-machine-wide state. Loopback and remote-client results remain separate future
-protocols.
+Phase 21D0 was local implementation and fixture validation only. Phase 21D1
+validated loopback serving on the C7g target. Phase 21D2B validated the fresh
+remote-client topology with a T4g load generator and packaged `slots4-cont-on`
+as a workload-scoped serving recommendation for concurrency 4.
+
+Loopback and remote-client results remain separate protocols. The v0.3 serving
+RecommendationBundle and Serving Performance Passport bind the recommendation
+to model digest, server binary digest, server capability digest, workload ID,
+concurrency, CPU assignment, parallel slot count, continuous batching state,
+network path, artifact validation, and cleanup evidence. `serve run --best`
+loads this evidence and never performs a search.
 
 ## Evidence Principles
 

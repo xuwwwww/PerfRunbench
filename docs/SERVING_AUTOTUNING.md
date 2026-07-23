@@ -27,9 +27,9 @@ server capability discovery
 ```
 
 There is no universal best server configuration. PerfRunbench keeps separate
-recommendation classes for `interactive_latency`, `balanced_multi_user`,
-`maximum_throughput`, `shared_prefix`, and `memory_constrained`. A class may
-have no eligible recommendation.
+recommendation classes for loopback, remote-client throughput, remote-client
+latency, shared-prefix, memory-constrained, and network-tuning evidence. A
+class may have no eligible recommendation.
 
 ## Capability Discovery
 
@@ -145,16 +145,57 @@ Eligible remote-client `slots4-cont-on` recommendations were observed for:
 
 | stage | workload | result |
 | --- | --- | --- |
-| J2 seven CPU | `interactive-short` | output throughput `15.334 -> 28.295 tok/s`, `+84.529%`; TTFT p95 `3389.856 -> 300.557 ms` |
-| J1 full eight CPU | `interactive-short` | output throughput `17.032 -> 31.355 tok/s`, `+84.092%`; TTFT p95 `3055.682 -> 271.088 ms` |
-| J1 full eight CPU | `decode-heavy` | output throughput `17.046 -> 31.790 tok/s`, `+86.490%`; TTFT p95 `10126.795 -> 202.424 ms` |
-| J1 full eight CPU | `prefill-heavy` | output throughput `16.563 -> 28.054 tok/s`, `+69.375%`; TTFT p95 `3967.424 -> 341.693 ms` |
+| J2 seven CPU | `interactive-short` | output throughput `15.334 -> 28.295 tok/s`, `+84.529%`; TTFT p95 `3389.856 -> 300.557 ms`, `91.134%` reduction |
+| J1 full eight CPU | `interactive-short` | output throughput `17.032 -> 31.355 tok/s`, `+84.092%`; TTFT p95 `3055.682 -> 271.088 ms`, `91.128%` reduction |
+| J1 full eight CPU | `decode-heavy` | output throughput `17.046 -> 31.790 tok/s`, `+86.490%`; TTFT p95 `10126.795 -> 202.424 ms`, `98.001%` reduction |
+| J1 full eight CPU | `prefill-heavy` | output throughput `16.563 -> 28.054 tok/s`, `+69.375%`; TTFT p95 `3967.424 -> 341.693 ms`, `91.388%` reduction |
 
 The recommendation remains scoped to the tested server, remote client,
 topology, model, binary, workload set, concurrency 4, and protocol. It is not
 combined with the Phase 21D1 loopback result or any `llama-bench` measurement.
 Network IRQ/RPS/XPS tuning was not executed because the prerequisite
 network-bottleneck evidence was absent.
+
+## Phase 21D3 Productization
+
+Phase 21D3 packages the Phase 21D2B evidence into public, sanitized CLI and
+release-candidate artifacts:
+
+```bash
+autotuneai serve recommend \
+  --workload interactive-short \
+  --concurrency 4 \
+  --recommendation-class maximum_throughput_remote
+
+autotuneai serve explain --recommendation <recommendation_id>
+
+autotuneai serve run \
+  --best \
+  --workload interactive-short \
+  --concurrency 4 \
+  --dry-run
+```
+
+Created recommendation classes:
+
+```text
+maximum_throughput_remote
+interactive_latency_remote
+```
+
+No balanced, shared-prefix, memory-constrained, or remote-network tuning
+recommendation is created in v0.3 because those evidence gates did not qualify.
+
+`serve run --best` loads preserved recommendation evidence and never launches a
+search. Hard-drift checks cover the model digest, server binary digest,
+capability digest, architecture, CPU model, logical CPU count, memory class,
+network topology and path, workload, concurrency, CPU assignment, slot count,
+continuous batching state, context size, artifact identity, and cleanup
+status.
+
+The public dry-run path performs no mutation and reports the expected
+sanitized command shape, memory/context preflight, port preflight, canary
+requirement, and cleanup plan.
 
 ## Phase 21D1 Real Loopback Result
 
