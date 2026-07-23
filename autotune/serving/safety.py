@@ -12,9 +12,19 @@ HARD_DRIFT_FIELDS = {
     "traffic_mode",
     "concurrency",
     "network_topology",
+    "network_path",
     "server_capability_digest",
     "architecture",
     "kernel_identity",
+    "cpu_model",
+    "logical_cpus",
+    "memory_class",
+    "cpu_assignment",
+    "parallel_slots",
+    "continuous_batching",
+    "context_size",
+    "artifact_manifest_digest",
+    "cleanup_status",
 }
 
 
@@ -40,6 +50,16 @@ def _read(payload: dict[str, Any], field: str) -> Any:
         network = payload.get("network_profile")
         if isinstance(network, dict):
             return network.get("topology")
+    if field == "network_path":
+        network = payload.get("network_profile")
+        if isinstance(network, dict):
+            return network.get("connection_policy")
+    if field in {"parallel_slots", "continuous_batching", "context_size", "cpu_assignment"}:
+        runtime = payload.get("runtime_profile")
+        if isinstance(runtime, dict):
+            if field == "cpu_assignment":
+                return runtime.get("process_cpu_affinity")
+            return runtime.get(field)
     if field in {"architecture", "kernel_identity"}:
         runtime = payload.get("runtime_identity")
         if isinstance(runtime, dict):

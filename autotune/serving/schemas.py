@@ -14,8 +14,10 @@ NOT_AVAILABLE = "not_available"
 TRAFFIC_MODES = {"closed-loop", "open-loop", "burst", "shared-prefix"}
 RECOMMENDATION_CLASSES = {
     "interactive_latency",
+    "interactive_latency_remote",
     "balanced_multi_user",
     "maximum_throughput",
+    "maximum_throughput_remote",
     "shared_prefix",
     "memory_constrained",
 }
