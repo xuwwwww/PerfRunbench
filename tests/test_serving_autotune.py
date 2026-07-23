@@ -12,6 +12,13 @@ from autotune.cli import main
 from autotune.serving.capabilities import discover_server_capabilities
 from autotune.serving.lifecycle import check_server_lifecycle_preflight
 from autotune.serving.network import create_phase21d2_network_plan
+from autotune.serving.recommendations import (
+    CANONICAL_PROFILE_ID,
+    canonical_remote_recommendations,
+    get_remote_recommendation,
+    recommendation_bundle,
+    serving_performance_passport,
+)
 from autotune.serving.safety import validate_serving_reuse
 from autotune.serving.search import create_serving_plan, run_fixture_serving_search, serving_passport_extension
 from autotune.serving.schemas import ServerRuntimeProfile, ServingExperimentResult, ServingMetricSummary, ServingTrafficProfile
@@ -126,6 +133,133 @@ class ServingAutotuneTest(unittest.TestCase):
             plan.recommendation_reuse_policy["phase21d1_loopback_recommendations"],
             "hard_drift_for_remote_network_topology",
         )
+
+    def test_remote_serving_recommendations_are_evidence_scoped(self) -> None:
+        recommendations = canonical_remote_recommendations()
+        classes = {item["recommendation_class"] for item in recommendations}
+        workloads = {item["serving_workload_id"] for item in recommendations}
+
+        self.assertEqual(classes, {"interactive_latency_remote", "maximum_throughput_remote"})
+        self.assertEqual(workloads, {"interactive-short", "decode-heavy", "prefill-heavy"})
+        self.assertEqual(len(recommendations), 6)
+        self.assertFalse(any(item["recommendation_class"] == "balanced_multi_user" for item in recommendations))
+        self.assertFalse(any(item["recommendation_class"] == "shared_prefix" for item in recommendations))
+        self.assertFalse(any(item["recommendation_class"] == "remote_network" for item in recommendations))
+
+        decode = get_remote_recommendation(
+            workload_id="decode-heavy",
+            concurrency=4,
+            recommendation_class="maximum_throughput_remote",
+        )
+        self.assertEqual(decode["profile_id"], CANONICAL_PROFILE_ID)
+        self.assertEqual(decode["metrics"]["throughput_delta_percent"], 86.490)
+        self.assertEqual(decode["metrics"]["ttft_p95_reduction_percent"], 98.001)
+        self.assertEqual(decode["result_origin"], "measured")
+
+    def test_remote_serving_bundle_and_passport_are_versioned_and_sanitized(self) -> None:
+        recommendation = get_remote_recommendation(workload_id="interactive-short", concurrency=4)
+        bundle = recommendation_bundle(recommendation)
+        passport = serving_performance_passport(recommendation)
+        serialized = json.dumps({"bundle": bundle, "passport": passport})
+
+        self.assertEqual(bundle["schema_version"], "1.0")
+        self.assertEqual(passport["schema_version"], "1.0")
+        self.assertEqual(passport["passport_kind"], "serving_performance_passport")
+        self.assertEqual(passport["verification_status"], "passed")
+        self.assertIn("network_tuning_not_executed_evidence_absent", serialized)
+        self.assertNotRegex(serialized, r"\b\d{1,3}(\.\d{1,3}){3}\b")
+        self.assertNotIn(".pem", serialized)
+        self.assertNotIn("PRIVATE KEY", serialized)
+
+    def test_cli_recommend_explain_and_run_best_dry_run_do_not_search(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            bundle_path = root / "bundle.json"
+            passport_path = root / "passport.json"
+            run_path = root / "run_best.json"
+
+            recommend_output = io.StringIO()
+            with redirect_stdout(recommend_output):
+                self.assertEqual(
+                    main(
+                        [
+                            "serve",
+                            "recommend",
+                            "--workload",
+                            "interactive-short",
+                            "--concurrency",
+                            "4",
+                            "--recommendation-class",
+                            "maximum_throughput_remote",
+                            "--output",
+                            str(bundle_path),
+                            "--passport-output",
+                            str(passport_path),
+                        ]
+                    ),
+                    0,
+                )
+            self.assertTrue(bundle_path.exists())
+            self.assertTrue(passport_path.exists())
+            self.assertIn("result_origin: measured", recommend_output.getvalue())
+
+            bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+            explain_output = io.StringIO()
+            with redirect_stdout(explain_output):
+                self.assertEqual(main(["serve", "explain", "--recommendation", bundle["bundle_id"]]), 0)
+            self.assertIn("network tuning was not executed".lower(), explain_output.getvalue().lower())
+
+            run_output = io.StringIO()
+            with redirect_stdout(run_output):
+                self.assertEqual(
+                    main(
+                        [
+                            "serve",
+                            "run",
+                            "--best",
+                            "--workload",
+                            "interactive-short",
+                            "--concurrency",
+                            "4",
+                            "--dry-run",
+                            "--output",
+                            str(run_path),
+                        ]
+                    ),
+                    0,
+                )
+            payload = json.loads(run_path.read_text(encoding="utf-8"))
+            self.assertFalse(payload["run_best_performs_search"])
+            self.assertFalse(payload["process_started"])
+            self.assertEqual(payload["validation"]["state"], "recommendation_applicable")
+            self.assertIn("--parallel", payload["expected_command"])
+            self.assertIn("--cont-batching", payload["expected_command"])
+
+    def test_cli_run_best_reports_hard_drift_without_retuning(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(
+                [
+                    "serve",
+                    "run",
+                    "--best",
+                    "--workload",
+                    "interactive-short",
+                    "--concurrency",
+                    "4",
+                    "--current-network-topology",
+                    "loopback",
+                    "--json",
+                ]
+            )
+        payload = json.loads(output.getvalue())
+
+        self.assertEqual(code, 2)
+        self.assertFalse(payload["run_best_performs_search"])
+        self.assertFalse(payload["process_started"])
+        self.assertEqual(payload["validation"]["state"], "topology_mismatch")
+        failed = [item for item in payload["validation"]["guard_results"] if item["status"] == "failed"]
+        self.assertTrue(any(item["field"] == "network_topology" for item in failed))
 
     def test_lifecycle_preflight_refuses_occupied_port_and_stale_server(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
