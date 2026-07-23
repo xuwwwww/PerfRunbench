@@ -1,26 +1,29 @@
 {
   "schema_version": "1.0",
   "result_origin": "unverified",
-  "baseline_profile_id": "portable-baseline",
-  "noise_band_percent": 2.0,
+  "baseline_profile_id": "upstream-default",
+  "noise_band_percent": 5.0,
+  "primary_metric": "decode_tokens_per_second",
+  "secondary_metric": "prefill_tokens_per_second",
+  "metric_goal": "maximize",
   "profiles": [
     {
-      "profile_id": "portable-baseline",
+      "profile_id": "upstream-default",
       "build_result_path": ".autotuneai/runs/<run_id>/armtune/build_profile/build_profile_result.json",
       "measurements": [
         {
-          "ttft_ms": 100.0,
-          "end_to_end_latency_ms": 180.0
+          "decode_tokens_per_second": 10.0,
+          "prefill_tokens_per_second": 40.0
         }
       ]
     },
     {
-      "profile_id": "arm-native",
+      "profile_id": "native-current-cpu",
       "build_result_path": ".autotuneai/runs/<run_id>/armtune/build_profile/build_profile_result.json",
       "measurements": [
         {
-          "ttft_ms": 92.0,
-          "end_to_end_latency_ms": 170.0
+          "decode_tokens_per_second": 11.0,
+          "prefill_tokens_per_second": 39.0
         }
       ]
     }

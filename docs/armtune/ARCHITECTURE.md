@@ -734,3 +734,58 @@ and always canaries before launching.
 The Phase 13 layer does not add new Arm benchmark backends. ArmTune continues
 to own Arm target inspection, `llama.cpp` build/runtime evidence, and
 Arm-specific Performance Passport details.
+
+## Phase 19 CPU-Aware Build Tuning
+
+Phase 19 extends build profiles so CPU-specific compilation is measured and
+guarded as a first-class tuning dimension:
+
+```text
+source lock
+-> compiler and CPU-feature probes
+-> allowlisted build candidates
+-> build/runtime backend evidence
+-> fixed build-profile comparison
+-> selected-build runtime search
+-> native-binary portability guard
+-> Performance Passport
+```
+
+The build profile schema records CPU target policy, backend policy,
+optimization policy, effective compiler/linker flags, runtime backend
+evidence, native binary scope, and eligibility state. `GGML_CPU_KLEIDIAI=ON`
+does not imply KleidiAI use by itself; `enabled_and_evidenced` requires both
+build evidence and runtime backend evidence.
+
+Native binary compatibility is separate from workload identity. Before reuse,
+PerfRunbench validates architecture, required CPU features, CPU model policy,
+binary digest, and startup smoke where required. A Neoverse-N1 CPU-model-bound
+binary is not silently reused on Neoverse-V1 or x86_64.
+
+## Phase 20 C7g Evidence Boundary
+
+Phase 20 exercised the Phase 19 architecture on a C7g / Neoverse-V1 target
+with pinned `llama.cpp` source and an existing Qwen2.5-7B Q4_K_M model:
+
+```text
+source lock
+-> explicit Neoverse-V1 build profile
+-> fixed build-profile comparison
+-> bounded runtime search
+-> secondary llama-server timing
+-> Performance Passport
+-> artifact revalidation
+```
+
+The architecture behaved correctly under a real measured run:
+
+- build/backend evidence rejected `portable-reference` and
+  KleidiAI-requested profiles when required evidence was missing
+- the statistical guard returned `inconclusive` when the best evidence-valid
+  build stayed inside the 5% noise band
+- runtime search selected the baseline when no candidate beat noise
+- the Performance Passport verified successfully but retained
+  `claim_eligibility_state: ineligible_provenance`
+
+This is a successful pipeline validation, not an eligible performance
+improvement claim.

@@ -10,6 +10,7 @@ current release focus is **ArmTune**, an Arm AI inference subsystem for:
 - Performance Passport generation
 - Guarded recommendation show, validate, dry-run apply, canary, lease, and
   rollback
+- Optional Linux host system and kernel profile planning
 
 ArmTune is the Arm-focused counterpart to the generic PerfRunbench resource and
 recommendation infrastructure. `llama.cpp` is the first workload adapter, not
@@ -123,10 +124,13 @@ autotuneai arm benchmark \
 Generate and inspect Arm build-profile evidence:
 
 ```bash
+autotuneai arm build-doctor \
+  --config configs/armtune/build_profiles.example.json
+
 autotuneai arm build-plan \
   --config configs/armtune/build_profiles.example.json
 
-autotuneai arm build-profile \
+autotuneai arm tune-build \
   --config configs/armtune/build_profiles.example.json
 ```
 
@@ -142,7 +146,7 @@ autotuneai arm optimize \
 Compare profiles and generate a Passport:
 
 ```bash
-autotuneai arm profile-compare \
+autotuneai arm compare-builds \
   --config configs/armtune/profile_comparison.example.json
 
 autotuneai arm passport \
@@ -181,6 +185,80 @@ autotuneai recommendation status \
 
 autotuneai recommendation rollback \
   --bundle .autotuneai/recommendations/<bundle_id>.json
+```
+
+## Serving Autotuning
+
+Workload-aware serving tuning is separate from the fixed single-request
+`llama-bench` protocol. v0.3 packages the validated `llama-server`
+remote-client recommendation flow while preserving fixture mode for public CI:
+
+```bash
+autotuneai serve doctor --json
+autotuneai serve workload show interactive-short --json
+autotuneai serve plan \
+  --workload interactive-short \
+  --traffic closed-loop \
+  --concurrency 4
+autotuneai serve search \
+  --workload interactive-short \
+  --candidate-cap 8 \
+  --fixture
+autotuneai serve pareto --experiment results/serving/search
+autotuneai serve network-plan
+autotuneai serve recommend \
+  --workload interactive-short \
+  --concurrency 4 \
+  --recommendation-class maximum_throughput_remote
+autotuneai serve run \
+  --best \
+  --workload interactive-short \
+  --concurrency 4 \
+  --dry-run
+```
+
+`serve run --best` loads an existing validated serving recommendation and does
+not search. The public dry-run path reports the selected profile, expected
+command shape, drift checks, memory/context preflight, port preflight, canary
+requirement, and cleanup plan without launching a private server.
+
+Validated remote serving recommendation classes:
+
+- `maximum_throughput_remote`
+- `interactive_latency_remote`
+
+No balanced, shared-prefix, memory-constrained, or remote-network tuning
+recommendation is created without qualifying evidence. PerfRunbench does not
+collapse unrelated serving metrics into one universal score.
+
+Validated remote serving evidence:
+
+| workload | baseline output tok/s | `slots4-cont-on` output tok/s | throughput delta | baseline TTFT p95 ms | `slots4-cont-on` TTFT p95 ms | TTFT p95 reduction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `interactive-short` | `17.032` | `31.355` | `+84.092%` | `3055.682` | `271.088` | `91.128%` |
+| `decode-heavy` | `17.046` | `31.790` | `+86.490%` | `10126.795` | `202.424` | `98.001%` |
+| `prefill-heavy` | `16.563` | `28.054` | `+69.375%` | `3967.424` | `341.693` | `91.388%` |
+
+The validated topology was a C7g / Neoverse-V1 server and a T4g /
+Neoverse-N1-class remote client over a direct private network path at
+concurrency 4. The run recorded `608` measured requests, zero retries, zero
+request failures, zero quality failures, passed artifact validation, and
+dual-host cleanup.
+
+Network tuning is explicitly not recommended:
+
+```text
+network_tuning_status: network_tuning_not_executed_evidence_absent
+```
+
+Detailed serving evidence and demo material:
+
+```text
+docs/results/VALIDATED_PERFORMANCE_SUMMARY.md
+docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md
+docs/demo/SERVING_AUTOTUNING_DEMO.md
+docs/demo/SERVING_AUTOTUNING_COMMANDS.md
+docs/demo/SERVING_AUTOTUNING_TALK_TRACK.md
 ```
 
 ## Real Arm Evidence Snapshot
@@ -229,12 +307,43 @@ speedup. The supported wording is:
 > Best observed eligible configuration under the tested Arm target, model,
 > inference workload, and measurement protocol.
 
+For CPU-aware native builds the claim boundary is narrower:
+
+> Best observed eligible configuration under the tested CPU, model, runtime
+> source commit, compiler, and measurement protocol.
+
+Native binaries keep a separate portability scope. A CPU-specific binary
+recommendation must validate architecture, required CPU features, CPU model
+policy, binary digest, and startup smoke before reuse on another target.
+KleidiAI is reported as `enabled_and_evidenced` only when both build evidence
+and runtime backend evidence are present.
+
 Detailed evidence is recorded in:
 
 ```text
 docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md
 docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md
 ```
+
+Phase 19 CPU-aware build tuning design documents:
+
+```text
+docs/CPU_AWARE_BUILD_TUNING.md
+docs/NATIVE_BINARY_PORTABILITY.md
+```
+
+Phase 21A Linux system and kernel profile planning documents:
+
+```text
+docs/LINUX_SYSTEM_AUTOTUNING.md
+docs/KERNEL_PROFILE_AUTOTUNING.md
+docs/HOST_STATE_ROLLBACK.md
+docs/SYSTEM_BENCHMARK_PROTOCOLS.md
+docs/ARM_4K_64K_KERNEL_COMPARISON.md
+```
+
+Phase 21A is planning and fake-root validation only. It does not access AWS,
+does not modify a real host, and does not change the v0.2.0 release claims.
 
 ## Related Historical Experiment
 
@@ -305,6 +414,9 @@ autotune/
                   result records.
   arm_tune/       Arm target inspection, llama.cpp adapter, search, profiles,
                   Passport, and workload-neutral correctness hooks.
+  serving/        Workload-aware llama-server capability discovery, traffic
+                  profiles, deterministic load generation, Pareto search,
+                  network plans, and serving recommendation guards.
   recommendation/ Generic RecommendationBundle generation, validation, guarded
                   apply, canary, lease, promote, and rollback.
   resource/       Run directories, process execution, monitoring, CPU affinity,

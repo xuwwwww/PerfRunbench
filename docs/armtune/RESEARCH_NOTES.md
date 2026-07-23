@@ -168,3 +168,41 @@ PerfRunbench current main keeps workload-neutral correctness hooks and may
 later execute external semantic tools through generic JSON or command-workload
 interfaces. It does not import BootTraceBench and BootTraceBench does not
 import PerfRunbench.
+
+## Phase 20: C7g Build Backend And Runtime Tuning
+
+- Evidence file:
+  `docs/results/PHASE_20_C7G_BUILD_BACKEND_RUNTIME_TUNING.md`
+- PerfRunbench validation source:
+  `b8bcdd6c33bd1d9b3a5a761f3061df2e02316e73`
+- Target: user-provisioned C7g / Graviton3 Linux Arm64 / Neoverse-V1 /
+  8 logical CPUs.
+- Model: Qwen2.5-7B Q4_K_M,
+  SHA-256 `1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49`.
+- llama.cpp source commit:
+  `47c786924ad1ab7e91da2cdc72fcdb563780c2bd`.
+- Build-profile comparison:
+  - `upstream-default` decode median: `17.71 tok/s`
+  - `explicit-neoverse-v1` decode median: `17.78 tok/s`
+  - observed delta: `0.395257%`
+  - recommendation: `inconclusive`
+- Runtime search:
+  - six unique candidates
+  - selected candidate: `baseline`
+  - complete confirmation decode median: `17.72 tok/s`
+  - recommendation: `inconclusive`
+- Secondary server timing:
+  - measured requests: `3/3`
+  - TTFT median: `61.470 ms`
+  - E2E latency median: `911.976 ms`
+  - quality gate: `not_evaluated`
+- Performance Passport:
+  - `claim_eligibility_state: ineligible_provenance`
+  - verification passed
+- Artifact revalidation:
+  - `77/77` manifests passed remotely
+  - `77/77` manifests passed after download
+
+Claim boundary: Phase 20 validated the real build/backend/runtime evidence
+pipeline. It did not verify a performance improvement, global Arm optimality,
+or KleidiAI execution.

@@ -8,29 +8,62 @@
     "compiler_id": "gcc",
     "compiler_version": "unknown",
     "cmake_version": "unknown",
+    "linker_version": "unknown",
     "generator": "Ninja",
     "build_type": "Release"
   },
   "profiles": [
-    "portable-baseline",
-    "arm-native",
+    "upstream-default",
     {
-      "profile_id": "arm-optimized",
+      "profile_id": "portable-reference",
       "effective_cmake_cache": {
-        "LLAMA_KLEIDIAI": "ON"
+        "GGML_NATIVE": "OFF",
+        "GGML_CPU_ALL_VARIANTS": "ON"
+      }
+    },
+    {
+      "profile_id": "native-current-cpu",
+      "effective_cmake_cache": {
+        "GGML_NATIVE": "ON"
       },
-      "compile_command_evidence": []
+      "effective_compiler_flags": [
+        "-mcpu=placeholder-cpu"
+      ],
+      "native_binary_scope": {
+        "schema_version": "1.0",
+        "architecture": "aarch64",
+        "portability_state": "cpu_model_bound",
+        "required_cpu_features": [
+          "<detected-feature>"
+        ],
+        "cpu_model": "<detected-cpu-model>",
+        "binary_sha256": "<sha256>"
+      }
+    },
+    {
+      "profile_id": "native-kleidiai",
+      "effective_cmake_cache": {
+        "GGML_NATIVE": "ON",
+        "GGML_CPU_KLEIDIAI": "ON"
+      },
+      "compile_command_evidence": [],
+      "runtime_backend_evidence": {
+        "runtime_backend_status": "requested_but_runtime_unverified"
+      }
     }
   ],
   "binaries": {
-    "portable-baseline": {
-      "path": "/<remote-portable-llama-server-binary>"
+    "upstream-default": {
+      "path": "/<remote-upstream-default-llama-bench-binary>"
     },
-    "arm-native": {
-      "path": "/<remote-arm-native-llama-server-binary>"
+    "portable-reference": {
+      "path": "/<remote-portable-reference-llama-bench-binary>"
     },
-    "arm-optimized": {
-      "path": "/<remote-arm-optimized-llama-server-binary>"
+    "native-current-cpu": {
+      "path": "/<remote-native-current-cpu-llama-bench-binary>"
+    },
+    "native-kleidiai": {
+      "path": "/<remote-native-kleidiai-llama-bench-binary>"
     }
   },
   "build": {

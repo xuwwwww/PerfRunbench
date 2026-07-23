@@ -12,6 +12,7 @@ def kleidiai_status(
     effective_cmake_cache: dict[str, str],
     compile_command_evidence: list[dict[str, Any]],
     linked_library_evidence: list[str],
+    runtime_backend_evidence: dict[str, Any] | None = None,
 ) -> str:
     if not definition.kleidiai_requested:
         return "unavailable"
@@ -19,6 +20,8 @@ def kleidiai_status(
         return "build_failed"
     requested = _enabled(definition.cmake_definitions.get("LLAMA_KLEIDIAI")) or _enabled(
         effective_cmake_cache.get("LLAMA_KLEIDIAI")
+    ) or _enabled(definition.cmake_definitions.get("GGML_CPU_KLEIDIAI")) or _enabled(
+        effective_cmake_cache.get("GGML_CPU_KLEIDIAI")
     )
     if not requested:
         return "unavailable"
@@ -32,8 +35,18 @@ def kleidiai_status(
             ),
         ]
     ).lower()
-    if "kleidiai" in evidence_text or "kleidi" in evidence_text:
+    build_evidenced = "kleidiai" in evidence_text or "kleidi" in evidence_text
+    runtime = runtime_backend_evidence or {}
+    runtime_text = "\n".join(str(value) for value in runtime.values()).lower()
+    runtime_evidenced = (
+        str(runtime.get("runtime_backend_status", "")).lower() == "enabled_and_evidenced"
+        or "cpu_kleidiai" in runtime_text
+        or "kleidiai" in runtime_text
+    )
+    if build_evidenced and runtime_evidenced:
         return "enabled_and_evidenced"
+    if build_evidenced:
+        return "requested_but_runtime_unverified"
     return "requested_but_unverified"
 
 

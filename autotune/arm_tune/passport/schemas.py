@@ -19,6 +19,8 @@ class PerformancePassport:
     artifact_manifest_sha256: str = ""
     benchmark_claims: dict[str, Any] = field(default_factory=dict)
     provenance_summary: dict[str, Any] = field(default_factory=dict)
+    build_evidence: dict[str, Any] = field(default_factory=dict)
+    host_system_evidence: dict[str, Any] = field(default_factory=dict)
     limitations: list[str] = field(default_factory=list)
     created_at_utc: str = field(default_factory=utc_now)
     schema_version: str = SCHEMA_VERSION

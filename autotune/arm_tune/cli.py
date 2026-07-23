@@ -10,6 +10,13 @@ from typing import Any
 from autotune.arm_tune import SCHEMA_VERSION
 from autotune.arm_tune.build_profiles.builder import inspect_build, run_build_profile, write_build_plan
 from autotune.arm_tune.build_profiles.comparison import run_profile_comparison
+from autotune.arm_tune.build_profiles.definitions import available_profile_ids, get_profile_definition
+from autotune.arm_tune.build_profiles.native_runner import run_native_build_profiles
+from autotune.arm_tune.build_profiles.validation import (
+    ALLOWED_BACKEND_POLICIES,
+    ALLOWED_CPU_TARGET_POLICIES,
+    ALLOWED_OPTIMIZATION_POLICIES,
+)
 from autotune.arm_tune.config import AFFINITY_MODE_CHOICES, default_local_target, load_benchmark_config, load_optimize_config, load_target_spec
 from autotune.arm_tune.errors import ArmTuneError
 from autotune.arm_tune.passport.generator import generate_passport
@@ -85,6 +92,14 @@ def build_parser() -> argparse.ArgumentParser:
     build_plan.add_argument("--config", required=True)
     build_plan.set_defaults(handler=_cmd_build_plan)
 
+    build_doctor = subparsers.add_parser("build-doctor", help="Inspect CPU-aware build profile readiness without launching a workload.")
+    build_doctor.add_argument("--config")
+    build_doctor.set_defaults(handler=_cmd_build_doctor)
+
+    tune_build = subparsers.add_parser("tune-build", help="Run CPU-aware build-profile evidence collection through existing ArmTune build profiles.")
+    tune_build.add_argument("--config", required=True)
+    tune_build.set_defaults(handler=_cmd_tune_build)
+
     build_profile = subparsers.add_parser("build-profile", help="Inspect existing build-profile artifacts and write build evidence.")
     build_profile.add_argument("--config", required=True)
     build_profile.set_defaults(handler=_cmd_build_profile)
@@ -96,6 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
     profile_compare = subparsers.add_parser("profile-compare", help="Compare build profiles using artifact-backed measurements.")
     profile_compare.add_argument("--config", required=True)
     profile_compare.set_defaults(handler=_cmd_profile_compare)
+
+    compare_builds = subparsers.add_parser("compare-builds", help="Compare CPU-aware build profiles using artifact-backed measurements.")
+    compare_builds.add_argument("--config", required=True)
+    compare_builds.set_defaults(handler=_cmd_compare_builds)
 
     passport = subparsers.add_parser("passport", help="Generate an ArmTune Performance Passport from a profile comparison result.")
     passport.add_argument("--comparison-result", required=True)
@@ -291,6 +310,49 @@ def _cmd_build_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_build_doctor(args: argparse.Namespace) -> int:
+    profiles = [get_profile_definition(profile_id).to_dict() for profile_id in available_profile_ids()]
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "armtune_build_doctor",
+        "ready": True,
+        "config_path": getattr(args, "config", None),
+        "cpu_target_policies": sorted(ALLOWED_CPU_TARGET_POLICIES),
+        "backend_policies": sorted(ALLOWED_BACKEND_POLICIES),
+        "optimization_policies": sorted(ALLOWED_OPTIMIZATION_POLICIES),
+        "profile_count": len(profiles),
+        "profiles": profiles,
+        "notes": [
+            "Build doctor does not compile or launch workloads.",
+            "CPU-specific recommendations require build, runtime, and native-binary portability evidence.",
+            "KleidiAI is eligible only when both build and runtime backend evidence are present.",
+        ],
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_tune_build(args: argparse.Namespace) -> int:
+    run_dir, manifest = create_run(
+        ["autotuneai", "arm", "tune-build", "--config", args.config],
+        ResourceBudget(enforce=False),
+    )
+    output_dir = run_dir / "armtune" / "build_profile"
+    try:
+        result = run_native_build_profiles(config_path=args.config, run_id=manifest.run_id, output_dir=output_dir)
+    except ArmTuneError:
+        finish_run(run_dir, manifest, "failed", 2)
+        raise
+    except Exception as exc:
+        finish_run(run_dir, manifest, "failed", 3)
+        print(f"ArmTune runtime error: {exc}", file=sys.stderr)
+        return 3
+    exit_code = 0 if any(profile.build_status == "completed" for profile in result.profiles) else 1
+    finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
+    print(_build_profile_summary(result))
+    return exit_code
+
+
 def _cmd_build_profile(args: argparse.Namespace) -> int:
     run_dir, manifest = create_run(
         ["autotuneai", "arm", "build-profile", "--config", args.config],
@@ -352,6 +414,10 @@ def _cmd_profile_compare(args: argparse.Namespace) -> int:
     finish_run(run_dir, manifest, "completed" if exit_code == 0 else "failed", exit_code)
     print(_profile_comparison_summary(result))
     return exit_code
+
+
+def _cmd_compare_builds(args: argparse.Namespace) -> int:
+    return _cmd_profile_compare(args)
 
 
 def _cmd_passport(args: argparse.Namespace) -> int:

@@ -14,7 +14,7 @@ from autotune.arm_tune.build_profiles.schemas import (
 )
 from autotune.arm_tune.errors import ArmTuneConfigError
 from autotune.arm_tune.schemas import BenchmarkArtifactManifest
-from autotune.arm_tune.search.statistics import NoiseBandDecision, summarize_metric
+from autotune.arm_tune.search.statistics import NoiseBandDecision, classify_noise_band, summarize_metric
 from autotune.arm_tune.targets.protocol import atomic_write_json, read_json
 from autotune.utils.config import load_config
 
@@ -27,6 +27,9 @@ PROFILE_COMPARISON_KEYS = {
     "result_origin",
     "baseline_profile_id",
     "noise_band_percent",
+    "primary_metric",
+    "secondary_metric",
+    "metric_goal",
     "profiles",
 }
 
@@ -38,14 +41,23 @@ def run_profile_comparison(*, config_path: str | Path, run_id: str, output_dir: 
     atomic_write_json(root / "profile_comparison_job.json", _job_payload(config, run_id))
     entries = [_entry_from_payload(item, config) for item in config["profiles"]]
     baseline_id = str(config.get("baseline_profile_id") or entries[0].profile_id)
-    recommendation = _recommendation(entries, baseline_id, float(config.get("noise_band_percent", 2.0)))
+    primary_metric = str(config.get("primary_metric", PRIMARY_METRIC))
+    secondary_metric = str(config.get("secondary_metric", SECONDARY_METRIC))
+    metric_goal = str(config.get("metric_goal", "minimize"))
+    recommendation = _recommendation(
+        entries,
+        baseline_id,
+        float(config.get("noise_band_percent", 2.0)),
+        primary_metric=primary_metric,
+        metric_goal=metric_goal,
+    )
     result = ProfileComparisonResult(
         run_id=run_id,
         operation=PROFILE_COMPARISON_OPERATION,
         result_origin=_combined_origin([entry.result_origin for entry in entries]),
         baseline_profile_id=baseline_id,
-        primary_metric=PRIMARY_METRIC,
-        secondary_metric=SECONDARY_METRIC,
+        primary_metric=primary_metric,
+        secondary_metric=secondary_metric,
         recommendation=recommendation,
         profiles=entries,
         rejected_profiles=_rejected_profiles(entries),
@@ -81,6 +93,9 @@ def _load_comparison_config(path: str | Path) -> dict[str, Any]:
     for item in profiles:
         if not isinstance(item, dict):
             raise ArmTuneConfigError("profile comparison profiles must be objects")
+    metric_goal = str(payload.get("metric_goal", "minimize"))
+    if metric_goal not in {"minimize", "maximize"}:
+        raise ArmTuneConfigError("metric_goal must be 'minimize' or 'maximize'")
     return dict(payload)
 
 
@@ -96,17 +111,35 @@ def _entry_from_payload(payload: dict[str, Any], config: dict[str, Any]) -> Prof
     quality_required = bool(payload.get("quality_required", False))
     measurements = _measurements(payload)
     failed = sum(1 for item in measurements if item.get("failed"))
+    metric_names = sorted(
+        {
+            key
+            for item in measurements
+            if isinstance(item, dict) and not item.get("failed")
+            for key, value in item.items()
+            if key not in {"failed"} and isinstance(value, (int, float))
+        }
+    )
+    primary_metric = str(config.get("primary_metric", PRIMARY_METRIC))
+    metrics = {
+        metric: summarize_metric(
+            metric,
+            [float(item[metric]) for item in measurements if metric in item and not item.get("failed")],
+            failed_count=failed,
+        )
+        for metric in metric_names
+    }
     ttft_values = [float(item[PRIMARY_METRIC]) for item in measurements if PRIMARY_METRIC in item and not item.get("failed")]
     e2e_values = [float(item[SECONDARY_METRIC]) for item in measurements if SECONDARY_METRIC in item and not item.get("failed")]
     reasons: list[str] = []
     if build_status != "completed":
         reasons.append(f"build_status={build_status}")
-    if profile_id == "arm-optimized" and kleidiai_status == "requested_but_unverified":
+    if kleidiai_status in {"requested_but_unverified", "requested_but_runtime_unverified"}:
         reasons.append("KleidiAI was requested but not evidenced")
     if quality_required and quality_status != "passed":
         reasons.append(f"quality_gate_status={quality_status}")
-    if not ttft_values:
-        reasons.append("median TTFT evidence is missing")
+    if _distribution_for_metric(primary_metric, metrics, ttft_values, e2e_values).median is None:
+        reasons.append(f"median {primary_metric} evidence is missing")
     eligible = not reasons
     if not eligible:
         if build_status != "completed" or "KleidiAI" in " ".join(reasons):
@@ -128,6 +161,7 @@ def _entry_from_payload(payload: dict[str, Any], config: dict[str, Any]) -> Prof
         ttft_ms=summarize_metric(PRIMARY_METRIC, ttft_values, failed_count=failed),
         end_to_end_latency_ms=summarize_metric(SECONDARY_METRIC, e2e_values, failed_count=failed),
         failure_rate=round(failed / len(measurements), 6) if measurements else 1.0,
+        metrics=metrics,
         failure_reasons=sorted(set(reasons)),
     )
 
@@ -136,9 +170,12 @@ def _recommendation(
     entries: list[ProfileComparisonEntry],
     baseline_id: str,
     noise_band_percent: float,
+    *,
+    primary_metric: str,
+    metric_goal: str,
 ) -> ProfileComparisonRecommendation:
     baseline = next((item for item in entries if item.profile_id == baseline_id), None)
-    eligible = [item for item in entries if item.eligible and item.ttft_ms.median is not None]
+    eligible = [item for item in entries if item.eligible and _metric_for(item, primary_metric).median is not None]
     if baseline is None:
         return ProfileComparisonRecommendation(
             status="insufficient_evidence",
@@ -151,8 +188,20 @@ def _recommendation(
             profile_id=None,
             message="No profile is eligible because build or measurement evidence is incomplete.",
         )
-    best = min(eligible, key=lambda item: float(item.ttft_ms.median))
-    decision = _classify_latency_noise_band(baseline=baseline.ttft_ms, candidate=best.ttft_ms, noise_band_percent=noise_band_percent)
+    if metric_goal == "maximize":
+        best = max(eligible, key=lambda item: float(_metric_for(item, primary_metric).median))
+        decision = classify_noise_band(
+            baseline=_metric_for(baseline, primary_metric),
+            candidate=_metric_for(best, primary_metric),
+            noise_band_percent=noise_band_percent,
+        )
+    else:
+        best = min(eligible, key=lambda item: float(_metric_for(item, primary_metric).median))
+        decision = _classify_latency_noise_band(
+            baseline=_metric_for(baseline, primary_metric),
+            candidate=_metric_for(best, primary_metric),
+            noise_band_percent=noise_band_percent,
+        )
     if best.profile_id == baseline.profile_id:
         return ProfileComparisonRecommendation(
             status="inconclusive",
@@ -164,7 +213,7 @@ def _recommendation(
         return ProfileComparisonRecommendation(
             status="recommended",
             profile_id=best.profile_id,
-            message=f"Best observed evidence-valid profile among {len(entries)} tested profiles.",
+            message=f"Best observed evidence-valid profile among {len(entries)} tested profiles using {primary_metric}.",
             noise_band_decision=decision,
         )
     return ProfileComparisonRecommendation(
@@ -208,6 +257,32 @@ def _classify_latency_noise_band(
         noise_band_percent=noise_band_percent,
         message=message,
     )
+
+
+def _metric_for(entry: ProfileComparisonEntry, metric_name: str):
+    if metric_name == PRIMARY_METRIC:
+        return entry.ttft_ms
+    if metric_name == SECONDARY_METRIC:
+        return entry.end_to_end_latency_ms
+    metric = entry.metrics.get(metric_name)
+    if metric is not None:
+        return metric
+    return summarize_metric(metric_name, [], failed_count=0)
+
+
+def _distribution_for_metric(
+    metric_name: str,
+    metrics: dict[str, Any],
+    ttft_values: list[float],
+    e2e_values: list[float],
+):
+    if metric_name in metrics:
+        return metrics[metric_name]
+    if metric_name == PRIMARY_METRIC:
+        return summarize_metric(PRIMARY_METRIC, ttft_values, failed_count=0)
+    if metric_name == SECONDARY_METRIC:
+        return summarize_metric(SECONDARY_METRIC, e2e_values, failed_count=0)
+    return summarize_metric(metric_name, [], failed_count=0)
 
 
 def _measurements(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -258,6 +333,9 @@ def _job_payload(config: dict[str, Any], run_id: str) -> dict[str, Any]:
         "run_id": run_id,
         "baseline_profile_id": config.get("baseline_profile_id"),
         "noise_band_percent": config.get("noise_band_percent", 2.0),
+        "primary_metric": config.get("primary_metric", PRIMARY_METRIC),
+        "secondary_metric": config.get("secondary_metric", SECONDARY_METRIC),
+        "metric_goal": config.get("metric_goal", "minimize"),
         "profile_count": len(config.get("profiles", [])),
     }
 

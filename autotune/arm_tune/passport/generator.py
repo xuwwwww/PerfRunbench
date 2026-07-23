@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from autotune.arm_tune import SCHEMA_VERSION
+from autotune.arm_tune.benchmark.artifact_validation import validate_artifact_manifest
+from autotune.arm_tune.benchmark.artifacts import artifact_record, write_artifact_manifest
 from autotune.arm_tune.benchmark.hashes import sha256_file
 from autotune.arm_tune.passport.markdown import passport_markdown
 from autotune.arm_tune.passport.schemas import PerformancePassport
@@ -33,6 +35,7 @@ def generate_passport(
         artifact_manifest_sha256=sha256_file(manifest_path) if manifest_path.exists() else "",
         benchmark_claims=_benchmark_claims(comparison),
         provenance_summary=_provenance_summary(comparison),
+        build_evidence=_build_evidence(comparison),
         limitations=_limitations(comparison, state),
     )
     root = Path(output_dir)
@@ -43,6 +46,18 @@ def generate_passport(
     markdown_path.write_text(passport_markdown(passport), encoding="utf-8", newline="\n")
     verification = verify_passport(json_path)
     atomic_write_json(root / "performance_passport_verification.json", verification.to_dict())
+    artifacts = {
+        "performance_passport_json": artifact_record(json_path, label="performance_passport_json", root=root),
+        "performance_passport_markdown": artifact_record(markdown_path, label="performance_passport_markdown", root=root),
+        "performance_passport_verification": artifact_record(
+            root / "performance_passport_verification.json",
+            label="performance_passport_verification",
+            root=root,
+        ),
+    }
+    write_artifact_manifest(root / "artifact_manifest.json", artifacts)
+    artifact_validation = validate_artifact_manifest(root)
+    atomic_write_json(root / "artifact_validation.json", artifact_validation.to_dict())
     return replace(passport), json_path, markdown_path
 
 
@@ -95,6 +110,33 @@ def _provenance_summary(comparison: dict[str, Any]) -> dict[str, Any]:
         "result_origin": comparison.get("result_origin"),
         "profile_count": len(comparison.get("profiles", [])) if isinstance(comparison.get("profiles"), list) else 0,
         "rejected_profile_count": len(comparison.get("rejected_profiles", [])) if isinstance(comparison.get("rejected_profiles"), list) else 0,
+    }
+
+
+def _build_evidence(comparison: dict[str, Any]) -> dict[str, Any]:
+    profiles = comparison.get("profiles", [])
+    if not isinstance(profiles, list):
+        profiles = []
+    build_profiles: list[dict[str, Any]] = []
+    for item in profiles:
+        if not isinstance(item, dict):
+            continue
+        build_profiles.append(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "profile_id": item.get("profile_id"),
+                "build_status": item.get("build_status"),
+                "kleidiai_status": item.get("kleidiai_status"),
+                "eligibility_status": item.get("eligibility_status"),
+                "metrics": sorted((item.get("metrics") or {}).keys()) if isinstance(item.get("metrics"), dict) else [],
+            }
+        )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "optional": True,
+        "profile_count": len(build_profiles),
+        "profiles": build_profiles,
+        "note": "Build evidence is optional and backward compatible; historical passports are not reinterpreted.",
     }
 
 

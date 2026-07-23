@@ -188,3 +188,80 @@ The allowed public recommendation wording remains:
 Do not claim global optimality, cross-instance portability, private workload
 coverage, automatic cloud provisioning, or optimized-path usage without
 recorded build and runtime evidence.
+
+## Phase 19: CPU-Aware Native Build Autotuning
+
+Status: insufficient evidence on the real T4g target; code and guard
+infrastructure remain valid.
+
+Phase 19 makes CPU-specific compilation a first-class ArmTune dimension while
+preserving historical Phase 9 evidence as a separate protocol.
+
+Goals:
+
+- add CPU target, backend, optimization, and portability fields to build
+  profile evidence
+- support `upstream-default`, `portable-reference`, `native-current-cpu`,
+  `explicit-current-cpu`, `native-kleidiai`, and `native-kleidiai-lto`
+  profile IDs
+- require KleidiAI build and runtime backend evidence before
+  `enabled_and_evidenced`
+- keep decode and prefill comparison metrics separate
+- add native-binary portability guards independent from workload identity
+- validate the workflow on one low-resource T4g.small target without comparing
+  the result to C7g evidence
+
+Allowed Phase 19 wording:
+
+> Best observed eligible configuration under the tested CPU, model, runtime
+> source commit, compiler, and measurement protocol.
+
+Non-goals:
+
+- no change to `v0.2.0` release/tag
+- no BootTrace prompt or model qualification work
+- no new model downloads
+- no C7g access
+- no global Arm speedup claim
+
+Real T4g note:
+
+```text
+build_run_id: 20260721_024332_303417
+outcome: insufficient_evidence
+reason: no suitable existing small GGUF model was available, and Phase 19
+  prohibited downloading a replacement model
+```
+
+## Phase 20: C7g Build Backend And Runtime Tuning
+
+Status: completed as real measured workflow validation; no eligible speedup
+claim.
+
+Phase 20 reused the existing C7g / Neoverse-V1 target, existing Qwen2.5-7B
+Q4_K_M model, and pinned `llama.cpp` source commit
+`47c786924ad1ab7e91da2cdc72fcdb563780c2bd`.
+
+Completed:
+
+- explicit `explicit-neoverse-v1` profile support
+- build evidence for five profiles
+- fixed build-profile comparison
+- six-candidate bounded runtime search
+- secondary `llama-server` TTFT/E2E measurement
+- Performance Passport generation and verification
+- artifact revalidation on-target and after download
+
+Outcome:
+
+```text
+build_profile_recommendation: inconclusive
+runtime_search_recommendation: inconclusive
+Performance_Passport_claim_eligibility_state: ineligible_provenance
+artifact_revalidation: 77/77 passed
+performance_improvement_verified: false
+```
+
+KleidiAI-requested profiles were not eligible because runtime backend evidence
+was not proven. BootTrace quality remained out of scope and did not block
+performance tuning.

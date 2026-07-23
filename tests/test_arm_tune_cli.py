@@ -123,10 +123,13 @@ class ArmTuneCliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         text = output.getvalue()
         for command in [
+            "build-doctor",
             "build-plan",
             "build-profile",
+            "tune-build",
             "inspect-build",
             "profile-compare",
+            "compare-builds",
             "passport",
             "verify-passport",
         ]:

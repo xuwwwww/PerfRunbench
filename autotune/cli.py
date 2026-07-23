@@ -48,6 +48,8 @@ from autotune.training_tuner.batch_size import BatchSizeTuningError, tune_batch_
 from autotune.training_tuner.multi_knob import parse_knob_specs, tune_training_knobs
 from autotune.golden_path.cli import add_cache_parser, add_tune_parser, run_auto_from_args, run_best_from_args
 from autotune.golden_path.doctor import format_doctor_result, run_doctor
+from autotune.serving.cli import add_serve_parser
+from autotune.system_profiles.cli import add_system_parser
 from autotune.training_adapter.errors import TrainingConfigError
 from autotune.training_adapter.init_config import write_init_config
 
@@ -109,6 +111,9 @@ def build_parser() -> argparse.ArgumentParser:
     recommendation.add_argument("--help", action="store_true", dest="recommendation_help")
     recommendation.add_argument("recommendation_args", nargs=argparse.REMAINDER)
     recommendation.set_defaults(handler=_cmd_recommendation)
+
+    add_system_parser(subparsers)
+    add_serve_parser(subparsers)
 
     run = subparsers.add_parser("run", help="Run a command with resource monitoring and optional limits.")
     _add_budget_args(run)

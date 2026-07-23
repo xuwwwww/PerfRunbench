@@ -10,6 +10,19 @@ Numbers from different targets or protocols must not be combined.
 | 15B | Linux Arm64 T4g.small / Neoverse-N1 class | Public synthetic PyTorch training | Real low-resource Arm PyTorch workflow | Do not compare with C7g | passed |
 | 15C | Windows x86_64 controller | Public synthetic PyTorch training | Local CLI, cache, drift, apply, and portability validation | Do not compare with Arm | passed |
 | 16 | Windows local clean venv plus GitHub Actions matrix | Dependency-free public fixtures | Release-candidate installed-wheel usability | Packaging and CLI usability, not performance | pending final CI |
+| 19 | Linux Arm64 T4g.small / Neoverse-N1 class | No suitable existing model available; build evidence only | CPU-aware native build tuning guard validation | Build artifacts collected, but no benchmark or recommendation claim | insufficient evidence |
+| 20 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp | CPU-aware build/backend evidence, bounded runtime search, server timing, Passport, and artifact validation | Real measured workflow validation; build and runtime improvements stayed inside the 5% noise band | passed |
+| 21A | Local fake Linux roots | Synthetic `/proc`, `/sys`, cgroup, IRQ, block, and boot fixtures | Host system and kernel profile framework, leases, rollback, and boot-plan safety | Planning and fake E2E only; no AWS and no real host mutation | passed |
+| 21B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Reversible Linux host-system apply, measurement, rollback, cleanup, and artifact validation | Real measured guard validation; no positive candidate cleared the 5% noise band | passed |
+| 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
+| 21C0 | Local fake Linux roots plus read-only Linux Arm64 C7g / Neoverse-V1 audit | Synthetic boot fixtures and read-only boot/kernel inventory | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, official 64K package metadata, and future protocol plan | Planning and read-only inventory only; no kernel install, no bootloader write, no reboot | passed |
+| 21C1 | Linux Arm64 C7g / Neoverse-V1 | No benchmark workload | Same-kernel GRUB one-time boot rehearsal with serial-console recovery validation | Reboot safety evidence only; no kernel change and no performance claim | passed |
+| 21C2A | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | 4K one-time boot-parameter isolation, rollback, cleanup, matched baseline measurement, and artifact validation | Real measured guard validation; G1/G2 stayed inside the 5% noise band and G3 regressed | passed |
+| 21C2B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | Official Ubuntu AWS ARM64 64K kernel transaction, G4/G5/G6/G7 one-time boots, matched measurements, package cleanup, and artifact validation | Real measured guard validation; 64K page-size and isolation differences stayed inside the 5% noise band except G7, which regressed | passed |
+| 21D0 | Local fixtures only | Synthetic serving workload fixtures | Workload-aware `llama-server` serving models, load generator, staged search policy, Pareto output, safety guards, and future network plans | Local preparation only; no AWS, no remote host, no real serving measurement | passed |
+| 21D1 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real loopback serving search with local client on CPU 0 and server on CPUs 1-7 | Eligible loopback-only recommendations for `interactive-short` concurrency 4; not remote-network evidence | passed |
+| 21D2A | Local fixtures and plan-only CLI | Synthetic serving network plan | Dual-host C7g-server/T4g-client orchestration contract, remote timing policy, hard-drift guard, and network-bottleneck gate | Local preparation only; AWS stopped, no remote access, no real serving measurement | passed |
+| 21D2B | Linux Arm64 C7g / Neoverse-V1 server plus Linux Arm64 T4g / Neoverse-N1 class remote client | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real direct-private-path remote serving validation for `slots4-cont-on` | Eligible remote-client recommendations for concurrency 4; network tuning skipped because bottleneck evidence was absent | passed |
 
 ## Current Evidence Boundaries
 
@@ -24,6 +37,12 @@ Numbers from different targets or protocols must not be combined.
   refuses to launch when no usable recommendation is available.
 - `run --auto` may retune on cache miss or hard drift according to policy; exact
   cache reuse does not create a new tuning result.
+- CPU-specific binary reuse requires native-binary portability evidence in
+  addition to workload and environment identity. Neoverse-N1 and Neoverse-V1
+  CPU-model-bound binaries are not interchangeable by default.
+- Serving RecommendationBundles are bound to workload, traffic mode,
+  concurrency class, server capability digest, binary/model digests, and
+  loopback or remote-network topology.
 
 ## Phase 15C Summary
 
@@ -59,3 +78,366 @@ ubuntu-24.04-arm
 The required CI matrix uses dependency-free fixtures and must not install
 PyTorch, download models/datasets, access AWS, or turn fixture evidence into
 measured performance evidence.
+
+## Phase 20 C7g Build/Backend Summary
+
+Phase 20 returned to a user-provisioned C7g / Neoverse-V1 target with the
+existing Qwen2.5-7B Q4_K_M model and pinned `llama.cpp` source commit
+`47c786924ad1ab7e91da2cdc72fcdb563780c2bd`.
+
+The validation completed build-profile comparison, bounded runtime search,
+secondary `llama-server` measurement, Performance Passport generation and
+verification, remote artifact revalidation, and downloaded artifact
+revalidation.
+
+Outcome:
+
+```text
+build_profile_recommendation: inconclusive
+runtime_search_recommendation: inconclusive
+selected_runtime_candidate: baseline
+KleidiAI_status: requested profiles rejected unless runtime backend evidence exists
+Performance_Passport: verification passed, claim_eligibility_state ineligible_provenance
+artifact_revalidation: 77/77 passed remotely and after download
+performance_improvement_verified: false
+```
+
+## Phase 21A System/Kernel Framework Summary
+
+Phase 21A adds a guarded local framework for future Linux system and kernel
+autotuning:
+
+```text
+AWS_access: false
+real_host_mutation: false
+snapshot_model: HostStateSnapshot
+profile_catalog: capability-driven safe-system
+reversible_apply: fake-root only
+rollback: reverse-order exact restoration
+boot_profiles: planning only, no GRUB writes
+protocol_separation: enforced
+dirty_host_recommendation: ineligible
+```
+
+This phase does not provide a performance result. It prepares future C7g
+validation for reversible system profiles and reboot-required kernel profiles.
+
+## Phase 21B C7g Reversible System Summary
+
+Phase 21B applied bounded reversible real-host profiles one at a time from the
+verified original state, measured the fixed `llama-bench` steady-state decode
+protocol, and rolled each profile back before the next candidate.
+
+Outcome:
+
+```text
+candidate_count: 7
+baseline_decode_median_tok_s: 17.44
+best_positive_candidate: thp-always at 17.50 tok/s
+best_positive_delta_percent: 0.344
+noise_band_percent: 5.0
+performance_improvement_verified: false
+host_restored_to_original_state: true
+remote_artifacts_checked: 712
+local_artifacts_checked: 712
+```
+
+`affinity-cpus-1-7` was a measured regression at `-10.493%`, because it
+reduced the workload CPU set and thread count from the eight-CPU baseline.
+
+## Phase 21B2 C7g Remaining System Summary
+
+Phase 21B2 completed the remaining reversible C7g families and preserved
+protocol boundaries.
+
+Outcome:
+
+```text
+candidate_count: 14
+baseline_decode_median_tok_s: 16.26
+best_positive_same_protocol_candidate: no-mmap at 16.75 tok/s
+best_positive_same_protocol_delta_percent: 3.014
+noise_band_percent: 5.0
+performance_improvement_verified: false
+host_restored_to_original_state: true
+all_reversible_families_exhausted: true
+remote_artifacts_checked: 327
+local_artifacts_checked: 327
+```
+
+`thp-always-mmap` exercised THP pages but remained inside the guard at
+`+1.630%`. `cpuset-1h7w`, `cpuset-2h6w`, and
+`cpuset-1h7w-irq-workqueue` regressed sharply. Storage cold-start and
+prefault evidence was labeled `protocol_baseline_missing` instead of being
+ranked against steady-state decode throughput.
+
+## Phase 21C0 Boot Readiness Summary
+
+Phase 21C0 adds local read-only planning for future reboot-required kernel
+profiles and validates the inventory path with a read-only C7g audit.
+
+Outcome:
+
+```text
+phase21c0_local_boot_readiness: passed
+phase21c0_remote_readonly_audit: passed
+remote_commit: 0280f6d70b88dade575e4db27299ca3e20b2433f
+current_kernel_release: 6.17.0-1019-aws
+current_base_page_size: 4096
+bootloader: grub_uefi
+fallback_kernel_verified: true
+official_64k_candidate_found: true
+official_64k_candidate_state: metadata_qualified_not_installed
+ready_for_phase21c_real_boot_validation: false
+kernel_or_boot_state_modified: false
+real_phase21c_started: false
+downloaded_artifact_validation: 599/599 passed
+```
+
+The fixture validation covers:
+
+```text
+G0 original-4k-default
+G1 4k-nohz-rcu-irq
+G2 4k-managed-irq-isolation
+G3 4k-domain-isolation
+G4 64k-default
+G5 64k-nohz-rcu-irq
+G6 64k-managed-irq-isolation
+```
+
+No performance claim exists for Phase 21C0.
+
+The remote read-only audit required one focused inventory fix:
+
+```text
+0280f6d fix: discover AWS 64K kernel metadata from apt
+```
+
+## Phase 21C1 Same-Kernel Boot Rehearsal Summary
+
+Phase 21C1 performed exactly one authorized guest OS reboot through a GRUB
+one-time entry that resolved to the already running known-good kernel.
+
+Outcome:
+
+```text
+phase21c1_one_time_boot_rehearsal: passed
+recovery_snapshot_verified: true
+serial_or_out_of_band_recovery_verified: true
+serial_console_interactive_login_verified: true
+serial_console_sudo_verified: true
+current_kernel_release: 6.17.0-1019-aws
+current_base_page_size: 4096
+post_boot_kernel_unchanged: true
+post_boot_page_size_unchanged: true
+kernel_command_line_unchanged: true
+permanent_default_unchanged: true
+host_healthy_after_reboot: true
+downloaded_artifact_validation: 30/30 passed
+ready_for_phase21c_real_boot_validation: true
+performance_improvement_verified: false
+```
+
+GRUB consumed the one-time entry value but left an empty `next_entry=` key in
+`grubenv`; the key was removed with `grub-editenv - unset next_entry` and the
+final GRUB environment list matched the pre-arm state.
+
+No 64K kernel was installed or booted, no permanent boot default was changed,
+and no benchmark was run.
+
+## Phase 21C2A 4K Boot Isolation Validation Summary
+
+Phase 21C2A executed guarded one-time 4K boot-parameter experiments on the
+existing C7g / Neoverse-V1 target:
+
+```text
+G0 original-4k-default
+G1 4k-nohz-rcu-irq
+G2 4k-managed-irq-isolation
+G3 4k-domain-isolation
+```
+
+The validation used isolated temporary GRUB custom entries, explicit removal
+verification, permanent-default refusal, mandatory return to G0 before another
+profile, and independent artifact revalidation.
+
+Comparison identities:
+
+```text
+E1 full-capacity baseline: G0 CPUs 0-7, threads 8
+E2 matched causal baseline: G0 CPUs 2-7, threads 6
+E3 experimental profile: G1/G2/G3 CPUs 2-7, threads 6
+```
+
+Only E2 versus E3 was used for causal boot-isolation classification. E1 remains
+a secondary product-capacity tradeoff.
+
+Outcome:
+
+```text
+G0_E2_decode_median: 13.52 tok/s
+G1_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G2_E3_decode_median: 13.63 tok/s, +0.81%, inconclusive
+G3_E3_decode_median: 12.59 tok/s, -6.88%, regressed
+remote_artifact_revalidation: 410/410 passed
+downloaded_artifact_revalidation: 410/410 passed
+original_4k_state_restored: true
+permanent_default_unchanged: true
+performance_improvement_verified: false
+latency_or_noise_improvement_verified: false
+```
+
+The first G1 attempt exposed a temporary-entry kernel-path generation defect
+before measurement. Recovery used Serial Console to select the original Ubuntu
+entry, the defect was corrected, cleanup passed, and corrected G1/G2/G3
+transactions restarted from verified G0. The failed pre-measurement boot is not
+included in performance comparisons.
+
+## Phase 21C2B0 64K Local Preparation Summary
+
+Phase 21C2B0 prepares future official AWS ARM64 64K validation without remote
+access or host mutation.
+
+Outcome:
+
+```text
+phase21c2b0_64k_local_preparation: passed
+g1_grub_path_regression_guarded: true
+package_transaction_plan_ready: true
+safe_g0_default_plan_ready: true
+package_cleanup_plan_ready: true
+ready_for_manual_c7g_start: true
+kernel_or_boot_state_modified: false
+aws_accessed: false
+```
+
+## Phase 21C2B C7g 64K Kernel Validation
+
+Phase 21C2B performed the guarded real 4K-versus-64K C7g validation described
+in `docs/results/PHASE_21C2B_C7G_64K_KERNEL_VALIDATION.md`.
+
+```text
+final_source_commit: f2175f69e37e2d826237d395a04b1c04db40e786
+original_kernel: 6.17.0-1019-aws
+candidate_64k_kernel: 6.17.0-1019-aws-64k
+H1_4k_full_decode_median: 17.46 tok/s
+H3_64k_full_decode_median: 17.55 tok/s
+H2_4k_matched_decode_median: 13.63 tok/s
+H4_64k_matched_decode_median: 13.64 tok/s
+G5_H5_decode_median: 13.61 tok/s
+G6_H5_decode_median: 13.67 tok/s
+G7_H5_decode_median: 12.63 tok/s
+page_size_performance_improvement_verified: false
+64k_isolation_improvement_verified: false
+original_4k_state_restored: true
+package_state_restored: true
+permanent_default_restored: true
+ready_to_stop_c7g: true
+```
+
+Coverage:
+
+```text
+generated GRUB path parsing
+guessed kernel path rejection
+official 64K package transaction planning
+apt simulation safety checks
+resolved-default safety checks
+G0 safety-pin planning
+G4/G5/G6/G7 experiment planning
+H1/H2/H3/H4/H5 comparison identities
+exact package cleanup planning
+plan-only CLI fake E2Es
+```
+
+This is not a 64K performance result. A future real phase must start from a
+manually started C7g target and create fresh same-session 4K and 64K baselines.
+
+## Phase 21D1 C7g Loopback Serving Summary
+
+Phase 21D1 validated real workload-aware serving search on the C7g target while
+preserving the restored 4K host state.
+
+Outcome:
+
+```text
+server_startups: 18 / 24
+measured_http_requests: 569 / 600
+eligible_recommendations: 2
+maximum_throughput: interactive-short c4, slots4-cont-on, +67.602% output tok/s
+interactive_latency: interactive-short c4, slots4-cont-on, +91.064% lower TTFT p95
+balanced_multi_user: no eligible recommendation
+shared_prefix: no eligible recommendation
+memory_constrained: no eligible recommendation
+remote_artifact_revalidation: 170/170 passed
+downloaded_artifact_revalidation: 170/170 passed
+host_restored_to_original_state: true
+```
+
+The recommendations are bound to loopback topology, workload, concurrency,
+binary digest, model digest, and server capability digest. They must not be
+reused as Phase 21D2 remote-client evidence.
+
+## Phase 21D2A Remote-Network Local Preparation Summary
+
+Phase 21D2A did not access AWS or either target. It prepares Phase 21D2B to
+start from a fresh two-host topology:
+
+```text
+server_role: C7g / Neoverse-V1 / Linux Arm64 / 8 logical CPUs
+client_role: T4g / Neoverse-N1 class / Linux Arm64 / 2 logical CPUs
+required_profile: slots4-cont-on
+server_cpu_policy: full_capacity_server_cpu_set_no_local_load_generator_reservation
+loopback_to_remote_network: hard_drift
+network_tuning_gate: skip_irq_rps_xps_until_network_bottleneck_is_observed
+aws_accessed: false
+remote_accessed: false
+```
+
+The prepared Phase 21D2B path is:
+
+```text
+confirm slots4-cont-on
+measure full-capacity remote serving
+classify server/client/network bottleneck
+test IRQ/RPS/XPS only when network bottleneck evidence exists
+report remote-network recommendation or inconclusive result
+```
+
+## Phase 21D2B C7g/T4g Remote Serving Summary
+
+Phase 21D2B validated the real two-host remote-client topology using C7g as
+the server and T4g as the deterministic lightweight client. The run used direct
+private-path HTTP traffic, deterministic randomized block order, fresh
+`llama-server` restart for every block, zero request retries, zero failures,
+and client-observed TTFT/E2E timing.
+
+Outcome:
+
+```text
+source_commit: b46460ee989baf54ebbeff6275ac9fb0bf866f3f
+measured_requests_total: 608
+paired_block_pairs: 6
+remote_slots4_throughput_improvement_verified: true
+remote_slots4_latency_improvement_verified: true
+full_capacity_remote_recommendation_created: true
+network_tuning_skipped_due_to_no_bottleneck: true
+client_bottleneck_detected: false
+downloaded_artifact_validation: 598/598 passed
+dual_host_restored: true
+```
+
+Eligible same-protocol comparisons:
+
+```text
+J2 interactive-short: 15.334 -> 28.295 output tok/s, +84.529%
+J1 interactive-short: 17.032 -> 31.355 output tok/s, +84.092%
+J1 decode-heavy: 17.046 -> 31.790 output tok/s, +86.490%
+J1 prefill-heavy: 16.563 -> 28.054 output tok/s, +69.375%
+```
+
+The recommendation is scoped to the tested C7g server, T4g remote client,
+direct private topology, model, binary, workload set, concurrency 4, and
+protocol. It must not be combined with Phase 21D1 loopback results or with
+single-request `llama-bench` measurements.

@@ -35,7 +35,7 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
             optimized_profile = next(profile for profile in result.profiles if profile.profile_id == "arm-optimized")
             self.assertEqual(optimized_profile.kleidiai_status, "requested_but_unverified")
 
-    def test_build_profile_records_kleidiai_only_when_evidenced(self) -> None:
+    def test_build_profile_records_kleidiai_only_when_build_and_runtime_evidenced(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             config_path = _write_build_config(
@@ -44,6 +44,7 @@ class ArmTuneCompetitionEvidenceTest(unittest.TestCase):
                 native=_binary(root, "native"),
                 optimized=_binary(root, "optimized"),
                 optimized_kleidiai_evidence=True,
+                optimized_kleidiai_runtime_evidence=True,
             )
 
             result = run_build_profile(config_path=config_path, run_id="build-run", output_dir=root / "build")
@@ -218,9 +219,18 @@ def _binary(root: Path, label: str) -> Path:
     return path
 
 
-def _write_build_config(root: Path, *, portable: Path, native: Path, optimized: Path, optimized_kleidiai_evidence: bool) -> Path:
+def _write_build_config(
+    root: Path,
+    *,
+    portable: Path,
+    native: Path,
+    optimized: Path,
+    optimized_kleidiai_evidence: bool,
+    optimized_kleidiai_runtime_evidence: bool = False,
+) -> Path:
     compile_evidence = [{"command": "cc -DKLEIDIAI=1"}] if optimized_kleidiai_evidence else []
     linked = ["libkleidiai.a"] if optimized_kleidiai_evidence else []
+    runtime_backend = {"runtime_backend_status": "enabled_and_evidenced", "startup_line": "CPU_KLEIDIAI buffer active"} if optimized_kleidiai_runtime_evidence else {}
     path = root / "build_profiles.json"
     atomic_write_json(
         path,
@@ -245,6 +255,7 @@ def _write_build_config(root: Path, *, portable: Path, native: Path, optimized: 
                     "effective_cmake_cache": {"LLAMA_KLEIDIAI": "ON"},
                     "compile_command_evidence": compile_evidence,
                     "linked_libraries": linked,
+                    "runtime_backend_evidence": runtime_backend,
                 },
             ],
             "binaries": {
