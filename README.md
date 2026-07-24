@@ -10,7 +10,6 @@ current release focus is **ArmTune**, an Arm AI inference subsystem for:
 - Performance Passport generation
 - Guarded recommendation show, validate, dry-run apply, canary, lease, and
   rollback
-- Optional Linux host system and kernel profile planning
 
 ArmTune is the Arm-focused counterpart to the generic PerfRunbench resource and
 recommendation infrastructure. `llama.cpp` is the first workload adapter, not
@@ -22,6 +21,20 @@ The shortest public workflow for a new user is:
 
 ```bash
 python -m pip install .
+autotuneai run --auto --preset quick -- python app.py
+autotuneai platform validate --preset quick --output validation.json
+```
+
+Config-free `run --auto` creates an in-memory generic command configuration,
+uses process wall time as its objective, and tests only process-scoped CPU
+thread settings. It writes no config unless `--save-config [PATH]` is present.
+The JSON summary reports `cache_hit`, `newly_tuned`, or
+`no_eligible_candidate`.
+
+Use an explicit adapter config when the workload exposes richer metrics or
+semantics:
+
+```bash
 autotuneai init --adapter pytorch-training --output autotune.yaml
 autotuneai doctor --config autotune.yaml -- python train.py
 autotuneai run --auto --config autotune.yaml -- python train.py
@@ -40,17 +53,13 @@ The `pytorch-training` adapter tunes bounded training slices with allowlisted
 knob bindings. It does not require PyTorch as a core dependency and does not
 rewrite user source files.
 
-The default ArmTune flow is:
+The primary product entry is:
 
 ```text
-inspect Arm target
--> inspect workload runtime
--> benchmark portable baseline
--> build Arm profiles
--> search runtime candidates
--> confirm selected candidate
--> generate Performance Passport
--> show, validate, and guarded-apply the recommendation
+run --auto
+-> platform validate
+-> serving recommendations
+-> ArmTune
 ```
 
 ```mermaid
@@ -67,6 +76,11 @@ flowchart LR
 Production Arm performance claims require a real Linux Arm64 target. Fixture,
 synthetic, and CI-runner outputs are labeled separately and are not measured
 Arm performance.
+
+Preset search limits are `quick` (5 minutes, 3 candidates), `standard`
+(20 minutes, 8 candidates), and `deep` (60 minutes, 16 candidates).
+`--budget-minutes N` overrides the preset wall-clock limit without weakening
+correctness, cleanup, drift, or failure guards.
 
 ## Install
 
@@ -332,6 +346,12 @@ docs/CPU_AWARE_BUILD_TUNING.md
 docs/NATIVE_BINARY_PORTABILITY.md
 ```
 
+## Advanced Guarded System Experiments
+
+Linux host, kernel, boot, and reboot-required profiles are opt-in guarded
+experiments. They are not part of normal `run --auto`, and no public kernel
+recommendation currently qualifies for general reuse.
+
 Phase 21A Linux system and kernel profile planning documents:
 
 ```text
@@ -359,6 +379,8 @@ The repository also includes generic PerfRunbench resource-guard and workload
 tuning commands:
 
 ```bash
+autotuneai run --auto --preset quick -- python app.py
+autotuneai platform validate --preset quick --output validation.json
 autotuneai inspect
 autotuneai executors --probe-systemd --probe-docker --check-sudo-cache
 autotuneai doctor --config autotune.yaml -- python train.py
@@ -405,6 +427,9 @@ root privileges, cloud credentials, or network access.
 autotune/
   golden_path/    Command identity, metric-source parsing, bounded tuning,
                   recommendation cache lookup, and automatic reuse policy.
+  platform_validation.py
+                  Sanitized OS, architecture, accelerator, and installed
+                  runtime compatibility validation.
   training_adapter/
                   PyTorch training adapter config validation, safe knob
                   bindings, bounded slices, effective-batch guards, and
