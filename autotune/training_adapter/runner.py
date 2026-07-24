@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import random
-import time
 from datetime import datetime
 from pathlib import Path
 from statistics import median
 from typing import Any
 
 from autotune.golden_path import SCHEMA_VERSION
+from autotune.golden_path.budget import SearchBudget
 from autotune.golden_path.cache import insert_cache_entry
 from autotune.golden_path.config import (
     budget_from_config,
@@ -39,6 +39,15 @@ from autotune.training_adapter.metrics import failure_diagnostics_from_exception
 
 def tune_training_command(config_path: str | Path, command: list[str]) -> dict[str, Any]:
     config = load_golden_path_config(config_path)
+    return tune_training_command_config(config, command, config_path=config_path)
+
+
+def tune_training_command_config(
+    config: dict[str, Any],
+    command: list[str],
+    *,
+    config_path: str | Path | None = None,
+) -> dict[str, Any]:
     validate_training_config(config)
     result = _base_result(config_path, command, config)
     root = Path(result["artifact_dir"])
@@ -60,26 +69,67 @@ def tune_training_command(config_path: str | Path, command: list[str]) -> dict[s
         _write_tuning_artifacts(result)
         return result
     tuning = tuning_section(config)
+    search_budget = SearchBudget.from_minutes(float(tuning["budget_minutes"]))
+    trial_timeout = float(slice_config(config).get("max_wall_time_seconds", 300.0))
     trials: list[dict[str, Any]] = []
     baseline = plans[0]
     for index in range(int(tuning["warmup_runs"])):
-        trials.append(_run_trial(baseline, config, phase="warmup", role="baseline", index=index))
-        _cooldown(config)
+        if not search_budget.can_start(trial_timeout, phase="warmup", candidate_id="baseline"):
+            break
+        trials.append(
+            _run_trial(
+                baseline,
+                config,
+                phase="warmup",
+                role="baseline",
+                index=index,
+                timeout_seconds=search_budget.bounded_timeout(trial_timeout),
+            )
+        )
+        search_budget.cooldown(float(search_config(config).get("cooldown_seconds", 0.0)))
     search_order = [baseline, *_shuffled(plans[1:], config)]
     for plan in search_order:
         for index in range(int(tuning["search_runs"])):
-            trials.append(_run_trial(plan, config, phase="search", role=_role(plan), index=index))
-            _cooldown(config)
+            if not search_budget.can_start(trial_timeout, phase="search", candidate_id=plan.candidate_id):
+                break
+            trials.append(
+                _run_trial(
+                    plan,
+                    config,
+                    phase="search",
+                    role=_role(plan),
+                    index=index,
+                    timeout_seconds=search_budget.bounded_timeout(trial_timeout),
+                )
+            )
+            search_budget.cooldown(float(search_config(config).get("cooldown_seconds", 0.0)))
+        if search_budget.exhausted:
+            break
     selected = _select_candidate(search_order, trials, objective_from_config(config))
+    completed_confirmation_pairs = 0
     if selected.candidate_id != "baseline":
         for index in range(int(tuning["confirmation_runs"])):
             pair_id = f"confirm_{index:03d}"
             pair = [baseline, selected]
             if index % 2 == 1:
                 pair.reverse()
+            pair_budget = (2 * trial_timeout) + float(search_config(config).get("cooldown_seconds", 0.0))
+            if not search_budget.can_start(pair_budget, phase="confirmation", candidate_id=selected.candidate_id):
+                break
             for plan in pair:
-                trials.append(_run_trial(plan, config, phase="confirmation", role=_role(plan), index=index, pair_id=pair_id))
-                _cooldown(config)
+                trials.append(
+                    _run_trial(
+                        plan,
+                        config,
+                        phase="confirmation",
+                        role=_role(plan),
+                        index=index,
+                        pair_id=pair_id,
+                        timeout_seconds=search_budget.bounded_timeout(trial_timeout),
+                    )
+                )
+                search_budget.cooldown(float(search_config(config).get("cooldown_seconds", 0.0)))
+            completed_confirmation_pairs += 1
     statistical_evidence = evaluate_statistical_evidence(
         {"trials": trials},
         StatisticalGuardConfig(
@@ -90,14 +140,23 @@ def tune_training_command(config_path: str | Path, command: list[str]) -> dict[s
             variability_threshold_percent=_optional_float(tuning.get("variability_threshold_percent")),
         ),
     )
+    evidence_status = statistical_evidence["status"]
+    required_confirmation_pairs = int(tuning["confirmation_runs"]) if selected.candidate_id != "baseline" else 0
+    if search_budget.exhausted or completed_confirmation_pairs < required_confirmation_pairs:
+        evidence_status = "inconclusive"
+        statistical_evidence["status"] = "inconclusive"
+        statistical_evidence["classification"] = "time_budget_exhausted"
     result.update(
         {
-            "status": statistical_evidence["status"] if selected.recommendation_eligible else "no_eligible_candidate",
+            "status": evidence_status if selected.recommendation_eligible else "no_eligible_candidate",
             "selected_candidate_id": selected.candidate_id,
             "search_order": [plan.candidate_id for plan in search_order],
             "trials": trials,
             "statistical_evidence": statistical_evidence,
             "selected_candidate_recommendation_eligible": selected.recommendation_eligible,
+            "search_budget": search_budget.to_dict(),
+            "confirmation_pairs_completed": completed_confirmation_pairs,
+            "confirmation_pairs_required": required_confirmation_pairs,
         }
     )
     passport_path = root / "performance_passport.json"
@@ -179,6 +238,7 @@ def _run_trial(
     role: str,
     index: int,
     pair_id: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     objective = objective_from_config(config)
     env = {
@@ -223,7 +283,7 @@ def _run_trial(
             advanced_options=AdvancedRunOptions(extra_env=env),
             capture_output=True,
             cwd=workload_cwd(config),
-            timeout_seconds=float(slice_config(config).get("max_wall_time_seconds", 300.0)),
+            timeout_seconds=timeout_seconds or float(slice_config(config).get("max_wall_time_seconds", 300.0)),
         )
         parsed = load_training_result_for_run(run_dir, config, return_code=return_code)
         metrics = parsed["metrics"]
@@ -267,7 +327,7 @@ def _run_trial(
     }
 
 
-def _base_result(config_path: str | Path, command: list[str], config: dict[str, Any]) -> dict[str, Any]:
+def _base_result(config_path: str | Path | None, command: list[str], config: dict[str, Any]) -> dict[str, Any]:
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     root = Path(".autotuneai") / "runs" / run_id / "pytorch_training"
     root.mkdir(parents=True, exist_ok=True)
@@ -277,7 +337,8 @@ def _base_result(config_path: str | Path, command: list[str], config: dict[str, 
         "run_id": run_id,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "result_origin": "measured",
-        "config_path": str(Path(config_path)),
+        "config_path": str(Path(config_path)) if config_path is not None else None,
+        "config_origin": "file" if config_path is not None else "in_memory_default",
         "artifact_dir": str(root),
         "objective": objective_from_config(config),
         "workload_identity": build_workload_identity(command, config, config_path=config_path),
@@ -421,12 +482,6 @@ def _shuffled(plans: list[CandidatePlan], config: dict[str, Any]) -> list[Candid
     copied = list(plans)
     random.Random(int(search_config(config).get("shuffle_seed", 0))).shuffle(copied)
     return copied
-
-
-def _cooldown(config: dict[str, Any]) -> None:
-    seconds = float(search_config(config).get("cooldown_seconds", 0.0))
-    if seconds > 0:
-        time.sleep(seconds)
 
 
 def _objective_value(metrics: dict[str, Any], metric: str) -> float | None:

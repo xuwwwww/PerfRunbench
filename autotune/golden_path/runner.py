@@ -8,6 +8,7 @@ from statistics import median
 from typing import Any
 
 from autotune.golden_path import SCHEMA_VERSION
+from autotune.golden_path.budget import SearchBudget
 from autotune.golden_path.cache import insert_cache_entry, lookup_cache
 from autotune.golden_path.config import (
     apply_section,
@@ -39,16 +40,34 @@ from autotune.resource.workload_runner import run_with_budget
 
 def tune_command(config_path: str | Path, command: list[str]) -> dict[str, Any]:
     config = load_golden_path_config(config_path)
-    if workload_section(config).get("adapter") == "pytorch-training":
-        from autotune.training_adapter.runner import tune_training_command
+    return tune_command_config(config, command, config_path=config_path)
 
-        return tune_training_command(config_path, command)
+
+def tune_command_config(
+    config: dict[str, Any],
+    command: list[str],
+    *,
+    config_path: str | Path | None = None,
+) -> dict[str, Any]:
+    if workload_section(config).get("adapter") == "pytorch-training":
+        from autotune.training_adapter.runner import tune_training_command_config
+
+        return tune_training_command_config(config, command, config_path=config_path)
     objective = objective_from_config(config)
     tuning = tuning_section(config)
+    search_budget = SearchBudget.from_minutes(float(tuning["budget_minutes"]))
+    trial_timeout = _trial_timeout_seconds(config)
     candidates = candidate_configs(config)
     if len(candidates) < 2:
         result = _base_result(config_path, command, config)
-        result.update({"status": "inconclusive", "reason": "no non-baseline candidates configured", "candidates": candidates})
+        result.update(
+            {
+                "status": "inconclusive",
+                "reason": "no non-baseline candidates configured",
+                "candidates": candidates,
+                "search_budget": search_budget.to_dict(),
+            }
+        )
         _write_tuning_artifacts(result)
         return result
     result = _base_result(config_path, command, config)
@@ -56,25 +75,67 @@ def tune_command(config_path: str | Path, command: list[str]) -> dict[str, Any]:
     trials: list[dict[str, Any]] = []
     warmups = int(tuning["warmup_runs"])
     for index in range(warmups):
-        trials.append(_run_trial(command, config, candidates[0], phase="warmup", role="baseline", index=index))
-        _cooldown(tuning)
+        if not search_budget.can_start(trial_timeout, phase="warmup", candidate_id="baseline"):
+            break
+        trials.append(
+            _run_trial(
+                command,
+                config,
+                candidates[0],
+                phase="warmup",
+                role="baseline",
+                index=index,
+                timeout_seconds=search_budget.bounded_timeout(trial_timeout),
+            )
+        )
+        search_budget.cooldown(float(tuning.get("cooldown_seconds", 0.0)))
     search_candidates = candidates[1:]
     random.Random(int(tuning["shuffle_seed"])).shuffle(search_candidates)
     search_order = [candidates[0], *search_candidates]
     for candidate in search_order:
         for index in range(int(tuning["search_runs"])):
-            trials.append(_run_trial(command, config, candidate, phase="search", role=_role(candidate), index=index))
-            _cooldown(tuning)
+            if not search_budget.can_start(trial_timeout, phase="search", candidate_id=str(candidate["id"])):
+                break
+            trials.append(
+                _run_trial(
+                    command,
+                    config,
+                    candidate,
+                    phase="search",
+                    role=_role(candidate),
+                    index=index,
+                    timeout_seconds=search_budget.bounded_timeout(trial_timeout),
+                )
+            )
+            search_budget.cooldown(float(tuning.get("cooldown_seconds", 0.0)))
+        if search_budget.exhausted:
+            break
     selected = _select_candidate(search_order, trials, objective)
+    completed_confirmation_pairs = 0
     if selected["id"] != "baseline":
         for index in range(int(tuning["confirmation_runs"])):
             pair_id = f"confirm_{index:03d}"
             pair = [candidates[0], selected]
             if index % 2 == 1:
                 pair.reverse()
+            pair_budget = (2 * trial_timeout) + float(tuning.get("cooldown_seconds", 0.0))
+            if not search_budget.can_start(pair_budget, phase="confirmation", candidate_id=str(selected["id"])):
+                break
             for candidate in pair:
-                trials.append(_run_trial(command, config, candidate, phase="confirmation", role=_role(candidate), index=index, pair_id=pair_id))
-                _cooldown(tuning)
+                trials.append(
+                    _run_trial(
+                        command,
+                        config,
+                        candidate,
+                        phase="confirmation",
+                        role=_role(candidate),
+                        index=index,
+                        pair_id=pair_id,
+                        timeout_seconds=search_budget.bounded_timeout(trial_timeout),
+                    )
+                )
+                search_budget.cooldown(float(tuning.get("cooldown_seconds", 0.0)))
+            completed_confirmation_pairs += 1
     statistical_evidence = evaluate_statistical_evidence(
         {"trials": trials},
         StatisticalGuardConfig(
@@ -85,20 +146,29 @@ def tune_command(config_path: str | Path, command: list[str]) -> dict[str, Any]:
             variability_threshold_percent=_optional_float(tuning.get("variability_threshold_percent")),
         ),
     )
+    evidence_status = statistical_evidence["status"]
+    required_confirmation_pairs = int(tuning["confirmation_runs"]) if selected["id"] != "baseline" else 0
+    if search_budget.exhausted or completed_confirmation_pairs < required_confirmation_pairs:
+        evidence_status = "inconclusive"
+        statistical_evidence["status"] = "inconclusive"
+        statistical_evidence["classification"] = "time_budget_exhausted"
     result.update(
         {
-            "status": statistical_evidence["status"],
+            "status": evidence_status,
             "candidates": candidates,
             "search_order": [candidate["id"] for candidate in search_order],
             "selected_candidate_id": selected["id"],
             "trials": trials,
             "statistical_evidence": statistical_evidence,
+            "search_budget": search_budget.to_dict(),
+            "confirmation_pairs_completed": completed_confirmation_pairs,
+            "confirmation_pairs_required": required_confirmation_pairs,
         }
     )
     passport_path = root / "performance_passport.json"
     _write_passport(result, passport_path)
     result["performance_passport_path"] = str(passport_path)
-    if statistical_evidence["status"] == "recommended" and selected["id"] != "baseline":
+    if evidence_status == "recommended" and selected["id"] != "baseline":
         bundle_path = root / "recommendation_bundle.json"
         selected_env = dict(selected["env"])
         baseline_config = _configuration_payload("baseline", command, config, candidates[0]["env"], config_path=config_path)
@@ -146,25 +216,38 @@ def run_best(config_path: str | Path, command: list[str]) -> dict[str, Any]:
 
 def run_auto(config_path: str | Path, command: list[str]) -> dict[str, Any]:
     config = load_golden_path_config(config_path)
+    return run_auto_config(config, command, config_path=config_path)
+
+
+def run_auto_config(
+    config: dict[str, Any],
+    command: list[str],
+    *,
+    config_path: str | Path | None = None,
+    launch_without_recommendation: bool = False,
+) -> dict[str, Any]:
     lookup = _lookup(config_path, command, config)
     policy = cache_policy(config)
     if lookup["state"] in {"ambiguous", "revoked"}:
         return {"schema_version": SCHEMA_VERSION, "status": "failed", "reason": f"cache state {lookup['state']} requires explicit intervention", "cache_lookup": _public_lookup(lookup)}
     newly_tuned = False
     if should_retune(str(lookup["state"]), policy["retune_policy"]):
-        tuned = tune_command(config_path, command)
+        tuned = tune_command_config(config, command, config_path=config_path)
         if tuned.get("status") != "recommended" or "cache_entry" not in tuned:
+            if launch_without_recommendation:
+                return _launch_without_recommendation(config, command, tuned)
             detail = tuned.get("reason")
             reason = "retune did not produce an eligible recommendation"
             if detail:
                 reason = f"{reason}: {detail}"
             return {"schema_version": SCHEMA_VERSION, "status": "failed", "reason": reason, "tuning_result": _public_tuning(tuned)}
-        config = load_golden_path_config(config_path)
         lookup = _lookup(config_path, command, config)
         newly_tuned = True
     if lookup["state"] not in {"exact_match", "soft_drift"}:
         return {"schema_version": SCHEMA_VERSION, "status": "failed", "reason": "cache lookup did not produce a reusable recommendation", "cache_lookup": _public_lookup(lookup)}
-    return _apply_and_launch(config, command, lookup, newly_tuned=newly_tuned, force_canary=False)
+    result = _apply_and_launch(config, command, lookup, newly_tuned=newly_tuned, force_canary=False)
+    result["auto_status"] = "newly_tuned" if newly_tuned else "cache_hit"
+    return result
 
 
 def _lookup(config_path: str | Path, command: list[str], config: dict[str, Any]) -> dict[str, Any]:
@@ -230,6 +313,7 @@ def _run_trial(
     role: str,
     index: int,
     pair_id: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     objective = objective_from_config(config)
     env = {
@@ -241,6 +325,7 @@ def _run_trial(
     if pair_id:
         env["PERFRUNBENCH_PAIR_ID"] = pair_id
     validate_env_overlay(env)
+    started_at = time.perf_counter()
     try:
         return_code, run_dir = run_with_budget(
             command,
@@ -250,8 +335,10 @@ def _run_trial(
             advanced_options=AdvancedRunOptions(extra_env=env),
             capture_output=True,
             cwd=_cwd(config),
+            timeout_seconds=timeout_seconds,
         )
-        metrics = load_metrics_for_run(run_dir, config, cwd=_cwd(config))
+        elapsed_seconds = time.perf_counter() - started_at
+        metrics = load_metrics_for_run(run_dir, config, cwd=_cwd(config), elapsed_seconds=elapsed_seconds)
         metric_value = objective_value(metrics, objective["metric"])
         failed = return_code != 0 or metric_value is None
         error = None if not failed else "command_failed_or_metric_missing"
@@ -289,7 +376,8 @@ def _base_result(config_path: str | Path, command: list[str], config: dict[str, 
         "run_id": run_id,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "result_origin": "measured",
-        "config_path": str(Path(config_path)),
+        "config_path": str(Path(config_path)) if config_path is not None else None,
+        "config_origin": "file" if config_path is not None else "in_memory_default",
         "artifact_dir": str(root),
         "objective": objective_from_config(config),
         "workload_identity": build_workload_identity(command, config, config_path=config_path),
@@ -423,12 +511,6 @@ def _role(candidate: dict[str, Any]) -> str:
     return "baseline" if candidate["id"] == "baseline" else "selected"
 
 
-def _cooldown(tuning: dict[str, Any]) -> None:
-    seconds = float(tuning.get("cooldown_seconds", 0.0))
-    if seconds > 0:
-        time.sleep(seconds)
-
-
 def _cwd(config: dict[str, Any]) -> Path:
     workload = workload_section(config)
     cwd = workload.get("cwd")
@@ -449,3 +531,37 @@ def _runtime_launch_spec(launch_spec: dict[str, Any]) -> dict[str, Any]:
         return full_run
     validate_launch_spec(launch_spec)
     return launch_spec
+
+
+def _trial_timeout_seconds(config: dict[str, Any]) -> float:
+    value = workload_section(config).get("timeout_seconds", 60.0)
+    try:
+        timeout = float(value)
+    except (TypeError, ValueError):
+        timeout = 60.0
+    return max(0.001, timeout)
+
+
+def _launch_without_recommendation(
+    config: dict[str, Any],
+    command: list[str],
+    tuning_result: dict[str, Any],
+) -> dict[str, Any]:
+    return_code, run_dir = run_with_budget(
+        command,
+        budget_from_config(config),
+        sample_interval_seconds=float(config.get("sample_interval_seconds", 0.5)),
+        hard_kill=bool(config.get("hard_kill", False)),
+        capture_output=True,
+        cwd=_cwd(config),
+    )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "status": "completed" if return_code == 0 else "failed",
+        "auto_status": "no_eligible_candidate",
+        "newly_tuned": False,
+        "return_code": return_code,
+        "run_dir": str(run_dir),
+        "reason": "tuning completed without an eligible recommendation; baseline command executed",
+        "tuning_result": _public_tuning(tuning_result),
+    }

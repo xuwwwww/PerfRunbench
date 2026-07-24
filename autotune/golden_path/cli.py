@@ -5,13 +5,21 @@ import json
 from pathlib import Path
 
 from autotune.golden_path.cache import gc_cache, invalidate_cache_entry, list_cache_entries, show_cache_entry
-from autotune.golden_path.config import DEFAULT_CACHE_ROOT, cache_root, load_golden_path_config
-from autotune.golden_path.runner import run_auto, run_best, tune_command
+from autotune.golden_path.config import (
+    DEFAULT_CACHE_ROOT,
+    PUBLIC_PRESETS,
+    cache_root,
+    load_golden_path_config,
+    with_tuning_overrides,
+)
+from autotune.golden_path.runner import run_auto, run_best, tune_command, tune_command_config
 
 
 def add_tune_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     tune = subparsers.add_parser("tune", help="Tune a command and cache an eligible RecommendationBundle.")
     tune.add_argument("--config", required=True)
+    tune.add_argument("--preset", choices=PUBLIC_PRESETS)
+    tune.add_argument("--budget-minutes", type=positive_minutes)
     tune.add_argument("--json", action="store_true")
     tune.add_argument("workload", nargs=argparse.REMAINDER)
     tune.set_defaults(handler=_cmd_tune)
@@ -48,16 +56,50 @@ def run_best_from_args(config_path: str, workload: list[str]) -> int:
     return int(result.get("return_code", 1)) if result.get("status") == "completed" else 1
 
 
-def run_auto_from_args(config_path: str, workload: list[str]) -> int:
-    command = command_after_separator(workload, "Usage: autotuneai run --auto --config <config> -- <command>")
-    result = run_auto(config_path, command)
+def run_auto_from_args(
+    config_path: str | None,
+    workload: list[str],
+    *,
+    preset: str | None = None,
+    budget_minutes: float | None = None,
+    save_config: str | None = None,
+) -> int:
+    from autotune.golden_path.config import default_command_config, save_golden_path_config
+    from autotune.golden_path.runner import run_auto_config
+
+    command = command_after_separator(workload, "Usage: autotuneai run --auto [--config <config>] -- <command>")
+    if config_path is None:
+        config = default_command_config(preset=preset or "quick", budget_minutes=budget_minutes)
+        if save_config is not None:
+            save_golden_path_config(config, save_config)
+        result = run_auto_config(config, command, launch_without_recommendation=True)
+    else:
+        config = with_tuning_overrides(
+            load_golden_path_config(config_path),
+            preset=preset,
+            budget_minutes=budget_minutes,
+        )
+        if save_config is not None:
+            save_golden_path_config(config, save_config)
+        if preset is None and budget_minutes is None:
+            result = run_auto(config_path, command)
+        else:
+            result = run_auto_config(config, command, config_path=config_path)
     print(json.dumps(_summary(result), indent=2, sort_keys=True))
     return int(result.get("return_code", 1)) if result.get("status") == "completed" else 1
 
 
 def _cmd_tune(args: argparse.Namespace) -> int:
     command = command_after_separator(args.workload, "Usage: autotuneai tune --config <config> -- <command>")
-    result = tune_command(args.config, command)
+    if args.preset is None and args.budget_minutes is None:
+        result = tune_command(args.config, command)
+    else:
+        config = with_tuning_overrides(
+            load_golden_path_config(args.config),
+            preset=args.preset,
+            budget_minutes=args.budget_minutes,
+        )
+        result = tune_command_config(config, command, config_path=args.config)
     print(json.dumps(_summary(result), indent=2, sort_keys=True))
     return 0 if result.get("status") in {"recommended", "inconclusive"} else 1
 
@@ -92,6 +134,7 @@ def _summary(result: dict) -> dict:
         "selected_candidate_id",
         "recommendation_bundle_id",
         "cache_state",
+        "auto_status",
         "newly_tuned",
         "return_code",
         "run_dir",
@@ -100,6 +143,7 @@ def _summary(result: dict) -> dict:
         "recommendation_bundle_path",
         "cache_entry",
         "reason",
+        "search_budget",
     ]
     summary = {key: result.get(key) for key in keys if key in result}
     evidence = result.get("statistical_evidence")
@@ -123,6 +167,13 @@ def _summary(result: dict) -> dict:
             "canary_status": apply_result.get("canary", {}).get("status") if isinstance(apply_result.get("canary"), dict) else None,
         }
     return summary
+
+
+def positive_minutes(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("budget minutes must be > 0")
+    return parsed
 
 
 def _cache_summary(entry: dict, *, include_paths: bool = False) -> dict:

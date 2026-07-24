@@ -8,19 +8,35 @@ from typing import Any
 from autotune.golden_path.config import metrics_section
 
 
-ALLOWED_METRIC_SOURCES = {"json_file", "jsonl_file", "stdout_json_prefix", "adapter_result_file"}
+ALLOWED_METRIC_SOURCES = {
+    "json_file",
+    "jsonl_file",
+    "stdout_json_prefix",
+    "adapter_result_file",
+    "process_wall_time",
+}
 
 
 class MetricSourceError(RuntimeError):
     pass
 
 
-def load_metrics_for_run(run_dir: str | Path, config: dict[str, Any], *, cwd: str | Path | None = None) -> dict[str, Any]:
+def load_metrics_for_run(
+    run_dir: str | Path,
+    config: dict[str, Any],
+    *,
+    cwd: str | Path | None = None,
+    elapsed_seconds: float | None = None,
+) -> dict[str, Any]:
     run_path = Path(run_dir)
     metrics = metrics_section(config)
     source = str(metrics.get("source") or "json_file")
     if source not in ALLOWED_METRIC_SOURCES:
         raise MetricSourceError(f"unsupported metrics source: {source}")
+    if source == "process_wall_time":
+        if elapsed_seconds is None or not math.isfinite(elapsed_seconds) or elapsed_seconds < 0:
+            raise MetricSourceError("process_wall_time requires a finite elapsed duration")
+        return {"wall_time_seconds": float(elapsed_seconds)}
     if source == "stdout_json_prefix":
         prefix = metrics.get("prefix")
         if not isinstance(prefix, str) or not prefix:
