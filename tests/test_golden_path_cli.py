@@ -5,13 +5,19 @@ import json
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import chdir, redirect_stdout
 from pathlib import Path
 
 from autotune.cli import main
 from autotune.golden_path.cache import invalidate_cache_entry, lookup_cache
-from autotune.golden_path.config import cache_root, load_golden_path_config
+from autotune.golden_path.config import (
+    PRESET_DEFAULTS,
+    cache_root,
+    default_command_config,
+    load_golden_path_config,
+)
 from autotune.golden_path.identity import build_workload_identity, environment_fingerprint_for_command, resolved_argv
+from autotune.golden_path.runner import tune_command_config
 
 
 class GoldenPathCliTest(unittest.TestCase):
@@ -75,6 +81,73 @@ class GoldenPathCliTest(unittest.TestCase):
             second_payload = json.loads(second.getvalue())
             self.assertFalse(second_payload["newly_tuned"])
             self.assertIn(second_payload["cache_state"], {"exact_match", "soft_drift"})
+
+    def test_config_free_auto_uses_quick_preset_without_writing_config(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            temp_path = Path(temp_dir)
+            script = _write_fake_workload(temp_path)
+            output = io.StringIO()
+
+            with chdir(temp_path), redirect_stdout(output):
+                code = main(["run", "--auto", "--preset", "quick", "--", sys.executable, str(script)])
+
+            self.assertEqual(code, 0)
+            payload = json.loads(output.getvalue())
+            self.assertIn(payload["auto_status"], {"cache_hit", "newly_tuned", "no_eligible_candidate"})
+            self.assertFalse((temp_path / "autotune.generated.json").exists())
+
+    def test_config_free_auto_saves_only_when_requested(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            temp_path = Path(temp_dir)
+            script = _write_fake_workload(temp_path)
+            saved = temp_path / "generated.json"
+            output = io.StringIO()
+
+            with chdir(temp_path), redirect_stdout(output):
+                code = main(
+                    [
+                        "run",
+                        "--auto",
+                        "--preset",
+                        "quick",
+                        "--budget-minutes",
+                        "0.001",
+                        "--save-config",
+                        str(saved),
+                        "--",
+                        sys.executable,
+                        str(script),
+                    ]
+                )
+
+            self.assertEqual(code, 0)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["auto_status"], "no_eligible_candidate")
+            config = json.loads(saved.read_text(encoding="utf-8"))
+            self.assertEqual(config["tuning"]["preset"], "quick")
+            self.assertEqual(config["metrics"]["source"], "process_wall_time")
+
+    def test_presets_and_hard_budget_return_partial_report(self) -> None:
+        self.assertEqual(PRESET_DEFAULTS["quick"]["max_candidates"], 3)
+        self.assertEqual(PRESET_DEFAULTS["standard"]["max_candidates"], 8)
+        self.assertEqual(PRESET_DEFAULTS["deep"]["max_candidates"], 16)
+        self.assertEqual(PRESET_DEFAULTS["quick"]["budget_minutes"], 5.0)
+        self.assertEqual(PRESET_DEFAULTS["standard"]["budget_minutes"], 20.0)
+        self.assertEqual(PRESET_DEFAULTS["deep"]["budget_minutes"], 60.0)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            temp_path = Path(temp_dir)
+            script = _write_fake_workload(temp_path)
+            config = default_command_config(preset="quick", budget_minutes=0.001)
+            with chdir(temp_path):
+                result = tune_command_config(config, [sys.executable, str(script)])
+                artifact_exists = Path(result["artifact_dir"]).exists()
+
+            self.assertEqual(result["status"], "inconclusive")
+            self.assertEqual(result["search_budget"]["status"], "exhausted")
+            self.assertTrue(result["search_budget"]["skipped_work"])
+            self.assertNotIn("cache_entry", result)
+            self.assertTrue(artifact_exists)
 
     def test_cache_lookup_reports_revoked_and_hard_drift_states(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:

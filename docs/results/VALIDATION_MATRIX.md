@@ -3,26 +3,29 @@
 This matrix separates portability and guard evidence from performance claims.
 Numbers from different targets or protocols must not be combined.
 
-| Phase | Target | Workload | Purpose | Result boundary | Status |
-| --- | --- | --- | --- | --- | --- |
-| 14B | Linux Arm64 C7g / Neoverse-V1 | Public synthetic PyTorch training | Real Arm training-adapter workflow and guarded apply | Single Arm target, synthetic workload | passed |
-| 15A | Linux Arm64 T4g.small / Neoverse-N1 class | Dependency-free fixture, PyTorch skipped when unsafe | Low-resource guard and portability evidence | No performance claim | passed |
-| 15B | Linux Arm64 T4g.small / Neoverse-N1 class | Public synthetic PyTorch training | Real low-resource Arm PyTorch workflow | Do not compare with C7g | passed |
-| 15C | Windows x86_64 controller | Public synthetic PyTorch training | Local CLI, cache, drift, apply, and portability validation | Do not compare with Arm | passed |
-| 16 | Windows local clean venv plus GitHub Actions matrix | Dependency-free public fixtures | Release-candidate installed-wheel usability | Packaging and CLI usability, not performance | pending final CI |
-| 19 | Linux Arm64 T4g.small / Neoverse-N1 class | No suitable existing model available; build evidence only | CPU-aware native build tuning guard validation | Build artifacts collected, but no benchmark or recommendation claim | insufficient evidence |
-| 20 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp | CPU-aware build/backend evidence, bounded runtime search, server timing, Passport, and artifact validation | Real measured workflow validation; build and runtime improvements stayed inside the 5% noise band | passed |
-| 21A | Local fake Linux roots | Synthetic `/proc`, `/sys`, cgroup, IRQ, block, and boot fixtures | Host system and kernel profile framework, leases, rollback, and boot-plan safety | Planning and fake E2E only; no AWS and no real host mutation | passed |
-| 21B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Reversible Linux host-system apply, measurement, rollback, cleanup, and artifact validation | Real measured guard validation; no positive candidate cleared the 5% noise band | passed |
-| 21B2 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp upstream-default binary | Remaining reversible system families: cpuset, IRQ/workqueue, mapping, THP exercise, storage cold-start, perf, and boot-readiness audit | Real measured guard validation; no positive same-protocol candidate cleared the 5% noise band | passed |
-| 21C0 | Local fake Linux roots plus read-only Linux Arm64 C7g / Neoverse-V1 audit | Synthetic boot fixtures and read-only boot/kernel inventory | C7g 4K/64K boot-readiness model, one-time plans, recovery blockers, official 64K package metadata, and future protocol plan | Planning and read-only inventory only; no kernel install, no bootloader write, no reboot | passed |
-| 21C1 | Linux Arm64 C7g / Neoverse-V1 | No benchmark workload | Same-kernel GRUB one-time boot rehearsal with serial-console recovery validation | Reboot safety evidence only; no kernel change and no performance claim | passed |
-| 21C2A | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | 4K one-time boot-parameter isolation, rollback, cleanup, matched baseline measurement, and artifact validation | Real measured guard validation; G1/G2 stayed inside the 5% noise band and G3 regressed | passed |
-| 21C2B | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-bench and llama-server | Official Ubuntu AWS ARM64 64K kernel transaction, G4/G5/G6/G7 one-time boots, matched measurements, package cleanup, and artifact validation | Real measured guard validation; 64K page-size and isolation differences stayed inside the 5% noise band except G7, which regressed | passed |
-| 21D0 | Local fixtures only | Synthetic serving workload fixtures | Workload-aware `llama-server` serving models, load generator, staged search policy, Pareto output, safety guards, and future network plans | Local preparation only; no AWS, no remote host, no real serving measurement | passed |
-| 21D1 | Linux Arm64 C7g / Neoverse-V1 | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real loopback serving search with local client on CPU 0 and server on CPUs 1-7 | Eligible loopback-only recommendations for `interactive-short` concurrency 4; not remote-network evidence | passed |
-| 21D2A | Local fixtures and plan-only CLI | Synthetic serving network plan | Dual-host C7g-server/T4g-client orchestration contract, remote timing policy, hard-drift guard, and network-bottleneck gate | Local preparation only; AWS stopped, no remote access, no real serving measurement | passed |
-| 21D2B | Linux Arm64 C7g / Neoverse-V1 server plus Linux Arm64 T4g / Neoverse-N1 class remote client | Qwen2.5-7B Q4_K_M with pinned llama.cpp llama-server | Real direct-private-path remote serving validation for `slots4-cont-on` | Eligible remote-client recommendations for concurrency 4; network tuning skipped because bottleneck evidence was absent | passed |
+| Evidence | Architecture | OS | Accelerator | Runtime | Validation type | Compatibility status | Performance status | Evidence origin |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 14B | Arm64 / Neoverse-V1 | Linux | CPU | PyTorch | synthetic training workflow and guarded apply | compatibility_verified | fixture_only | real target / synthetic workload |
+| 15A | Arm64 / Neoverse-N1 class | Linux | CPU | dependency-free command fixture | low-resource guard and portability | fixture_only | fixture_only | real target / test fixture |
+| 15B | Arm64 / Neoverse-N1 class | Linux | CPU | PyTorch | synthetic training workflow | compatibility_verified | fixture_only | real target / synthetic workload |
+| 15C | x86_64 | Windows | CPU | PyTorch | CLI, cache, drift, and process apply | compatibility_verified | fixture_only | local measured synthetic workload |
+| 16 | x86_64 and Arm64 | Windows and Linux | CPU | installed wheel / command fixture | release usability matrix | compatibility_verified | fixture_only | GitHub-hosted runners / test fixture |
+| 19 | Arm64 / Neoverse-N1 class | Linux | CPU | build tooling | native build evidence guard | compatibility_verified | unavailable | real target / build evidence only |
+| 20 | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama.cpp | build/runtime search and Passport | compatibility_verified | unavailable | real measured; differences within 5% noise band |
+| 21A | synthetic Arm/Linux fixtures | fake Linux roots | CPU | system profile fixtures | apply, lease, rollback, and boot-plan safety | fixture_only | fixture_only | local fixture |
+| 21B | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama.cpp | reversible host-profile measurement | compatibility_verified | unavailable | real measured; no candidate cleared 5% noise band |
+| 21B2 | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama.cpp | remaining reversible system families | compatibility_verified | unavailable | real measured; no candidate cleared 5% noise band |
+| 21C0 | Arm64 / Neoverse-V1 plus fixtures | Linux | CPU | boot/kernel planning | read-only inventory and recovery planning | compatibility_verified | fixture_only | real read-only audit plus local fixtures |
+| 21C1 | Arm64 / Neoverse-V1 | Linux | CPU | GRUB one-time boot | reboot safety rehearsal | compatibility_verified | unavailable | real safety evidence |
+| 21C2A | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama.cpp | 4K boot-parameter comparison | compatibility_verified | unavailable | real measured; G1/G2 within noise, G3 regressed |
+| 21C2B | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama.cpp | 4K/64K kernel comparison | compatibility_verified | unavailable | real measured; no eligible 64K improvement |
+| 21D0 | synthetic | local fixture environment | CPU | serving fixtures | serving model, loadgen, search, and safety | fixture_only | fixture_only | local fixture |
+| 21D1 | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama-server | loopback serving search | compatibility_verified | performance_improvement_verified | real measured loopback protocol |
+| 21D2A | synthetic dual-host plan | local fixture environment | CPU | serving network fixture | remote orchestration and drift guards | fixture_only | fixture_only | local fixture |
+| 21D2B | Arm64 / Neoverse-V1 server and Neoverse-N1 client | Linux | CPU | pinned llama-server | direct-private-path remote serving | compatibility_verified | performance_improvement_verified | real measured remote-client protocol |
+| 22A local | AMD64 | Windows 10 | CPU | Python 3.11 generic command | bounded compatibility smoke | compatibility_verified | unavailable | local bounded validation |
+| 22A local | AMD64 | Windows 10 | NVIDIA GPU detected | PyTorch CPU/CUDA | dependency-preserving runtime probe | unavailable | unavailable | local bounded validation |
+| 22A local | AMD64 | Windows 10 | CPU | ONNX Runtime | dependency-preserving runtime probe | unavailable | unavailable | local bounded validation |
 
 ## Current Evidence Boundaries
 

@@ -8,9 +8,23 @@ proof is detected.
 ## Core Flow
 
 ```text
-controller CLI
--> environment and target inspection
--> workload adapter
+run --auto
+-> platform validate
+-> serving recommendations
+-> ArmTune
+```
+
+`run --auto` is the simplest command-workload entry. Without `--config`, it
+builds an in-memory process-scoped configuration and uses a hard preset budget.
+`platform validate` records sanitized compatibility evidence for the current
+OS, architecture, accelerator, and already-installed runtimes. Serving and
+ArmTune add workload-specific capability, measurement, and recommendation
+protocols without changing the generic entry path.
+
+All performance recommendations still follow the evidence pipeline:
+
+```text
+workload identity
 -> bounded candidate generation
 -> repeated benchmark execution
 -> statistical guard
@@ -26,6 +40,7 @@ controller CLI
 | `autotune.golden_path` | Public `init`, `doctor`, `tune`, `run --auto`, and `run --best` workflows. |
 | `autotune.recommendation` | RecommendationBundle generation, validation, canary, lease, status, rollback, and cache integration. |
 | `autotune.training_adapter` | Dependency-free and PyTorch-backed bounded training slice adapter. |
+| `autotune.platform_validation` | Sanitized, dependency-preserving local platform and runtime compatibility validation. |
 | `autotune.arm_tune` | Arm target inspection, SSH/local target orchestration, `llama.cpp` benchmarking, runtime search, build profiles, and Performance Passport evidence. |
 | `autotune.serving` | Workload-aware `llama-server` capability discovery, traffic profiles, deterministic load generation, Pareto selection, network plans, and serving recommendation guards. |
 | `autotune.system_profiles` | Host state snapshots, Linux system-profile planning, reversible leases, rollback, protocol separation, and boot-profile planning using fake-root validation. |
@@ -77,9 +92,12 @@ Phase 19 does not:
 - add BootTrace qualification logic
 - claim global Arm speedup from one target
 
-## Phase 21A Host System Profile Boundary
+## Advanced Guarded System Experiments
 
-The system-profile layer is separate from workload adapters. It owns:
+The system-profile layer is separate from normal `run --auto` and workload
+adapters. Kernel, boot, and reboot-required profiles are opt-in experiments;
+no public kernel recommendation currently qualifies for general reuse. The
+advanced layer owns:
 
 ```text
 host snapshot
@@ -96,9 +114,6 @@ Phase 21B2 validate bounded reversible C7g real-host profiles with exact
 rollback, artifact revalidation, and protocol-specific ranking. They do not
 produce a performance recommendation because no positive same-protocol
 candidate cleared the configured noise band.
-
-Bootloader writes, kernel installation, reboot-required profiles, and 4K/64K
-kernel comparisons remain future Phase 21C validation work.
 
 ## Phase 21D Serving Path
 

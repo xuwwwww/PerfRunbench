@@ -170,6 +170,22 @@ class PyTorchTrainingAdapterTest(unittest.TestCase):
             self.assertTrue(failures)
             self.assertTrue(any(trial["training_diagnostics"].get("failure_class") == "timeout" for trial in failures))
 
+    def test_total_tuning_budget_returns_partial_report_without_cache_entry(self) -> None:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+            root = Path(temp_dir)
+            script = _write_fixture(root)
+            config = _training_config(root)
+            config["tuning"]["budget_minutes"] = 0.001
+            config_path = root / "autotune_budget.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+
+            result = tune_command(config_path, [sys.executable, str(script)])
+
+            self.assertIn(result["status"], {"inconclusive", "no_eligible_candidate"})
+            self.assertEqual(result["search_budget"]["status"], "exhausted")
+            self.assertTrue(result["search_budget"]["skipped_work"])
+            self.assertNotIn("cache_entry", result)
+
 
 def _write_fixture(root: Path) -> Path:
     script = root / "train_fixture.py"
