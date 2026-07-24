@@ -429,7 +429,8 @@ def _configuration_payload(
 def _constraints(config: dict[str, Any], objective: dict[str, str], evidence: dict[str, Any]) -> dict[str, Any]:
     apply = apply_section(config)
     canary = apply.get("canary", {}) if isinstance(apply.get("canary"), dict) else {}
-    if not canary:
+    metric_source = config.get("metrics", {}).get("source") if isinstance(config.get("metrics"), dict) else None
+    if not canary and metric_source != "process_wall_time":
         baseline = evidence.get("baseline_median")
         if isinstance(baseline, (int, float)):
             canary = {"throughput_metric": objective["metric"], "baseline_throughput_floor": baseline}
