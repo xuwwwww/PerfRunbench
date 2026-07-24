@@ -55,6 +55,7 @@ from autotune.golden_path.cli import (
 )
 from autotune.golden_path.config import PUBLIC_PRESETS
 from autotune.golden_path.doctor import format_doctor_result, run_doctor
+from autotune.platform_validation import add_platform_parser
 from autotune.serving.cli import add_serve_parser
 from autotune.system_profiles.cli import add_system_parser
 from autotune.training_adapter.errors import TrainingConfigError
@@ -121,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_system_parser(subparsers)
     add_serve_parser(subparsers)
+    add_platform_parser(subparsers)
 
     run = subparsers.add_parser("run", help="Run a command with resource monitoring and optional limits.")
     _add_budget_args(run)
