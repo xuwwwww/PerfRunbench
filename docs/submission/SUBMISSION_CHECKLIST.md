@@ -1,66 +1,82 @@
 # Submission Checklist
 
-## Repository
+The checked repository items are reproducible from public files. Devpost form
+items must be checked only after the saved submission is inspected in the
+browser.
 
-- [ ] `main` contains the intended release state.
-- [ ] `v0.2.0` tag exists.
-- [ ] GitHub Release exists.
-- [ ] Release assets are downloadable.
-- [ ] Release asset SHA-256 digests match the verified final artifacts.
-- [ ] README presents PerfRunbench as the main product.
-- [ ] README presents ArmTune as the Arm inference subsystem.
-- [ ] BootTraceBench link is correct.
-- [ ] BootTrace is not in the default tuning workflow.
-- [ ] No unrelated dirty files are included in public history.
-- [ ] License file is present or the limitation is acknowledged.
+## Repository And Release
 
-## Devpost
+- [x] `origin/main` contains the public v0.3.1 release state.
+- [x] `v0.3.1` tag exists.
+- [x] GitHub Release v0.3.1 exists and is public.
+- [x] Wheel and sdist are downloadable.
+- [x] Downloaded release SHA-256 digests match `PROJECT_FACTS.md`.
+- [x] README presents PerfRunbench as the product.
+- [x] README presents ArmTune as the Arm inference subsystem.
+- [x] BootTrace is optional experimental work outside the default path.
+- [x] Root MIT `LICENSE` is present.
+- [x] Public submission files contain no private connection material.
+- [x] Source deck and exported PDF are included.
 
-- [ ] Title: `PerfRunbench`.
-- [ ] Tagline ready.
-- [ ] Full description ready.
-- [ ] Short description ready.
-- [ ] Challenge category selected.
-- [ ] Technologies list ready.
-- [ ] Screenshots uploaded.
-- [ ] Demo video uploaded.
-- [ ] Repository URL added.
-- [ ] Release URL added.
-- [ ] Team member information complete.
-- [ ] Acknowledgements complete.
-- [ ] Limitations included.
+## Devpost Copy
 
-## Evidence
+- [x] English title is ready.
+- [x] English tagline is ready.
+- [x] English short description is ready.
+- [x] English full description is ready.
+- [x] Cloud AI track wording is explicit.
+- [x] Built-with list is ready.
+- [x] Repository URL is ready.
+- [x] v0.3.1 release URL is ready.
+- [x] Limitations and claim boundaries are included.
+- [x] Significant updates since June 10, 2026 are documented.
+- [ ] Project fields saved and re-opened in Devpost.
+- [ ] Cloud AI track selected in Devpost.
+- [ ] Repository and release links saved in Devpost.
+- [ ] Team member and Arm Developer Program registration confirmed by the
+  signed-in account.
 
-- [ ] Measured, synthetic, fixture, and CI smoke evidence are clearly labeled.
-- [ ] C7g llama.cpp build-profile results are not combined with runtime-search
-  results.
-- [ ] `tokens/s` and `samples/s` are never compared directly.
-- [ ] C7g, T4g, and Windows are not ranked by throughput.
-- [ ] No universal-best claim is made.
-- [ ] Synthetic PyTorch results are not described as production training
-  performance.
-- [ ] Arm relevance is clear.
-- [ ] Performance Passport verification is shown.
-- [ ] Guarded apply validation is shown.
-- [ ] Cross-target hard-drift refusal is shown.
+## Screenshots And Slides
 
-## Video
+- [x] Actual public fixture `run --auto` output captured.
+- [x] Fixture screenshot explicitly says it is not performance evidence.
+- [x] Real C7g/T4g result slide is protocol-scoped.
+- [x] Guard and inconclusive behavior are shown.
+- [x] GitHub Actions compatibility screenshot is included.
+- [x] GitHub v0.3.1 release screenshot is included.
+- [x] Submission deck exports to a nine-page PDF.
+- [x] Desktop visual QA reports no overflow.
+- [ ] Final six-image screenshot set uploaded to Devpost, subject to the form's
+  gallery limit.
 
-- [ ] Duration is within the competition limit.
-- [ ] Audio is understandable.
-- [ ] Commands are readable.
-- [ ] No private data is visible.
-- [ ] No long waiting periods are included.
-- [ ] Captions or subtitles are included if useful.
-- [ ] Final call to action shows repository and release links.
+## Evidence Integrity
 
-## Final Safety
+- [x] Measured, synthetic, fixture, and compatibility evidence are separated.
+- [x] Remote serving, build profile, runtime search, and secondary latency
+  protocols are not combined.
+- [x] `tokens/s`, requests/s, and `samples/s` are not compared directly.
+- [x] C7g, T4g, and Windows are not ranked using unrelated protocols.
+- [x] No global-best or universal-speedup claim is made.
+- [x] CI compatibility is not presented as measured Arm performance.
+- [x] Performance Passport verification is documented.
+- [x] Guarded apply and rollback are documented.
+- [x] Cross-target hard-drift refusal is documented.
+- [x] Unsupported network, kernel, compiler, and 64K-page experiments are not
+  presented as eligible improvements.
 
-- [ ] No credentials.
-- [ ] No private IP addresses.
-- [ ] No PEM paths.
-- [ ] No model weights.
-- [ ] No private artifact paths.
-- [ ] No AWS instance is left running for submission work.
-- [ ] No PyPI publication is claimed.
+## Public Safety
+
+- [x] No credentials or tokens.
+- [x] No private or public AWS addresses.
+- [x] No PEM paths or SSH fingerprints.
+- [x] No model files or private model paths.
+- [x] No private artifact paths or local absolute paths in tracked evidence.
+- [x] No PyPI publication is claimed.
+- [x] Submission work requires no running AWS resources.
+- [x] Safety scan and `git diff --check` pass.
+
+## Optional Video
+
+- [x] Video is treated as optional under the competition rules.
+- [x] No placeholder, fake URL, or pending demo QR is submitted.
+- [x] Video is intentionally omitted from this submission package.

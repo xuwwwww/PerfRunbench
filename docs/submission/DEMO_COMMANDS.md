@@ -7,13 +7,13 @@ worktree, or editable installation.
 Use the GitHub Release wheel downloaded from:
 
 ```text
-https://github.com/xuwwwww/PerfRunbench/releases/tag/v0.2.0
+https://github.com/xuwwwww/PerfRunbench/releases/tag/v0.3.1
 ```
 
 ## 1. Create A Temporary Demo Directory
 
 ```powershell
-$DemoRoot = Join-Path $env:TEMP "perfrunbench-v020-demo"
+$DemoRoot = Join-Path $env:TEMP "perfrunbench-v031-demo"
 Remove-Item -LiteralPath $DemoRoot -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $DemoRoot | Out-Null
 Set-Location $DemoRoot
@@ -26,13 +26,13 @@ py -3.11 -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install --upgrade pip
 ```
 
-## 3. Install The v0.2.0 Wheel
+## 3. Install The v0.3.1 Wheel
 
 Replace `<downloads>` with the directory where the public GitHub Release wheel
 was saved.
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install "<downloads>\perfrunbench-0.2.0-py3-none-any.whl"
+& .\.venv\Scripts\python.exe -m pip install "<downloads>\perfrunbench-0.3.1-py3-none-any.whl"
 ```
 
 ## 4. Confirm CLI Availability

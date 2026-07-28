@@ -1,129 +1,78 @@
-# Screenshot Shot List
+# Final Screenshot Set
 
-Use screenshots that are readable on Devpost and in a 16:9 demo video. Redact
-or crop anything private before uploading.
+All screenshots are 16:9 PNG files under
+`docs/submission/assets/devpost/`. They are generated from the checked-in
+Slidev deck after its visual QA pass.
 
-## 1. GitHub Repository Hero
+## Upload Order
 
-- Visible: repository name, README title, quick start, release badge or link.
-- Crop: browser toolbar can remain, but no other personal tabs.
-- Redact: account-only notifications if visible.
-- Aspect ratio: 16:9.
-- Caption: `PerfRunbench repository and quick-start workflow.`
+### 1. Product Overview
 
-## 2. Public Quick Start
+- File: `01-perfrunbench-overview.png`
+- Caption:
+  `PerfRunbench turns bounded search, statistical confirmation, and guarded reuse into one workflow.`
+- Evidence class: project overview plus scoped real-result headline
 
-- Visible: `init`, `doctor`, and `run --auto` commands.
-- Crop: keep only README quick-start section.
-- Redact: none expected.
-- Aspect ratio: 16:9 or 4:3.
-- Caption: `One-command guarded autotuning workflow.`
+### 2. Real Arm Remote Serving Throughput
 
-## 3. Doctor Output
+- File: `02-real-arm-serving-throughput.png`
+- Caption:
+  `On the tested C7g server, T4g remote client, pinned model/runtime, and concurrency-4 protocols, output throughput improved by 69.375%-86.490%.`
+- Evidence class: measured
+- Scope: C7g server, T4g remote client, Qwen2.5-7B Q4_K_M, pinned
+  llama-server, direct private path, concurrency 4
 
-- Visible: readiness checks, config accepted, no workload launch.
-- Crop: terminal only.
-- Redact: local absolute paths.
-- Aspect ratio: 16:9.
-- Caption: `Doctor validates workload readiness before tuning.`
+### 3. Real Arm Remote Serving Latency And Reliability
 
-## 4. First Auto Run Cache Miss
+- File: `03-real-arm-serving-latency.png`
+- Caption:
+  `The same scoped remote validation reduced p95 TTFT by 91.128%-98.001% across three workloads, with 608 measured requests and zero failures.`
+- Evidence class: measured
 
-- Visible: cache miss, bounded tuning start, candidate count.
-- Crop: terminal only.
-- Redact: local absolute paths.
-- Aspect ratio: 16:9.
-- Caption: `First run performs bounded tuning on cache miss.`
+### 4. Actual Config-Free Run
 
-## 5. Selected Candidate
+- File: `04-public-fixture-run-auto.png`
+- Caption:
+  `An actual public fixture run demonstrates config-free run --auto; fixture output is not performance evidence.`
+- Evidence class: `test_fixture`
+- Source command:
 
-- Visible: selected candidate or explicit inconclusive status, confirmation
-  summary, noise-band decision.
-- Crop: terminal or result document only.
-- Redact: private paths.
-- Aspect ratio: 16:9.
-- Caption: `PerfRunbench recommends only eligible measured candidates.`
+  ```bash
+  autotuneai run --auto --preset quick -- python app.py
+  ```
 
-## 6. Second Auto Run Cache Hit
+### 5. Recommendation Guards
 
-- Visible: cache hit, no retuning, environment validation.
-- Crop: terminal only.
-- Redact: local absolute paths.
-- Aspect ratio: 16:9.
-- Caption: `Exact cache reuse avoids unnecessary retuning.`
+- File: `05-recommendation-guards.png`
+- Caption:
+  `Hard drift, noise-band, cleanup, and no-evidence guards prevent unsafe recommendations.`
+- Evidence class: product safety behavior
 
-## 7. Performance Passport Verification
+### 6. Arm And Platform Validation
 
-- Visible: Passport status, verification passed, artifact manifest.
-- Crop: public evidence document.
-- Redact: any private local path if displayed.
-- Aspect ratio: 16:9.
-- Caption: `Performance Passport keeps recommendation evidence auditable.`
+- File: `06-arm-and-platform-validation.png`
+- Caption:
+  `Real Arm64 performance evidence is separated from installed-wheel compatibility validation on Windows, Linux x86-64, and Linux Arm64.`
+- Evidence class: scoped Arm evidence plus compatibility, clearly separated
 
-## 8. Environment Hard-Drift Refusal
+## Supporting Assets
 
-- Visible: hard drift or incompatible environment, no `run --best` launch.
-- Crop: terminal or validation matrix.
-- Redact: private host details.
-- Aspect ratio: 16:9.
-- Caption: `Recommendations are refused on incompatible environments.`
+- Deck source:
+  `docs/submission/arm-ai-challenge-deck/slides.md`
+- Exported PDF:
+  `docs/submission/arm-ai-challenge-deck/PerfRunbench-Arm-AI-Challenge.pdf`
+- Raw fixture output:
+  `docs/submission/evidence/public_fixture_run_auto.json`
+- Screenshot provenance:
+  `docs/submission/evidence/SCREENSHOT_PROVENANCE.md`
 
-## 9. Architecture Diagram
+## Never Include
 
-- Visible: full diagram from command to cleanup or rollback.
-- Crop: generated diagram only.
-- Redact: none expected.
-- Aspect ratio: 16:9.
-- Caption: `PerfRunbench guarded autotuning architecture.`
-
-## 10. C7g llama Before/After Chart
-
-- Visible: baseline, selected, `+28.25% observed decode throughput`.
-- Crop: chart only.
-- Redact: none expected.
-- Aspect ratio: 16:9.
-- Caption: `Protocol-specific Arm inference runtime tuning result.`
-
-## 11. C7g PyTorch Before/After Chart
-
-- Visible: baseline, selected, synthetic CPU-only workload footnote.
-- Crop: chart only.
-- Redact: none expected.
-- Aspect ratio: 16:9.
-- Caption: `Synthetic PyTorch guard workflow on C7g Arm64.`
-
-## 12. Validation Matrix
-
-- Visible: C7g, T4g, Windows rows and pass states.
-- Crop: chart only.
-- Redact: none expected.
-- Aspect ratio: 16:9.
-- Caption: `Multi-target validation matrix without cross-machine ranking.`
-
-## 13. GitHub v0.2.0 Release
-
-- Visible: title, tag, assets, release state.
-- Crop: release page content only.
-- Redact: account-only controls if visible.
-- Aspect ratio: 16:9.
-- Caption: `Published GitHub Release with verified wheel and sdist.`
-
-## 14. Test And CI Success
-
-- Visible: GitHub Actions release validation success across Windows, Linux, and
-  Arm64.
-- Crop: action run summary or job matrix.
-- Redact: none expected.
-- Aspect ratio: 16:9.
-- Caption: `Installed-wheel validation across Windows, Linux, and Arm64 CI.`
-
-## Never Show
-
-- AWS IP addresses.
-- PEM paths.
-- Private cache paths.
-- Absolute user paths.
-- Hidden artifact directories.
-- Keys, credentials, or tokens.
-- Model weight paths.
-
+- AWS public or private addresses
+- SSH key paths or host-key fingerprints
+- Security Group IDs
+- cloud credentials or tokens
+- model paths or model weights
+- private artifact directories
+- local absolute paths
+- browser account-only controls

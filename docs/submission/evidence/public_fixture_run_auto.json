@@ -1,0 +1,9 @@
+{
+    "auto_status":  "no_eligible_candidate",
+    "newly_tuned":  false,
+    "reason":  "tuning completed without an eligible recommendation; baseline command executed",
+    "return_code":  0,
+    "run_dir":  ".autotuneai\\runs\\20260728_105806_338978",
+    "schema_version":  "1.0",
+    "status":  "completed"
+}
