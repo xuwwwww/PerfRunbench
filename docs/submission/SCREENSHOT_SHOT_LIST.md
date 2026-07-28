@@ -55,6 +55,15 @@ Slidev deck after its visual QA pass.
   `Real Arm64 performance evidence is separated from installed-wheel compatibility validation on Windows, Linux x86-64, and Linux Arm64.`
 - Evidence class: scoped Arm evidence plus compatibility, clearly separated
 
+### 7. Real T4g Training Tuning Evidence
+
+- File: `07-t4g-training-tuning-evidence.png`
+- Caption:
+  `On one T4g.small and one public synthetic CPU PyTorch protocol, 12 paired confirmations measured 14,430 to 33,275 samples/s while preserving failures, CPU-credit state, and guard evidence.`
+- Evidence class: measured synthetic-workload guard and workflow evidence
+- Scope: one T4g.small, CPU-only PyTorch 2.13.0, fixed effective batch size 32,
+  5,000-step slices, 12 paired confirmations, T4g Unlimited surplus state
+
 ## Supporting Assets
 
 - Deck source:

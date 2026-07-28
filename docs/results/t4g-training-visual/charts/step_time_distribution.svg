@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="560" viewBox="0 0 1100 560" role="img" aria-label="Confirmation step-time distribution">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<style>.title{font:700 30px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.label{font:600 16px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 15px Segoe UI,Arial,sans-serif;fill:#0f172a}.axis{font:700 19px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:15px Segoe UI,Arial,sans-serif;fill:#64748b}.badge{font:700 16px Segoe UI,Arial,sans-serif;fill:#fff}</style>
+<text x="70" y="58" class="title">Confirmation step-time distribution</text>
+<text x="70" y="91" class="subtitle">Lower is better; values come from the same paired runs as throughput.</text>
+<line x1="360" y1="259.36" x2="360" y2="150.00" stroke="#0f172a" stroke-width="3"/>
+<rect x="285" y="241.36" width="150" height="13.20" fill="#2563eb" opacity=".22" stroke="#2563eb" stroke-width="3"/>
+<line x1="285" y1="251.12" x2="435" y2="251.12" stroke="#2563eb" stroke-width="5"/>
+<circle cx="360" cy="253.33" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="150.00" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="259.22" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="238.48" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="231.62" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="253.34" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="251.90" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="250.33" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="242.32" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="259.36" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="249.10" r="5" fill="#2563eb" opacity=".65"/>
+<circle cx="360" cy="258.22" r="5" fill="#2563eb" opacity=".65"/>
+<text x="360" y="475" text-anchor="middle" class="axis">Baseline</text>
+<text x="360" y="510" text-anchor="middle" class="note">median 2.218 ms/step</text>
+<line x1="750" y1="400.00" x2="750" y2="385.92" stroke="#0f172a" stroke-width="3"/>
+<rect x="675" y="392.94" width="150" height="5.40" fill="#dc2626" opacity=".22" stroke="#dc2626" stroke-width="3"/>
+<line x1="675" y1="394.70" x2="825" y2="394.70" stroke="#dc2626" stroke-width="5"/>
+<circle cx="750" cy="400.00" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="398.62" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="395.00" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="398.69" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="398.25" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="393.03" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="385.92" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="394.39" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="392.69" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="395.95" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="391.04" r="5" fill="#dc2626" opacity=".65"/>
+<circle cx="750" cy="394.31" r="5" fill="#dc2626" opacity=".65"/>
+<text x="750" y="475" text-anchor="middle" class="axis">Selected</text>
+<text x="750" y="510" text-anchor="middle" class="note">median 0.962 ms/step</text>
+</svg>

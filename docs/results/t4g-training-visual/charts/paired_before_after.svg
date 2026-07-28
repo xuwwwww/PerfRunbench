@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620" role="img" aria-label="Paired before and after">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<style>.title{font:700 30px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.label{font:600 16px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 15px Segoe UI,Arial,sans-serif;fill:#0f172a}.axis{font:700 19px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:15px Segoe UI,Arial,sans-serif;fill:#64748b}.badge{font:700 16px Segoe UI,Arial,sans-serif;fill:#fff}</style>
+<text x="70" y="58" class="title">Paired before and after</text>
+<text x="70" y="91" class="subtitle">Each line is one fresh baseline/selected confirmation pair.</text>
+<line x1="290" y1="120" x2="290" y2="500" stroke="#e2e8f0" stroke-width="2"/>
+<line x1="810" y1="120" x2="810" y2="500" stroke="#e2e8f0" stroke-width="2"/>
+<line x1="290" y1="417.41" x2="810" y2="146.21" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="417.41" r="6" fill="#2563eb"/>
+<circle cx="810" cy="146.21" r="6" fill="#dc2626"/>
+<line x1="290" y1="473.79" x2="810" y2="152.25" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="473.79" r="6" fill="#2563eb"/>
+<circle cx="810" cy="152.25" r="6" fill="#dc2626"/>
+<line x1="290" y1="412.77" x2="810" y2="167.39" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="412.77" r="6" fill="#2563eb"/>
+<circle cx="810" cy="167.39" r="6" fill="#dc2626"/>
+<line x1="290" y1="428.21" x2="810" y2="151.95" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="428.21" r="6" fill="#2563eb"/>
+<circle cx="810" cy="151.95" r="6" fill="#dc2626"/>
+<line x1="290" y1="432.80" x2="810" y2="153.85" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="432.80" r="6" fill="#2563eb"/>
+<circle cx="810" cy="153.85" r="6" fill="#dc2626"/>
+<line x1="290" y1="417.41" x2="810" y2="175.23" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="417.41" r="6" fill="#2563eb"/>
+<circle cx="810" cy="175.23" r="6" fill="#dc2626"/>
+<line x1="290" y1="418.51" x2="810" y2="201.32" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="418.51" r="6" fill="#2563eb"/>
+<circle cx="810" cy="201.32" r="6" fill="#dc2626"/>
+<line x1="290" y1="419.70" x2="810" y2="169.85" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="419.70" r="6" fill="#2563eb"/>
+<circle cx="810" cy="169.85" r="6" fill="#dc2626"/>
+<line x1="290" y1="425.53" x2="810" y2="176.55" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="425.53" r="6" fill="#2563eb"/>
+<circle cx="810" cy="176.55" r="6" fill="#dc2626"/>
+<line x1="290" y1="412.66" x2="810" y2="163.51" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="412.66" r="6" fill="#2563eb"/>
+<circle cx="810" cy="163.51" r="6" fill="#dc2626"/>
+<line x1="290" y1="420.62" x2="810" y2="182.86" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="420.62" r="6" fill="#2563eb"/>
+<circle cx="810" cy="182.86" r="6" fill="#dc2626"/>
+<line x1="290" y1="413.58" x2="810" y2="170.19" stroke="#94a3b8" stroke-width="2" opacity=".7"/>
+<circle cx="290" cy="413.58" r="6" fill="#2563eb"/>
+<circle cx="810" cy="170.19" r="6" fill="#dc2626"/>
+<text x="290" y="540" text-anchor="middle" class="axis">Baseline</text>
+<text x="810" y="540" text-anchor="middle" class="axis">Selected</text>
+<text x="550" y="580" text-anchor="middle" class="note">12 pairs | median delta 128.172%</text>
+</svg>

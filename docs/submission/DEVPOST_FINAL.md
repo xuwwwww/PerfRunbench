@@ -127,6 +127,15 @@ Public synthetic PyTorch workloads validate semantics preservation,
 low-resource guards, cache reuse, and hard-drift refusal on Arm and Windows.
 They are not production training performance claims.
 
+A separate clean measured T4g.small protocol used CPU-only PyTorch 2.13.0,
+fixed effective batch size 32, 5,000-step slices, and 12 paired confirmations.
+It measured a baseline median of 14,430.040 samples/s and a selected median of
+33,274.800 samples/s. The ratio-of-medians improvement was 130.593958%, with
+3.360982% selected variability. Four stalled DataLoader-worker trials remained
+explicit failures. The result discloses that the burstable target ran with
+zero CPU credit balance and T4g Unlimited surplus capacity. It is not combined
+with C7g or llama.cpp results and is not a production training claim.
+
 ### Why It Matters
 
 PerfRunbench makes performance work reviewable. Instead of handing a user a

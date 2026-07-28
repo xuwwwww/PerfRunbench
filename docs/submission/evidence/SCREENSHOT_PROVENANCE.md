@@ -59,3 +59,35 @@ media box 735.12 x 414 points
 
 Visual QA checked all nine slides at 1366x768 and 1920x1080. It reported zero
 overflow failures.
+
+## T4g Training Visual Evidence
+
+The seventh screenshot was rendered with headless Chrome at 1920x1080 from the
+sanitized checked-in HTML report. Its source is clean measured run:
+
+```text
+run_id: 20260728_142936_906425
+source_commit: 43781a0dcafa58c24778ad310920a5c2c6196839
+result_origin: measured
+paired_confirmations: 12
+```
+
+The HTML renderer displays only the source filename, not a local absolute
+path. The screenshot contains no AWS address, resource ID, SSH material,
+account identifier, model path, or private artifact path.
+
+Final artifacts:
+
+```text
+07-t4g-training-tuning-evidence.png
+SHA-256 4460f157a929ff0a6800a6e830dfc9a7f5fcaa69eb2347c03c118ddc14a2dd98
+
+training_tuning_report.html
+SHA-256 86d01dcee6ded74c6e13d85f43888a133b44469b6dcced7f2fd529cb823cac48
+
+training_summary.json
+SHA-256 53083edbee9e3d579c71ae4bbec3a72b0b98b332a0861a9d312535025cc91021
+
+paired_confirmation.csv
+SHA-256 0a4c0de57f462cbb0885cbf9c949b2105fe94c294438bcaa77567f1af9c69848
+```

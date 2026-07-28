@@ -133,13 +133,16 @@ Screen:
 - `docs/submission/assets/c7g_llama_runtime_before_after.png`
 - `docs/submission/assets/c7g_pytorch_before_after.png`
 - `docs/submission/assets/multitarget_validation_summary.png`
+- `docs/results/t4g-training-visual/charts/paired_before_after.png`
+- `docs/results/t4g-training-visual/charts/guard_summary.png`
 
 Narration:
 
 > The real evidence is protocol-specific. C7g llama.cpp runtime search measured
 > 13.630 to 17.480 tokens per second under one inference protocol. Synthetic
-> PyTorch validations exercise the guard and cache workflow; they are not
-> production training claims.
+> PyTorch validations exercise the guard and cache workflow; a separate clean
+> T4g protocol measured 12 paired confirmations and preserved four stalled
+> trials. It is not a production training claim and is not combined with C7g.
 
 ### 02:30-02:50 - Passport And Guarded Apply
 

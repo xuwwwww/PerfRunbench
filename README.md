@@ -339,6 +339,40 @@ docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md
 docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md
 ```
 
+## Low-Resource Arm Training Evidence
+
+A separate measured T4g.small protocol validates the public CPU-only synthetic
+PyTorch adapter, bounded search, failed-candidate preservation, paired
+confirmation, cache reuse, budget exhaustion, rollback, and visual evidence
+export.
+
+| Metric | Baseline | Selected |
+| --- | ---: | ---: |
+| median throughput | `14,430.040 samples/s` | `33,274.800 samples/s` |
+| median step time | `2.218 ms` | `0.962 ms` |
+
+```text
+paired confirmations: 12
+ratio-of-medians improvement: 130.593958%
+median paired improvement: 128.172176%
+selected variability: 3.360982%
+failed DataLoader-worker trials preserved: 4
+```
+
+![T4g paired training confirmation](docs/results/t4g-training-visual/charts/paired_before_after.png)
+
+This is one burstable T4g.small and one public synthetic CPU PyTorch
+measurement protocol. It is not a production training benchmark, must not be
+compared directly with C7g, and is not a general PyTorch or Arm speedup claim.
+The CPU credit and surplus state is recorded with the result.
+
+Detailed evidence and reusable chart data:
+
+```text
+docs/results/T4G_TRAINING_VISUAL_EVIDENCE.md
+docs/results/t4g-training-visual/
+```
+
 Phase 19 CPU-aware build tuning design documents:
 
 ```text

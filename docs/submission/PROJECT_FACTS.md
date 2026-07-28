@@ -149,6 +149,25 @@ Synthetic PyTorch workloads validated tuning mechanics and guard behavior on
 C7g Arm64, T4g Arm64, and Windows x86-64. Those values are not production
 training performance claims and must not be compared across targets.
 
+A clean measured T4g.small visual-evidence protocol added stronger
+distribution and guard evidence:
+
+```text
+baseline median: 14,430.039978 samples/s
+selected median: 33,274.800277 samples/s
+ratio-of-medians improvement: 130.593958%
+median paired improvement: 128.172176%
+paired confirmations: 12
+selected variability: 3.360982%
+failed DataLoader-worker trials preserved: 4
+```
+
+This claim is limited to one T4g.small, CPU-only PyTorch 2.13.0, the public
+synthetic workload, fixed effective batch size 32, and the recorded slice and
+measurement protocol. CPU credit balance was zero throughout the clean run;
+the run used T4g Unlimited surplus capacity, which is disclosed in the
+evidence. It is not combined with C7g or llama.cpp results.
+
 ## Safety And Guard Evidence
 
 - Hard environment drift prevents recommendation reuse.
@@ -195,6 +214,7 @@ The repository history and evidence documents preserve these changes.
 - `docs/results/PHASE_15A_T4G_LOW_RESOURCE_VALIDATION.md`
 - `docs/results/PHASE_15B_T4G_REAL_PYTORCH_VALIDATION.md`
 - `docs/results/PHASE_15C_WINDOWS_X86_PYTORCH_VALIDATION.md`
+- `docs/results/T4G_TRAINING_VISUAL_EVIDENCE.md`
 - `docs/results/VALIDATED_PERFORMANCE_SUMMARY.md`
 - `docs/results/VALIDATION_MATRIX.md`
 - `docs/releases/v0.3.1.md`

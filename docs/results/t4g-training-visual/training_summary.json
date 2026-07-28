@@ -1,0 +1,69 @@
+{
+  "baseline_samples_per_second": {
+    "count": 12,
+    "max": 14914.619017849798,
+    "median": 14430.039977584107,
+    "min": 10315.534369175426,
+    "p95": 14909.96224987394,
+    "q1": 13895.842627278167,
+    "q3": 14629.761430454173
+  },
+  "baseline_step_time_ms": {
+    "count": 12,
+    "max": 3.1021175302000303,
+    "median": 2.2176173181000194,
+    "min": 2.1455459212000276,
+    "p95": 2.709448668890004,
+    "q1": 2.1874794784499727,
+    "q3": 2.302938262800035
+  },
+  "candidate_count": 5,
+  "claim_boundary": "Best observed eligible configuration under the tested training workload, slice protocol, and measurement protocol.",
+  "classification": "improved",
+  "failed_trial_count": 4,
+  "kind": "pytorch_training_visual_summary",
+  "noise_band_percent": 5.0,
+  "paired_confirmation_count": 12,
+  "paired_improvement_percent": {
+    "count": 12,
+    "max": 234.50986529474272,
+    "median": 128.17217597042696,
+    "min": 112.8870549361562,
+    "p95": 191.67371471695913,
+    "q1": 124.67205072214635,
+    "q3": 142.92526659069867
+  },
+  "result_origin": "measured",
+  "schema_version": "1.0",
+  "search_budget": {
+    "elapsed_seconds": 584.67673,
+    "limit_seconds": 1800.0,
+    "remaining_seconds": 1215.323266,
+    "schema_version": "1.0",
+    "skipped_work": [],
+    "status": "completed"
+  },
+  "selected_candidate_id": "micro_batch_size_32_gradient_accumulation_1",
+  "selected_samples_per_second": {
+    "count": 12,
+    "max": 34960.88374209623,
+    "median": 33274.80027697078,
+    "min": 30814.76819960358,
+    "p95": 34723.37699078509,
+    "q1": 32752.512316444903,
+    "q3": 34416.29258868014
+  },
+  "selected_step_time_ms": {
+    "count": 12,
+    "max": 1.0384631093999817,
+    "median": 0.9616961286999867,
+    "min": 0.9153086699999222,
+    "p95": 1.0138327493600128,
+    "q1": 0.9297943129000033,
+    "q3": 0.9770259567500034
+  },
+  "selected_variability_percent": 3.3609819817590108,
+  "source_run_id": "20260728_142936_906425",
+  "status": "recommended",
+  "valid_trial_count": 41
+}
