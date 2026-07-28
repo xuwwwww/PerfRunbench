@@ -242,6 +242,8 @@ validation chronology.
 
 ## Links
 
+- Devpost:
+  `https://devpost.com/software/project-9d2tryln4vo7`
 - Repository: `https://github.com/xuwwwww/PerfRunbench`
 - GitHub Release: `https://github.com/xuwwwww/PerfRunbench/releases/tag/v0.3.1`
 - Release validation:

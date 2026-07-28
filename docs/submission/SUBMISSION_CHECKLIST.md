@@ -30,11 +30,12 @@ browser.
 - [x] v0.3.1 release URL is ready.
 - [x] Limitations and claim boundaries are included.
 - [x] Significant updates since June 10, 2026 are documented.
-- [ ] Project fields saved and re-opened in Devpost.
-- [ ] Cloud AI track selected in Devpost.
-- [ ] Repository and release links saved in Devpost.
-- [ ] Team member and Arm Developer Program registration confirmed by the
-  signed-in account.
+- [x] Project fields saved and re-opened in Devpost.
+- [x] Cloud AI track explicitly identified in the Devpost story.
+- [x] Repository and release links saved in Devpost.
+- [x] Signed-in Devpost account and individual team entry confirmed.
+- [ ] Arm Developer Program registration must be confirmed in the entrant's
+  separate Arm account.
 
 ## Screenshots And Slides
 
@@ -46,8 +47,17 @@ browser.
 - [x] GitHub v0.3.1 release screenshot is included.
 - [x] Submission deck exports to a nine-page PDF.
 - [x] Desktop visual QA reports no overflow.
-- [ ] Final six-image screenshot set uploaded to Devpost, subject to the form's
-  gallery limit.
+- [x] Final six-image screenshot set uploaded to Devpost.
+
+## Submission Status
+
+- [x] Official Rules and Devpost Terms accepted by the entrant.
+- [x] Project submitted to the Arm Create: AI Optimization Challenge.
+- [x] Submitted project page:
+  `https://devpost.com/software/project-9d2tryln4vo7`
+- [x] Anonymous HTTP access to the project page returns `200`.
+- [x] Public preview shows the Cloud AI track, six screenshots, repository link,
+  scoped Arm performance evidence, and no video embed.
 
 ## Evidence Integrity
 
