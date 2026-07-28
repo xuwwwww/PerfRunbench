@@ -133,13 +133,23 @@ Screen:
 - `docs/submission/assets/c7g_llama_runtime_before_after.png`
 - `docs/submission/assets/c7g_pytorch_before_after.png`
 - `docs/submission/assets/multitarget_validation_summary.png`
+- `docs/results/c7g4xlarge-realistic/arm_inference_report_overview.png`
+- `docs/results/c7g4xlarge-realistic/charts/serving_before_after.svg`
+- `docs/results/c7g4xlarge-realistic/charts/guard_summary.svg`
+- `docs/results/t4g-training-visual/charts/paired_before_after.png`
+- `docs/results/t4g-training-visual/charts/guard_summary.png`
 
 Narration:
 
 > The real evidence is protocol-specific. C7g llama.cpp runtime search measured
 > 13.630 to 17.480 tokens per second under one inference protocol. Synthetic
-> PyTorch validations exercise the guard and cache workflow; they are not
-> production training claims.
+> PyTorch validations exercise the guard and cache workflow; a separate clean
+> T4g protocol measured 12 paired confirmations and preserved four stalled
+> trials. On a separate larger C7g.4xlarge loopback protocol, fifteen-thread
+> llama-bench scaling reached about 10.9 times the one-thread throughput. At
+> concurrency eight, slots4-cont-on improved eligible interactive and decode
+> throughput by 70.749 to 80.331 percent, while prefill regressed and was
+> rejected. These separate protocols are not combined.
 
 ### 02:30-02:50 - Passport And Guarded Apply
 
@@ -183,3 +193,6 @@ If the live fixture demo is too slow or terminal output is hard to read:
    `previously measured real evidence`.
 4. Do not include AWS console pages, IP addresses, PEM paths, private cache
    paths, or model file paths.
+
+The larger-target saved-evidence segment can be recorded independently by
+following `docs/demo/C7G4XLARGE_VISUAL_EVIDENCE_DEMO.md`.

@@ -109,6 +109,39 @@ slice protocol, and measurement protocol.
 PerfRunbench does not claim global optimality and does not convert failed,
 stalled, or invalid-metric candidates into zero-valued measurements.
 
+## Visual Evidence Export
+
+`report-training` converts an existing versioned training tuning result into
+reusable evidence without changing the underlying benchmark data:
+
+```bash
+autotuneai report-training \
+  --input .autotuneai/runs/<run-id>/pytorch_training/tuning_result.json \
+  --output-dir results/reports/training-visuals
+```
+
+The command writes:
+
+- an HTML before/after report
+- trial-level CSV
+- paired-confirmation CSV
+- a versioned summary JSON
+- standalone SVG charts for candidate ranking, paired before/after,
+  distributions, and guard status
+- an optional T4g CPU-credit timeline when normalized CloudWatch JSON is
+  supplied with `--cloudwatch`
+
+The public bounded T4g experiment configuration is:
+
+```text
+configs/experiments/t4g_training_visualization.yaml
+```
+
+This report is an evidence view, not a second source of benchmark truth.
+Search, warm-up, confirmation, failed, and guard records retain their original
+roles. Results from different targets or workload protocols must not be
+combined into one improvement claim.
+
 ## Real Arm Validation
 
 Phase 14B validated the adapter on a real Linux Arm64 / Neoverse-V1 target with

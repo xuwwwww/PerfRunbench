@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="456" viewBox="0 0 1100 456" role="img" aria-label="Candidate search throughput">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<style>.title{font:700 30px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.label{font:600 16px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 15px Segoe UI,Arial,sans-serif;fill:#0f172a}.axis{font:700 19px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:15px Segoe UI,Arial,sans-serif;fill:#64748b}.badge{font:700 16px Segoe UI,Arial,sans-serif;fill:#fff}</style>
+<text x="70" y="58" class="title">Candidate search throughput</text>
+<text x="70" y="91" class="subtitle">Median bar with min/max whisker across valid search trials.</text>
+<text x="70" y="170" class="label">batch 32 / accumulation 1</text>
+<rect x="350" y="146" width="424.73" height="34" rx="6" fill="#2563eb"/>
+<line x1="764.54" y1="163" x2="787.59" y2="163" stroke="#0f172a" stroke-width="3"/>
+<text x="1010" y="170" text-anchor="end" class="value">34,509.866 samples/s</text>
+<text x="70" y="244" class="label">batch 16 / accumulation 2</text>
+<rect x="350" y="220" width="263.17" height="34" rx="6" fill="#2563eb"/>
+<line x1="574.95" y1="237" x2="621.37" y2="237" stroke="#0f172a" stroke-width="3"/>
+<text x="1010" y="244" text-anchor="end" class="value">20,298.540 samples/s</text>
+<text x="70" y="318" class="label">baseline: batch 8 / accumulation 4</text>
+<rect x="350" y="294" width="189.64" height="34" rx="6" fill="#2563eb"/>
+<line x1="537.40" y1="311" x2="543.59" y2="311" stroke="#0f172a" stroke-width="3"/>
+<text x="1010" y="318" text-anchor="end" class="value">13,830.558 samples/s</text>
+<text x="70" y="392" class="label">OMP threads 2</text>
+<rect x="350" y="368" width="176.79" height="34" rx="6" fill="#2563eb"/>
+<line x1="513.75" y1="385" x2="529.85" y2="385" stroke="#0f172a" stroke-width="3"/>
+<text x="1010" y="392" text-anchor="end" class="value">12,699.763 samples/s</text>
+</svg>

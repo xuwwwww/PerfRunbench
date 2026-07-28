@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PerfRunbench Training Tuning Evidence</title>
+<style>
+:root{--ink:#0f172a;--muted:#64748b;--line:#dbe3ee;--surface:#f8fafc;--blue:#2563eb;--red:#dc2626}
+*{box-sizing:border-box} body{margin:0;background:#fff;color:var(--ink);font-family:Segoe UI,Arial,sans-serif}
+.page{max-width:1180px;margin:0 auto;padding:32px 28px 48px}
+.hero{border-bottom:3px solid var(--ink);padding-bottom:22px;margin-bottom:24px}
+.eyebrow{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--blue);margin:0 0 8px}
+h1{font-size:42px;line-height:1.08;margin:0 0 12px} h2{font-size:21px;margin:0 0 14px}
+.lede,.note{color:var(--muted);max-width:920px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.stat,.panel{border:1px solid var(--line);border-radius:8px;background:#fff}
+.stat{padding:14px} .label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.value{font-size:21px;font-weight:700;word-break:break-word} .panel{padding:18px;margin-bottom:16px}
+.panel img{display:block;width:100%;height:auto} table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--muted);text-transform:uppercase}
+code{font-family:Cascadia Mono,Consolas,monospace;font-size:.92em}
+@media(max-width:760px){.page{padding:20px 12px}.stats{grid-template-columns:1fr 1fr}h1{font-size:32px}}
+</style>
+</head>
+<body>
+<main class="page">
+<header class="hero">
+<p class="eyebrow">PerfRunbench measured evidence</p>
+<h1>Training tuning before and after</h1>
+<p class="lede">Repeated paired confirmation from one bounded PyTorch training protocol. Search trials, warm-up trials, failures, guards, and cleanup evidence remain separate.</p>
+</header>
+<section class="stats">
+<div class="stat"><span class="label">Baseline median</span><span class="value">14,430.040 samples/s</span></div>
+<div class="stat"><span class="label">Selected median</span><span class="value">33,274.800 samples/s</span></div>
+<div class="stat"><span class="label">Paired median delta</span><span class="value">128.172%</span></div>
+<div class="stat"><span class="label">Paired confirmations</span><span class="value">12</span></div>
+</section>
+<section class="panel">
+<h2>Evidence boundary</h2>
+<table><tbody>
+<tr><th>Source</th><td><code>tuning_result.json</code></td></tr>
+<tr><th>Run ID</th><td><code>20260728_142936_906425</code></td></tr>
+<tr><th>Result origin</th><td><code>measured</code></td></tr>
+<tr><th>Status</th><td><code>recommended</code></td></tr>
+<tr><th>Selected candidate</th><td><code>micro_batch_size_32_gradient_accumulation_1</code></td></tr>
+<tr><th>Noise band</th><td>5.000%</td></tr>
+<tr><th>Claim boundary</th><td>Best observed eligible configuration under the tested training workload, slice protocol, and measurement protocol.</td></tr>
+</tbody></table>
+<p class="note">A result from one T4g.small and a synthetic CPU PyTorch workload is not a general PyTorch or Arm speedup claim. C7g and llama.cpp evidence use different protocols and must not be combined with this result.</p>
+</section>
+<section class="panel"><h2>Candidate Ranking</h2><img src="charts/candidate_ranking.svg" alt="Candidate Ranking"></section>
+<section class="panel"><h2>Paired Before After</h2><img src="charts/paired_before_after.svg" alt="Paired Before After"></section>
+<section class="panel"><h2>Throughput Distribution</h2><img src="charts/throughput_distribution.svg" alt="Throughput Distribution"></section>
+<section class="panel"><h2>Step Time Distribution</h2><img src="charts/step_time_distribution.svg" alt="Step Time Distribution"></section>
+<section class="panel"><h2>Guard Summary</h2><img src="charts/guard_summary.svg" alt="Guard Summary"></section>
+<section class="panel"><h2>Cpu Credit Timeline</h2><img src="charts/cpu_credit_timeline.svg" alt="Cpu Credit Timeline"></section>
+<section class="panel">
+<h2>Statistical guards</h2>
+<table><thead><tr><th>Stage</th><th>Code</th><th>Status</th><th>Message</th></tr></thead><tbody><tr><td>trial</td><td>failed_trials_preserved</td><td>warn</td><td>4 failed trial(s) are preserved in statistical evidence.</td></tr><tr><td>trial</td><td>warmup_excluded</td><td>pass</td><td>1 warm-up trial(s) were excluded.</td></tr><tr><td>trial</td><td>contaminated_trials_excluded</td><td>pass</td><td>No contaminated trials were recorded.</td></tr><tr><td>recommendation</td><td>min_valid_trials</td><td>pass</td><td>Baseline confirmation has enough valid samples.</td></tr><tr><td>recommendation</td><td>min_valid_trials</td><td>pass</td><td>Selected confirmation has enough valid samples.</td></tr><tr><td>recommendation</td><td>paired_baseline_evidence</td><td>pass</td><td>12 paired confirmation sample(s) were found.</td></tr><tr><td>recommendation</td><td>improvement_outside_noise_band</td><td>pass</td><td>Median improvement 130.593958% is outside the 5.000000% noise band.</td></tr><tr><td>recommendation</td><td>consistent_confirmation_direction</td><td>pass</td><td>Paired confirmation direction was consistent.</td></tr><tr><td>recommendation</td><td>variability_threshold</td><td>pass</td><td>Selected variability is within the configured threshold.</td></tr></tbody></table>
+</section>
+</main>
+</body>
+</html>

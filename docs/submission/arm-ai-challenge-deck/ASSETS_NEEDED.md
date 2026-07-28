@@ -33,7 +33,7 @@ URL or placeholder demo QR.
 
 ### GitHub Actions Screenshot
 
-- Slide: 8
+- Slide: 10
 - Source:
   `https://github.com/xuwwwww/PerfRunbench/actions/runs/30234620475`
 - Must show the successful Windows x86-64, Ubuntu x86-64, and Ubuntu Arm64
@@ -41,7 +41,7 @@ URL or placeholder demo QR.
 
 ### GitHub Release Screenshot
 
-- Slide: 9
+- Slide: 11
 - Source:
   `https://github.com/xuwwwww/PerfRunbench/releases/tag/v0.3.1`
 - Must show the release title, published state, and assets without account-only
@@ -49,11 +49,26 @@ URL or placeholder demo QR.
 
 ### Repository QR Code
 
-- Slide: 9
+- Slide: 11
 - Encodes:
   `https://github.com/xuwwwww/PerfRunbench`
 - Asset:
   `public/assets/repository-qr.svg`
+
+### C7g.4xlarge Measured Charts
+
+- Slides: 7 and 8
+- Assets:
+  - `public/assets/c7g4xlarge-thread-scaling.svg`
+  - `public/assets/c7g4xlarge-serving-before-after.svg`
+- Generated from:
+  `docs/results/c7g4xlarge-realistic/arm_inference_summary.json`
+- Source evidence:
+  `docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md`
+- Classification: measured Arm64 evidence
+- Claim boundary: one C7g.4xlarge, pinned model and binary, declared
+  llama-bench and loopback protocols; no cross-instance or remote-network
+  claim
 
 ## Never Include
 

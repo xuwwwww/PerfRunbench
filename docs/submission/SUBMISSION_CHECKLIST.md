@@ -45,9 +45,11 @@ browser.
 - [x] Guard and inconclusive behavior are shown.
 - [x] GitHub Actions compatibility screenshot is included.
 - [x] GitHub v0.3.1 release screenshot is included.
-- [x] Submission deck exports to a nine-page PDF.
+- [x] Submission deck exports to an eleven-page PDF.
 - [x] Desktop visual QA reports no overflow.
-- [x] Final six-image screenshot set uploaded to Devpost.
+- [x] Final seven-image screenshot set uploaded to Devpost.
+- [x] C7g.4xlarge evidence overview is prepared as the eighth sanitized image.
+- [ ] The entrant has reviewed and uploaded the eighth screenshot to Devpost.
 
 ## Submission Status
 

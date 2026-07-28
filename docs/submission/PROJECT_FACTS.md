@@ -115,6 +115,36 @@ by 69.375%-86.490% and reduced p95 TTFT by 91.128%-98.001%.
 This is not a universal speedup claim and must not be generalized to other
 models, hardware, concurrency levels, runtimes, or network paths.
 
+## Larger C7g Capacity Evidence
+
+A separate C7g.4xlarge loopback experiment used 16 logical Neoverse-V1 CPUs,
+one reserved local client CPU, 15 server CPUs, the same model digest, and a
+fresh pinned llama.cpp binary digest.
+
+The separate pp512/tg128 protocol scaled from 1 to 15 threads:
+
+```text
+prefill: 6.761 -> 73.669 tokens/s, 10.897x
+decode:  2.759 -> 30.089 tokens/s, 10.907x
+```
+
+Full-capacity concurrency-8 paired confirmation measured:
+
+| Workload | Baseline output tok/s | `slots4-cont-on` output tok/s | Delta | Eligibility |
+| --- | ---: | ---: | ---: | --- |
+| `decode-heavy` | 25.779 | 46.488 | +80.331% | eligible |
+| `interactive-short` | 25.600 | 43.712 | +70.749% | eligible |
+| `prefill-heavy` | 19.734 | 15.585 | -21.025% | rejected |
+
+The run recorded 769 measured HTTP requests, 17 fresh server starts, passed
+cleanup, and 278 independently revalidated downloaded artifacts. It also
+preserved HTTP 400 context-limit failures for the eight-slot long-prefill
+candidate.
+
+This result is loopback evidence, not remote-network evidence. It is not a
+direct C7g.2xlarge versus C7g.4xlarge comparison. Hardware-scaling and
+runtime-tuning percentages remain separate.
+
 ## Separate Measured Protocols
 
 Do not add, multiply, average, or otherwise combine these results with the
@@ -149,6 +179,25 @@ Synthetic PyTorch workloads validated tuning mechanics and guard behavior on
 C7g Arm64, T4g Arm64, and Windows x86-64. Those values are not production
 training performance claims and must not be compared across targets.
 
+A clean measured T4g.small visual-evidence protocol added stronger
+distribution and guard evidence:
+
+```text
+baseline median: 14,430.039978 samples/s
+selected median: 33,274.800277 samples/s
+ratio-of-medians improvement: 130.593958%
+median paired improvement: 128.172176%
+paired confirmations: 12
+selected variability: 3.360982%
+failed DataLoader-worker trials preserved: 4
+```
+
+This claim is limited to one T4g.small, CPU-only PyTorch 2.13.0, the public
+synthetic workload, fixed effective batch size 32, and the recorded slice and
+measurement protocol. CPU credit balance was zero throughout the clean run;
+the run used T4g Unlimited surplus capacity, which is disclosed in the
+evidence. It is not combined with C7g or llama.cpp results.
+
 ## Safety And Guard Evidence
 
 - Hard environment drift prevents recommendation reuse.
@@ -178,6 +227,7 @@ before that date. Significant work added during the submission period includes:
 - PyTorch training adapter and low-resource Arm validation
 - workload-aware llama-server serving autotuning
 - real C7g server plus T4g remote-client validation
+- larger C7g thread scaling and workload-aware loopback serving validation
 - config-free `run --auto` with quick, standard, and deep hard budgets
 - valid partial reports on timeout
 - portable `platform validate`
@@ -188,6 +238,7 @@ The repository history and evidence documents preserve these changes.
 ## Evidence Documents
 
 - `docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`
+- `docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md`
 - `docs/results/PHASE_21D3_SERVING_AUTOTUNING_PRODUCTIZATION.md`
 - `docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md`
 - `docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md`
@@ -195,6 +246,7 @@ The repository history and evidence documents preserve these changes.
 - `docs/results/PHASE_15A_T4G_LOW_RESOURCE_VALIDATION.md`
 - `docs/results/PHASE_15B_T4G_REAL_PYTORCH_VALIDATION.md`
 - `docs/results/PHASE_15C_WINDOWS_X86_PYTORCH_VALIDATION.md`
+- `docs/results/T4G_TRAINING_VISUAL_EVIDENCE.md`
 - `docs/results/VALIDATED_PERFORMANCE_SUMMARY.md`
 - `docs/results/VALIDATION_MATRIX.md`
 - `docs/releases/v0.3.1.md`

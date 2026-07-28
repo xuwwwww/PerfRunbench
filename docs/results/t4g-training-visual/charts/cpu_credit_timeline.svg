@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520" role="img" aria-label="T4g CPU credit timeline">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<style>.title{font:700 30px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.label{font:600 16px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 15px Segoe UI,Arial,sans-serif;fill:#0f172a}.axis{font:700 19px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:15px Segoe UI,Arial,sans-serif;fill:#64748b}.badge{font:700 16px Segoe UI,Arial,sans-serif;fill:#fff}</style>
+<text x="70" y="58" class="title">T4g CPU credit timeline</text>
+<text x="70" y="91" class="subtitle">CloudWatch balance and surplus balance; five-minute granularity on basic monitoring.</text>
+<polyline points="90.00,390.69 400.00,390.69 710.00,390.69 1020.00,390.69" fill="none" stroke="#2563eb" stroke-width="4"/>
+<line x1="600" y1="64" x2="632" y2="64" stroke="#2563eb" stroke-width="5"/>
+<text x="640" y="70" class="note">CPUCreditBalance</text>
+<polyline points="90.00,217.38 400.00,241.53 710.00,188.35 1020.00,149.31" fill="none" stroke="#dc2626" stroke-width="4"/>
+<line x1="815" y1="64" x2="847" y2="64" stroke="#dc2626" stroke-width="5"/>
+<text x="855" y="70" class="note">CPUSurplusCreditBalance</text>
+<text x="90" y="455" class="note">balance 0.000 to 0.000 | surplus 10.146 to 14.130 | charged samples total 0.000</text>
+</svg>

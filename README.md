@@ -275,6 +275,46 @@ docs/demo/SERVING_AUTOTUNING_COMMANDS.md
 docs/demo/SERVING_AUTOTUNING_TALK_TRACK.md
 ```
 
+## Larger Arm Capacity And Workload-Aware Guards
+
+A separate measured C7g.4xlarge experiment validates thread scaling and
+full-capacity serving behavior on 16 logical Neoverse-V1 CPUs. It uses a pinned
+Qwen2.5-7B Q4_K_M artifact, a pinned fresh llama.cpp build, one reserved local
+client CPU, and 15 server CPUs.
+
+The separate `llama-bench` pp512/tg128 protocol scaled from 1 to 15 threads:
+
+| Metric | 1 thread | 15 threads | Speedup | 15-thread efficiency |
+| --- | ---: | ---: | ---: | ---: |
+| prefill | `6.761 tok/s` | `73.669 tok/s` | `10.897x` | `72.6%` |
+| decode | `2.759 tok/s` | `30.089 tok/s` | `10.907x` | `72.7%` |
+
+Full-capacity loopback concurrency-8 paired confirmation produced a
+workload-scoped result:
+
+| Workload | Baseline output tok/s | `slots4-cont-on` output tok/s | Delta | Result |
+| --- | ---: | ---: | ---: | --- |
+| `decode-heavy` | `25.779` | `46.488` | `+80.331%` | eligible |
+| `interactive-short` | `25.600` | `43.712` | `+70.749%` | eligible |
+| `prefill-heavy` | `19.734` | `15.585` | `-21.025%` | rejected |
+
+The same run preserved two eight-slot long-prefill screening slices with HTTP
+400 context-limit failures and skipped full-capacity concurrency 4 because no
+candidate passed every screening guard. It recorded 769 measured HTTP
+requests, 17 fresh server starts, passed cleanup, and independently validated
+278 artifacts after download.
+
+![C7g.4xlarge serving before and after](docs/results/c7g4xlarge-realistic/charts/serving_before_after.svg)
+
+This is loopback evidence, not remote-network evidence. The hardware-scaling
+and runtime-tuning percentages are separate and are not combined. Detailed
+methodology, CSV data, charts, and the sanitized HTML report are in:
+
+```text
+docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md
+docs/results/c7g4xlarge-realistic/
+```
+
 ## Real Arm Evidence Snapshot
 
 The current measured Arm evidence is a preliminary single-target result on a
@@ -337,6 +377,40 @@ Detailed evidence is recorded in:
 ```text
 docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md
 docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md
+```
+
+## Low-Resource Arm Training Evidence
+
+A separate measured T4g.small protocol validates the public CPU-only synthetic
+PyTorch adapter, bounded search, failed-candidate preservation, paired
+confirmation, cache reuse, budget exhaustion, rollback, and visual evidence
+export.
+
+| Metric | Baseline | Selected |
+| --- | ---: | ---: |
+| median throughput | `14,430.040 samples/s` | `33,274.800 samples/s` |
+| median step time | `2.218 ms` | `0.962 ms` |
+
+```text
+paired confirmations: 12
+ratio-of-medians improvement: 130.593958%
+median paired improvement: 128.172176%
+selected variability: 3.360982%
+failed DataLoader-worker trials preserved: 4
+```
+
+![T4g paired training confirmation](docs/results/t4g-training-visual/charts/paired_before_after.png)
+
+This is one burstable T4g.small and one public synthetic CPU PyTorch
+measurement protocol. It is not a production training benchmark, must not be
+compared directly with C7g, and is not a general PyTorch or Arm speedup claim.
+The CPU credit and surplus state is recorded with the result.
+
+Detailed evidence and reusable chart data:
+
+```text
+docs/results/T4G_TRAINING_VISUAL_EVIDENCE.md
+docs/results/t4g-training-visual/
 ```
 
 Phase 19 CPU-aware build tuning design documents:

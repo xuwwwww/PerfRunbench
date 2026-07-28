@@ -24,7 +24,7 @@ try {
     const viewportDir = path.join(outputRoot, viewport.name);
     await fs.mkdir(viewportDir, { recursive: true });
 
-    for (let slide = 1; slide <= 9; slide += 1) {
+    for (let slide = 1; slide <= 11; slide += 1) {
       await page.goto(`${baseUrl}/${slide}`, { waitUntil: "networkidle" });
       await page.waitForTimeout(300);
 

@@ -1,0 +1,300 @@
+{
+  "candidate_count_including_baseline": 4,
+  "claim_boundary": "Results are limited to one C7g.4xlarge, one Qwen2.5-7B Q4_K_M artifact, one pinned llama.cpp build, and the declared loopback and llama-bench protocols. Hardware scaling and runtime tuning percentages are not combined.",
+  "cleanup_passed": true,
+  "kind": "arm_inference_visual_summary",
+  "llama_cpp_commit": "b15ca938ad00aa6b3ee6c2edda7363fd02826b18",
+  "measured_http_requests": 769,
+  "model_sha256": "1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49",
+  "performance_passport_status": "eligible_preliminary",
+  "recommendation_count": 1,
+  "remote_artifacts_checked": 274,
+  "remote_artifacts_failed": 0,
+  "result_origin": "measured",
+  "schema_version": "1.0",
+  "screening_rejections": [
+    {
+      "client_limited": true,
+      "concurrency": 4,
+      "failure_count": 12,
+      "profile_id": "slots8-cont-on",
+      "quality_failures": 12,
+      "workload_id": "prefill-heavy"
+    },
+    {
+      "client_limited": false,
+      "concurrency": 8,
+      "failure_count": 12,
+      "profile_id": "slots8-cont-on",
+      "quality_failures": 12,
+      "workload_id": "prefill-heavy"
+    }
+  ],
+  "server_startups": 17,
+  "serving_comparisons": [
+    {
+      "baseline_by_pair": {
+        "1": 14.292255944840383,
+        "2": 14.296658412619779,
+        "3": 14.30143486387757
+      },
+      "baseline_output_tokens_per_second_median": 14.296658412619779,
+      "baseline_ttft_p95_ms": 4628.442326399727,
+      "bootstrap": {
+        "excludes_zero": true,
+        "median_percent": 82.88828951389688,
+        "p05_percent": 81.84244789012651,
+        "p95_percent": 83.93436410233188,
+        "pair_count": 3,
+        "samples": 10000,
+        "supported": true
+      },
+      "candidate_by_pair": {
+        "1": 26.167595303033664,
+        "2": 26.35685513162784,
+        "3": 25.91697562278007
+      },
+      "candidate_output_tokens_per_second_median": 26.167595303033664,
+      "candidate_ttft_p95_ms": 1305.6228022501955,
+      "cleanup_passed": true,
+      "guards_passed": true,
+      "latency_eligible": true,
+      "pair_count": 3,
+      "paired_improvement_percent": {
+        "count": 3,
+        "max": 84.35675226290937,
+        "median": 83.08932756329747,
+        "min": 81.21940818848128,
+        "p95": 84.23000979294818,
+        "p99": 84.33140376891713
+      },
+      "ratio_of_medians_improvement_percent": 83.03294761477487,
+      "stage": "7-CPU capacity match / c4",
+      "throughput_eligible": true,
+      "ttft_p95_reduction_percent": 71.79131314215196,
+      "workload_id": "interactive-short"
+    },
+    {
+      "baseline_by_pair": {
+        "1": 25.77915388286846,
+        "2": 25.723152304937898,
+        "3": 25.807576140050415
+      },
+      "baseline_output_tokens_per_second_median": 25.77915388286846,
+      "baseline_ttft_p95_ms": 15816.690060500378,
+      "bootstrap": {
+        "excludes_zero": true,
+        "median_percent": 80.10446220296825,
+        "p05_percent": 79.54951423305107,
+        "p95_percent": 80.66062352497998,
+        "pair_count": 3,
+        "samples": 10000,
+        "supported": true
+      },
+      "candidate_by_pair": {
+        "1": 46.54030457474177,
+        "2": 46.487845129137305,
+        "3": 46.21039809245495
+      },
+      "candidate_output_tokens_per_second_median": 46.487845129137305,
+      "candidate_ttft_p95_ms": 5103.116592450078,
+      "cleanup_passed": true,
+      "guards_passed": true,
+      "latency_eligible": true,
+      "pair_count": 3,
+      "paired_improvement_percent": {
+        "count": 3,
+        "max": 80.72374869938996,
+        "median": 80.53464743724632,
+        "min": 79.05749010168253,
+        "p95": 80.7048385731756,
+        "p99": 80.71996667414709
+      },
+      "ratio_of_medians_improvement_percent": 80.33115183051376,
+      "stage": "15-CPU full capacity / c8",
+      "throughput_eligible": true,
+      "ttft_p95_reduction_percent": 67.73587537638936,
+      "workload_id": "decode-heavy"
+    },
+    {
+      "baseline_by_pair": {
+        "1": 25.503996952848883,
+        "2": 25.599882195487076,
+        "3": 25.617604968742143
+      },
+      "baseline_output_tokens_per_second_median": 25.599882195487076,
+      "baseline_ttft_p95_ms": 5978.607965750234,
+      "bootstrap": {
+        "excludes_zero": true,
+        "median_percent": 70.87792456780777,
+        "p05_percent": 70.36960312087237,
+        "p95_percent": 71.38775367672156,
+        "pair_count": 3,
+        "samples": 10000,
+        "supported": true
+      },
+      "candidate_by_pair": {
+        "1": 43.79248254275993,
+        "2": 43.71155290374685,
+        "3": 43.59604431037654
+      },
+      "candidate_output_tokens_per_second_median": 43.71155290374685,
+      "candidate_ttft_p95_ms": 2454.2093437004496,
+      "cleanup_passed": true,
+      "guards_passed": true,
+      "latency_eligible": true,
+      "pair_count": 3,
+      "paired_improvement_percent": {
+        "count": 3,
+        "max": 71.70831153925525,
+        "median": 70.74903927273783,
+        "min": 70.18001629571214,
+        "p95": 71.61238431260351,
+        "p99": 71.6891260939249
+      },
+      "ratio_of_medians_improvement_percent": 70.74903927273783,
+      "stage": "15-CPU full capacity / c8",
+      "throughput_eligible": true,
+      "ttft_p95_reduction_percent": 58.95015432087326,
+      "workload_id": "interactive-short"
+    },
+    {
+      "baseline_by_pair": {
+        "1": 19.80672193215267,
+        "2": 19.524043806989066,
+        "3": 19.73446180702333
+      },
+      "baseline_output_tokens_per_second_median": 19.73446180702333,
+      "baseline_ttft_p95_ms": 10106.897232950132,
+      "bootstrap": {
+        "excludes_zero": false,
+        "median_percent": -20.9036113856784,
+        "p05_percent": -21.36417232507958,
+        "p95_percent": -20.438620883280855,
+        "pair_count": 3,
+        "samples": 10000,
+        "supported": true
+      },
+      "candidate_by_pair": {
+        "1": 15.54173663690208,
+        "2": 15.5914817203698,
+        "3": 15.58524355857617
+      },
+      "candidate_output_tokens_per_second_median": 15.58524355857617,
+      "candidate_ttft_p95_ms": 21192.544317249212,
+      "cleanup_passed": true,
+      "guards_passed": true,
+      "latency_eligible": false,
+      "pair_count": 3,
+      "paired_improvement_percent": {
+        "count": 3,
+        "max": -20.14214947218833,
+        "median": -21.025241473626032,
+        "min": -21.53301949641222,
+        "p95": -20.230458672332098,
+        "p99": -20.159811312217084
+      },
+      "ratio_of_medians_improvement_percent": -21.025241473626032,
+      "stage": "15-CPU full capacity / c8",
+      "throughput_eligible": false,
+      "ttft_p95_reduction_percent": -109.68397945274506,
+      "workload_id": "prefill-heavy"
+    }
+  ],
+  "source_commit": "fab3297a62e510cf33b4cf27771707514f8f8542",
+  "status": "passed",
+  "target": {
+    "client_cpu_range": "0",
+    "cpu": "Neoverse-V1",
+    "instance_class": "c7g.4xlarge",
+    "logical_cpus": 16,
+    "server_cpu_range_full": "1-15",
+    "topology": "single_host_loopback"
+  },
+  "thread_scaling": [
+    {
+      "avg_tokens_per_second": 6.760716,
+      "stddev_tokens_per_second": 0.002624,
+      "test": "pp512",
+      "threads": 1
+    },
+    {
+      "avg_tokens_per_second": 2.758606,
+      "stddev_tokens_per_second": 0.001652,
+      "test": "tg128",
+      "threads": 1
+    },
+    {
+      "avg_tokens_per_second": 13.640876,
+      "stddev_tokens_per_second": 0.00156,
+      "test": "pp512",
+      "threads": 2
+    },
+    {
+      "avg_tokens_per_second": 5.320612,
+      "stddev_tokens_per_second": 0.002284,
+      "test": "tg128",
+      "threads": 2
+    },
+    {
+      "avg_tokens_per_second": 26.693346,
+      "stddev_tokens_per_second": 0.003026,
+      "test": "pp512",
+      "threads": 4
+    },
+    {
+      "avg_tokens_per_second": 10.465054,
+      "stddev_tokens_per_second": 0.004029,
+      "test": "tg128",
+      "threads": 4
+    },
+    {
+      "avg_tokens_per_second": 35.501778,
+      "stddev_tokens_per_second": 0.006007,
+      "test": "pp512",
+      "threads": 6
+    },
+    {
+      "avg_tokens_per_second": 14.600933,
+      "stddev_tokens_per_second": 0.005437,
+      "test": "tg128",
+      "threads": 6
+    },
+    {
+      "avg_tokens_per_second": 46.903033,
+      "stddev_tokens_per_second": 0.004394,
+      "test": "pp512",
+      "threads": 8
+    },
+    {
+      "avg_tokens_per_second": 18.446693,
+      "stddev_tokens_per_second": 0.013168,
+      "test": "tg128",
+      "threads": 8
+    },
+    {
+      "avg_tokens_per_second": 62.153049,
+      "stddev_tokens_per_second": 0.003599,
+      "test": "pp512",
+      "threads": 12
+    },
+    {
+      "avg_tokens_per_second": 25.42425,
+      "stddev_tokens_per_second": 0.014001,
+      "test": "tg128",
+      "threads": 12
+    },
+    {
+      "avg_tokens_per_second": 73.668538,
+      "stddev_tokens_per_second": 0.005383,
+      "test": "pp512",
+      "threads": 15
+    },
+    {
+      "avg_tokens_per_second": 30.089102,
+      "stddev_tokens_per_second": 0.019495,
+      "test": "tg128",
+      "threads": 15
+    }
+  ]
+}

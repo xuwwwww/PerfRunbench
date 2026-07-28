@@ -1219,6 +1219,116 @@ pre,
   height: 74px;
 }
 
+/* Slides 6-7: larger-target measured evidence */
+
+.scale-layout,
+.workload-guard-layout {
+  display: grid;
+  grid-template-columns: 1.42fr 0.58fr;
+  gap: 24px;
+  align-items: stretch;
+  margin-top: 20px;
+}
+
+.scale-chart,
+.workload-guard-chart {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--white);
+}
+
+.scale-chart img,
+.workload-guard-chart img {
+  display: block;
+  width: 100%;
+  max-height: 390px;
+  object-fit: contain;
+}
+
+.scale-facts,
+.workload-guard-facts {
+  display: grid;
+  gap: 10px;
+}
+
+.scale-fact,
+.scale-efficiency,
+.guard-result,
+.context-guard {
+  border-left: 4px solid var(--green);
+  padding: 14px 16px;
+  background: var(--paper);
+}
+
+.scale-fact span,
+.context-guard > span {
+  display: block;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.scale-fact strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 17px;
+}
+
+.scale-fact b {
+  display: block;
+  margin-top: 2px;
+  color: var(--red);
+  font-size: 13px;
+}
+
+.scale-efficiency strong {
+  display: block;
+  font-size: 20px;
+}
+
+.scale-efficiency span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.guard-result {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.guard-result strong {
+  font-size: 20px;
+}
+
+.guard-result span {
+  color: var(--muted);
+  font-size: 9px;
+  text-align: right;
+}
+
+.guard-result.reject,
+.context-guard {
+  border-left-color: var(--red);
+}
+
+.context-guard strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.context-guard p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
 @media (max-aspect-ratio: 16/9) {
   .slidev-layout {
     padding-right: 50px;

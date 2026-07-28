@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PerfRunbench Arm Inference Evidence</title>
+<style>
+:root{--ink:#0f172a;--muted:#64748b;--line:#dbe3ee;--blue:#2563eb;--red:#dc2626;--green:#059669}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font-family:Segoe UI,Arial,sans-serif}
+.page{max-width:1180px;margin:0 auto;padding:32px 28px 48px}.hero{border-bottom:3px solid var(--ink);padding-bottom:22px;margin-bottom:24px}
+.eyebrow{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--blue);margin:0 0 8px}
+h1{font-size:42px;line-height:1.08;margin:0 0 12px}h2{font-size:21px;margin:0 0 14px}
+.lede,.note{color:var(--muted);max-width:940px}.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.stat,.panel{border:1px solid var(--line);border-radius:8px;background:#fff}.stat{padding:14px}
+.label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}.value{font-size:21px;font-weight:700;word-break:break-word}
+.panel{padding:18px;margin-bottom:16px}.panel img{display:block;width:100%;height:auto}table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}th{font-size:12px;color:var(--muted);text-transform:uppercase}
+code{font-family:Cascadia Mono,Consolas,monospace;font-size:.92em}@media(max-width:760px){.page{padding:20px 12px}.stats{grid-template-columns:1fr 1fr}h1{font-size:32px}}
+</style>
+</head>
+<body>
+<main class="page">
+<header class="hero">
+<p class="eyebrow">PerfRunbench measured Arm64 evidence</p>
+<h1>Realistic Arm inference tuning</h1>
+<p class="lede">Pinned Qwen2.5-7B Q4_K_M and llama.cpp evidence on one C7g.4xlarge. Thread scaling, capacity matching, and runtime tuning remain separate protocols.</p>
+</header>
+<section class="stats">
+<div class="stat"><span class="label">Best eligible delta</span><span class="value">83.033%</span></div>
+<div class="stat"><span class="label">Measured requests</span><span class="value">769</span></div>
+<div class="stat"><span class="label">Candidates</span><span class="value">4</span></div>
+<div class="stat"><span class="label">Rejected slices</span><span class="value">2</span></div>
+<div class="stat"><span class="label">Passport</span><span class="value">eligible preliminary</span></div>
+</section>
+<section class="panel">
+<h2>Evidence boundary</h2>
+<table><tbody>
+<tr><th>Source</th><td><code>summary.json</code></td></tr>
+<tr><th>Origin</th><td><code>measured</code></td></tr>
+<tr><th>Target</th><td><code>c7g.4xlarge</code> / Neoverse-V1</td></tr>
+<tr><th>Topology</th><td><code>single_host_loopback</code></td></tr>
+<tr><th>Cleanup</th><td><code>True</code></td></tr>
+<tr><th>Claim boundary</th><td>Results are limited to one C7g.4xlarge, one Qwen2.5-7B Q4_K_M artifact, one pinned llama.cpp build, and the declared loopback and llama-bench protocols. Hardware scaling and runtime tuning percentages are not combined.</td></tr>
+</tbody></table>
+<p class="note">Hardware scaling percentages and runtime-tuning percentages are never added together. Loopback evidence is not remote-network evidence.</p>
+</section>
+<section class="panel"><h2>llama-bench thread scaling</h2><img src="charts/thread_scaling.svg" alt="llama-bench thread scaling"></section>
+<section class="panel"><h2>Serving throughput before and after</h2><img src="charts/serving_before_after.svg" alt="Serving throughput before and after"></section>
+<section class="panel"><h2>Paired confirmation deltas</h2><img src="charts/paired_confirmation.svg" alt="Paired confirmation deltas"></section>
+<section class="panel"><h2>p95 TTFT before and after</h2><img src="charts/ttft_p95.svg" alt="p95 TTFT before and after"></section>
+<section class="panel"><h2>Evidence guards</h2><img src="charts/guard_summary.svg" alt="Evidence guards"></section>
+<section class="panel">
+<h2>Measured serving comparisons</h2>
+<table><thead><tr><th>Protocol</th><th>Workload</th><th>Baseline tok/s</th><th>Selected tok/s</th><th>Delta</th><th>Guard</th></tr></thead>
+<tbody><tr><td>7-CPU capacity match / c4</td><td>interactive-short</td><td>14.297</td><td>26.168</td><td>83.033%</td><td>eligible</td></tr><tr><td>15-CPU full capacity / c8</td><td>decode-heavy</td><td>25.779</td><td>46.488</td><td>80.331%</td><td>eligible</td></tr><tr><td>15-CPU full capacity / c8</td><td>interactive-short</td><td>25.600</td><td>43.712</td><td>70.749%</td><td>eligible</td></tr><tr><td>15-CPU full capacity / c8</td><td>prefill-heavy</td><td>19.734</td><td>15.585</td><td>-21.025%</td><td>not eligible</td></tr></tbody></table>
+</section>
+<section class="panel">
+<h2>Screening guards</h2>
+<p class="note">Failed and client-limited measurements remain visible and are excluded from recommendation selection.</p>
+<table><thead><tr><th>Profile</th><th>Workload</th><th>Concurrency</th><th>Failures</th><th>Quality failures</th><th>Client limited</th></tr></thead>
+<tbody><tr><td>slots8-cont-on</td><td>prefill-heavy</td><td>4</td><td>12</td><td>12</td><td>yes</td></tr><tr><td>slots8-cont-on</td><td>prefill-heavy</td><td>8</td><td>12</td><td>12</td><td>no</td></tr></tbody></table>
+</section>
+</main>
+</body>
+</html>

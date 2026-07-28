@@ -26,6 +26,7 @@ from performance evidence.
 | Phase 21D3 productization evidence | present |
 | v0.3.1 release documentation | present |
 | Validation matrix | present |
+| T4g visual training evidence | present |
 
 ## Public Links
 
@@ -48,6 +49,8 @@ Passed:
 - Installed-wheel CI is compatibility evidence, not performance evidence.
 - Synthetic PyTorch output is guard and workflow evidence, not production
   training evidence.
+- The T4g visual result is limited to one synthetic CPU PyTorch protocol and
+  discloses its burstable CPU-credit state.
 - Compiler, kernel, 64K-page, and network experiments are not claimed as
   improvements.
 - No global-best or universal-speedup wording is used.
@@ -68,8 +71,8 @@ The final scan covers text and generated assets for:
 Final scan result:
 
 ```text
-scanned_text_files: 27
-screenshots_validated: 6
+scanned_text_files: 36
+screenshots_validated: 7
 submission_failures: 0
 npm production vulnerabilities: 0
 ```
@@ -90,4 +93,4 @@ npm production vulnerabilities: 0
 - Save and re-open the Devpost project fields.
 - Confirm Cloud AI track selection.
 - Confirm signed-in account/team and Arm Developer Program registration.
-- Upload and inspect the five final screenshots.
+- Upload and inspect the seven final screenshots.

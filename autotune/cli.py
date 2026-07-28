@@ -20,6 +20,8 @@ from autotune.resource.advanced_tuning import (
 )
 from autotune.report.run_report import generate_run_report
 from autotune.report.comparison_report import generate_comparison_report
+from autotune.report.training_tuning_report import generate_training_tuning_report
+from autotune.report.arm_inference_report import generate_arm_inference_report
 from autotune.recommendation.optimizer import (
     LATEST_RECOMMENDATION,
     OPTIMIZATION_TARGETS,
@@ -190,6 +192,23 @@ def build_parser() -> argparse.ArgumentParser:
     report_comparison.add_argument("--input", default="results/reports/tuning_comparison.json")
     report_comparison.add_argument("--output")
     report_comparison.set_defaults(handler=_cmd_report_comparison)
+
+    report_training = subparsers.add_parser(
+        "report-training",
+        help="Export visual evidence from a PyTorch training tuning result.",
+    )
+    report_training.add_argument("--input", required=True)
+    report_training.add_argument("--output-dir")
+    report_training.add_argument("--cloudwatch", help="Optional normalized CloudWatch metric JSON.")
+    report_training.set_defaults(handler=_cmd_report_training)
+
+    report_arm_inference = subparsers.add_parser(
+        "report-arm-inference",
+        help="Export visual evidence from a measured Arm inference tuning result.",
+    )
+    report_arm_inference.add_argument("--input", required=True)
+    report_arm_inference.add_argument("--output-dir")
+    report_arm_inference.set_defaults(handler=_cmd_report_arm_inference)
 
     calibrate = subparsers.add_parser("calibrate-memory", help="Measure memory budget behavior on this machine.")
     calibrate.add_argument("--budget-gb", nargs="+", type=float, required=True)
@@ -572,6 +591,31 @@ def _cmd_report(args: argparse.Namespace) -> int:
 def _cmd_report_comparison(args: argparse.Namespace) -> int:
     report_path = generate_comparison_report(args.input, args.output)
     print(f"Wrote tuning comparison report to {report_path}")
+    return 0
+
+
+def _cmd_report_training(args: argparse.Namespace) -> int:
+    try:
+        outputs = generate_training_tuning_report(
+            args.input,
+            args.output_dir,
+            cloudwatch_path=args.cloudwatch,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(outputs, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_report_arm_inference(args: argparse.Namespace) -> int:
+    try:
+        outputs = generate_arm_inference_report(
+            args.input,
+            args.output_dir,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(outputs, indent=2, sort_keys=True))
     return 0
 
 

@@ -109,6 +109,23 @@ These numbers are protocol-specific. They are not a universal speedup claim
 and do not apply to other hardware, models, runtimes, concurrency levels, or
 network paths.
 
+A later, separate C7g.4xlarge loopback experiment tested realistic
+larger-target capacity. Under a separate pp512/tg128 protocol, prefill scaled
+from 6.761 to 73.669 tokens/s and decode scaled from 2.759 to 30.089 tokens/s
+when moving from 1 to 15 threads, approximately 10.9x in both cases.
+
+Under the full-capacity loopback concurrency-8 paired protocol,
+`slots4-cont-on` improved eligible `decode-heavy` output throughput from
+25.779 to 46.488 tokens/s (+80.331%) and `interactive-short` from 25.600 to
+43.712 tokens/s (+70.749%). The same candidate regressed `prefill-heavy` by
+21.025%, so that workload was excluded. Eight-slot long-prefill requests that
+exceeded per-slot context were preserved as HTTP 400 failures rather than
+converted into metrics.
+
+This larger-target result is loopback evidence, not remote-network evidence,
+and is not a direct C7g.2xlarge versus C7g.4xlarge comparison. Hardware
+scaling and runtime tuning remain separate protocols.
+
 Separate earlier protocols established a C7g llama.cpp build-profile decode
 median of 10.825 tokens/s for `portable-baseline` and 17.530 tokens/s for
 `arm-native`; a bounded runtime search measured 13.630 to 17.480 tokens/s
@@ -126,6 +143,15 @@ including when they execute on native Arm64 CI.
 Public synthetic PyTorch workloads validate semantics preservation,
 low-resource guards, cache reuse, and hard-drift refusal on Arm and Windows.
 They are not production training performance claims.
+
+A separate clean measured T4g.small protocol used CPU-only PyTorch 2.13.0,
+fixed effective batch size 32, 5,000-step slices, and 12 paired confirmations.
+It measured a baseline median of 14,430.040 samples/s and a selected median of
+33,274.800 samples/s. The ratio-of-medians improvement was 130.593958%, with
+3.360982% selected variability. Four stalled DataLoader-worker trials remained
+explicit failures. The result discloses that the burstable target ran with
+zero CPU credit balance and T4g Unlimited surplus capacity. It is not combined
+with C7g or llama.cpp results and is not a production training claim.
 
 ### Why It Matters
 
@@ -197,6 +223,8 @@ llama-server build, and a model whose digest was fixed before comparison.
 - Refused cross-target recommendation reuse under hard environment drift.
 - Kept unsupported compiler, kernel, 64K-page, and network experiments from
   becoming fabricated performance recommendations.
+- Demonstrated 1-to-15-thread Arm inference scaling and a workload-scoped
+  concurrency-8 serving recommendation on C7g.4xlarge.
 
 ## What Was Learned
 
@@ -208,6 +236,11 @@ uncontrolled sweeps.
 The remote serving result also showed why workload shape matters. The same
 validated candidate improved three declared concurrency-4 workloads, but the
 claim still belongs to that exact target, model, topology, and protocol.
+
+The larger-target result made that boundary more visible: four serving slots
+helped interactive and decode-heavy concurrency-8 traffic, but harmed
+prefill-heavy traffic. A useful recommendation therefore identifies eligible
+workloads instead of declaring one profile globally best.
 
 ## Significant Updates Since June 10, 2026
 
@@ -248,11 +281,15 @@ validation chronology.
   `https://github.com/xuwwwww/PerfRunbench/actions/runs/30234620475`
 - Real remote-serving evidence:
   `https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`
+- Larger C7g capacity evidence:
+  `https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md`
 
 ## Limitations
 
 - The headline result covers one C7g server, one T4g client, one model, one
   pinned runtime, concurrency 4, and three declared workloads.
+- The larger-target result covers one C7g.4xlarge, one loopback client CPU,
+  one pinned model/runtime, and declared c4/c8 protocols.
 - Broader Arm hardware, model, and concurrency validation remains future work.
 - Synthetic training evidence validates mechanics and guards, not production
   training speed.
