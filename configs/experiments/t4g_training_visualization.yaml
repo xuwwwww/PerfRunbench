@@ -1,0 +1,85 @@
+schema_version: "1.0"
+workload:
+  adapter: pytorch-training
+  cwd: .
+  timeout_seconds: 90
+  identity_files:
+    - examples/pytorch_synthetic_training/train_synthetic.py
+objective:
+  metric: samples_per_second
+  direction: maximize
+metrics:
+  source: stdout_json_prefix
+  prefix: "AUTOTUNEAI_TRAIN_RESULT "
+training:
+  schema_version: "1.0"
+  world_size: 1
+  slice:
+    mode: cli_argument
+    flag: --max-steps
+    warmup_steps: 0
+    measured_steps: 5000
+    minimum_completed_steps: 5000
+    max_wall_time_seconds: 60
+    omit_from_full_run: true
+  progress:
+    source: stdout_json_prefix
+    step_prefix: "AUTOTUNEAI_TRAIN_STEP "
+    result_prefix: "AUTOTUNEAI_TRAIN_RESULT "
+  semantics:
+    effective_batch_policy: preserve
+    semantic_change_allowed: false
+  capabilities:
+    amp_modes: [disabled]
+    compile_modes: [disabled]
+    cpu_only: true
+  search:
+    max_candidates: 4
+    shuffle_seed: 20260728
+    cooldown_seconds: 1
+    stages: [input_pipeline, batch_config, cpu_runtime]
+  knobs:
+    - name: micro_batch_size
+      baseline: 8
+      candidates: [8, 16, 32]
+      binding:
+        type: cli_argument
+        flag: --micro-batch-size
+    - name: gradient_accumulation
+      baseline: 4
+      candidates: [4, 2, 1]
+      binding:
+        type: cli_argument
+        flag: --gradient-accumulation
+    - name: dataloader_workers
+      baseline: 0
+      candidates: [0, 1]
+      binding:
+        type: cli_argument
+        flag: --num-workers
+    - name: cpu_threads
+      baseline: 1
+      candidates: [1, 2]
+      binding:
+        type: env_var
+        name: OMP_NUM_THREADS
+tuning:
+  preset: standard
+  warmup_runs: 1
+  search_runs: 4
+  confirmation_runs: 12
+  min_valid_trials: 8
+  noise_band_percent: 5.0
+  variability_threshold_percent: 20.0
+  shuffle_seed: 20260728
+  cooldown_seconds: 1
+  max_candidates: 4
+  budget_minutes: 30
+cache:
+  root: .autotuneai/cache/t4g-training-visualization
+  retune_policy: on_hard_drift_or_missing
+  canary_policy: on_new_or_drift
+  ttl_days: 14
+apply:
+  canary_runs: 1
+  lease_minutes: 15
