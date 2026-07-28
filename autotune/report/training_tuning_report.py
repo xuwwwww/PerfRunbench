@@ -184,7 +184,7 @@ code{{font-family:Cascadia Mono,Consolas,monospace;font-size:.92em}}
 <section class="panel">
 <h2>Evidence boundary</h2>
 <table><tbody>
-<tr><th>Source</th><td><code>{escape(str(source) if source else "in-memory")}</code></td></tr>
+<tr><th>Source</th><td><code>{escape(source.name if source else "in-memory")}</code></td></tr>
 <tr><th>Run ID</th><td><code>{escape(str(summary.get("source_run_id")))}</code></td></tr>
 <tr><th>Result origin</th><td><code>{escape(str(summary.get("result_origin")))}</code></td></tr>
 <tr><th>Status</th><td><code>{escape(str(summary.get("status")))}</code></td></tr>
@@ -263,7 +263,7 @@ def _candidate_ranking_svg(data: dict[str, Any], trials: list[dict[str, Any]]) -
             if item.get("phase") == "search" and item.get("candidate_id") == candidate_id
         ]
         if values:
-            rows.append((candidate_id, values))
+            rows.append((_candidate_chart_label(candidate, candidate_id), values))
     rows.sort(key=lambda item: median(item[1]), reverse=True)
     return _horizontal_range_chart("Candidate search throughput", rows, "samples/s")
 
@@ -293,7 +293,7 @@ def _paired_before_after_svg(pairs: list[dict[str, Any]], summary: dict[str, Any
     parts.append(f'<text x="810" y="540" text-anchor="middle" class="axis">Selected</text>')
     parts.append(
         f'<text x="550" y="580" text-anchor="middle" class="note">'
-        f'{len(pairs)} pairs · median delta {_fmt(summary["paired_improvement_percent"].get("median"))}%</text>'
+        f'{len(pairs)} pairs | median delta {_fmt(summary["paired_improvement_percent"].get("median"))}%</text>'
     )
     parts.append("</svg>")
     return "\n".join(parts)
@@ -306,7 +306,7 @@ def _distribution_svg(pairs: list[dict[str, Any]], summary: dict[str, Any]) -> s
         "Confirmation throughput distribution",
         [("Baseline", baseline, _BASELINE), ("Selected", selected, _SELECTED)],
         "samples/s",
-        f'noise band {summary.get("noise_band_percent")}% · all valid confirmation samples shown',
+        f'noise band {summary.get("noise_band_percent")}% | all valid confirmation samples shown',
     )
 
 
@@ -348,25 +348,62 @@ def _guard_summary_svg(data: dict[str, Any]) -> str:
 
 
 def _credit_timeline_svg(cloudwatch: dict[str, list[dict[str, Any]]]) -> str:
-    series = cloudwatch.get("CPUCreditBalance", [])
-    values = [(str(item.get("timestamp")), float(item["value"])) for item in series if _finite(item.get("value"))]
+    balance = [
+        (str(item.get("timestamp")), float(item["value"]))
+        for item in cloudwatch.get("CPUCreditBalance", [])
+        if _finite(item.get("value"))
+    ]
+    surplus = [
+        (str(item.get("timestamp")), float(item["value"]))
+        for item in cloudwatch.get("CPUSurplusCreditBalance", [])
+        if _finite(item.get("value"))
+    ]
+    charged = [
+        float(item["value"])
+        for item in cloudwatch.get("CPUSurplusCreditsCharged", [])
+        if _finite(item.get("value"))
+    ]
+    plotted = [
+        ("CPUCreditBalance", balance, _BASELINE),
+        ("CPUSurplusCreditBalance", surplus, _SELECTED),
+    ]
+    values = [value for _label, series, _color in plotted for _timestamp, value in series]
     width, height = 1100, 520
     parts = _svg_start(width, height, "T4g CPU credit timeline")
-    parts.extend(_chart_heading("T4g CPU credit timeline", "CloudWatch CPUCreditBalance; five-minute granularity on basic monitoring."))
+    parts.extend(
+        _chart_heading(
+            "T4g CPU credit timeline",
+            "CloudWatch balance and surplus balance; five-minute granularity on basic monitoring.",
+        )
+    )
     if not values:
-        parts.append('<text x="80" y="230" class="note">No CPUCreditBalance datapoints were supplied.</text>')
+        parts.append('<text x="80" y="230" class="note">No CPU credit datapoints were supplied.</text>')
         parts.append("</svg>")
         return "\n".join(parts)
-    low, high = _bounds([item[1] for item in values])
+    low, high = _bounds(values, include_zero=True)
     left, right, top, bottom = 90, 1020, 130, 410
-    points = []
-    for index, (_timestamp, value) in enumerate(values):
-        x = left + (right - left) * index / max(1, len(values) - 1)
-        y = bottom - ((value - low) / (high - low)) * (bottom - top)
-        points.append(f"{x:.2f},{y:.2f}")
-    parts.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{_BASELINE}" stroke-width="4"/>')
-    parts.append(f'<text x="{left}" y="455" class="note">first {_fmt(values[0][1])}</text>')
-    parts.append(f'<text x="{right}" y="455" text-anchor="end" class="note">last {_fmt(values[-1][1])}</text>')
+    for label, series, color in plotted:
+        if not series:
+            continue
+        points = []
+        for index, (_timestamp, value) in enumerate(series):
+            x = left + (right - left) * index / max(1, len(series) - 1)
+            y = bottom - ((value - low) / (high - low)) * (bottom - top)
+            points.append(f"{x:.2f},{y:.2f}")
+        parts.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="4"/>')
+        legend_x = 600 if label == "CPUCreditBalance" else 815
+        parts.append(f'<line x1="{legend_x}" y1="64" x2="{legend_x + 32}" y2="64" stroke="{color}" stroke-width="5"/>')
+        parts.append(f'<text x="{legend_x + 40}" y="70" class="note">{escape(label)}</text>')
+    balance_first = balance[0][1] if balance else None
+    balance_last = balance[-1][1] if balance else None
+    surplus_first = surplus[0][1] if surplus else None
+    surplus_last = surplus[-1][1] if surplus else None
+    parts.append(
+        f'<text x="{left}" y="455" class="note">'
+        f'balance {_fmt(balance_first)} to {_fmt(balance_last)} | '
+        f'surplus {_fmt(surplus_first)} to {_fmt(surplus_last)} | '
+        f'charged samples total {_fmt(sum(charged))}</text>'
+    )
     parts.append("</svg>")
     return "\n".join(parts)
 
@@ -376,19 +413,19 @@ def _horizontal_range_chart(title: str, rows: list[tuple[str, list[float]]], uni
     height = 160 + max(1, len(rows)) * 74
     values = [value for _label, samples in rows for value in samples]
     low, high = _bounds(values, include_zero=True)
-    left, right = 390, 1010
+    left, plot_right, value_x = 350, 820, 1010
     parts = _svg_start(width, height, title)
     parts.extend(_chart_heading(title, "Median bar with min/max whisker across valid search trials."))
     if not rows:
         parts.append('<text x="80" y="200" class="note">No valid search trials.</text>')
     for index, (label, samples) in enumerate(rows):
         y = 140 + index * 74
-        scale = lambda value: left + ((value - low) / (high - low)) * (right - left)
+        scale = lambda value: left + ((value - low) / (high - low)) * (plot_right - left)
         minimum, maximum, med = min(samples), max(samples), median(samples)
         parts.append(f'<text x="70" y="{y + 30}" class="label">{escape(label)}</text>')
         parts.append(f'<rect x="{left}" y="{y + 6}" width="{max(1, scale(med) - left):.2f}" height="34" rx="6" fill="{_BASELINE}"/>')
         parts.append(f'<line x1="{scale(minimum):.2f}" y1="{y + 23}" x2="{scale(maximum):.2f}" y2="{y + 23}" stroke="{_INK}" stroke-width="3"/>')
-        parts.append(f'<text x="{right}" y="{y + 30}" text-anchor="end" class="value">{_fmt(med)} {unit}</text>')
+        parts.append(f'<text x="{value_x}" y="{y + 30}" text-anchor="end" class="value">{_fmt(med)} {unit}</text>')
     parts.append("</svg>")
     return "\n".join(parts)
 
@@ -550,6 +587,25 @@ def _chart_heading(title: str, subtitle: str) -> list[str]:
 
 def _chart_title(name: str) -> str:
     return Path(name).stem.replace("_", " ").title()
+
+
+def _candidate_chart_label(candidate: dict[str, Any], candidate_id: str) -> str:
+    knobs = candidate.get("knob_values", {})
+    if not isinstance(knobs, dict):
+        return candidate_id
+    batch = knobs.get("micro_batch_size")
+    accumulation = knobs.get("gradient_accumulation")
+    workers = knobs.get("dataloader_workers")
+    threads = knobs.get("cpu_threads")
+    if candidate_id == "baseline" and batch is not None and accumulation is not None:
+        return f"baseline: batch {batch} / accumulation {accumulation}"
+    if candidate.get("stage") == "batch_config" and batch is not None and accumulation is not None:
+        return f"batch {batch} / accumulation {accumulation}"
+    if candidate.get("stage") == "input_pipeline" and workers is not None:
+        return f"workers {workers}"
+    if candidate.get("stage") == "cpu_runtime" and threads is not None:
+        return f"OMP threads {threads}"
+    return candidate_id
 
 
 def _fmt(value: Any) -> str:

@@ -28,8 +28,30 @@ class TrainingTuningReportTest(unittest.TestCase):
             root = Path(temp_dir)
             source = root / "tuning_result.json"
             source.write_text(json.dumps(_result()), encoding="utf-8")
+            cloudwatch = root / "cloudwatch.json"
+            cloudwatch.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "metrics": {
+                            "CPUCreditBalance": [
+                                {"timestamp": "2026-01-01T00:00:00Z", "value": 4.0},
+                                {"timestamp": "2026-01-01T00:05:00Z", "value": 0.0},
+                            ],
+                            "CPUSurplusCreditBalance": [
+                                {"timestamp": "2026-01-01T00:00:00Z", "value": 0.0},
+                                {"timestamp": "2026-01-01T00:05:00Z", "value": 2.0},
+                            ],
+                            "CPUSurplusCreditsCharged": [
+                                {"timestamp": "2026-01-01T00:05:00Z", "value": 0.0},
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
 
-            outputs = generate_training_tuning_report(source, root / "visuals")
+            outputs = generate_training_tuning_report(source, root / "visuals", cloudwatch_path=cloudwatch)
 
             for path in outputs.values():
                 self.assertTrue(Path(path).exists())
@@ -42,9 +64,20 @@ class TrainingTuningReportTest(unittest.TestCase):
             html = Path(outputs["report"]).read_text(encoding="utf-8")
             self.assertIn("Training tuning before and after", html)
             self.assertIn("tested training workload", html)
+            self.assertIn("<code>tuning_result.json</code>", html)
+            self.assertNotIn(str(root), html)
             charts = Path(outputs["charts"])
             self.assertTrue((charts / "paired_before_after.svg").exists())
             self.assertTrue((charts / "throughput_distribution.svg").exists())
+            paired_chart = (charts / "paired_before_after.svg").read_text(encoding="utf-8")
+            distribution_chart = (charts / "throughput_distribution.svg").read_text(encoding="utf-8")
+            self.assertIn("pairs | median delta", paired_chart)
+            self.assertIn("noise band 5.0% | all valid confirmation samples shown", distribution_chart)
+            credit_chart = (charts / "cpu_credit_timeline.svg").read_text(encoding="utf-8")
+            self.assertIn("CPUSurplusCreditBalance", credit_chart)
+            self.assertIn("charged samples total 0.000", credit_chart)
+            ranking_chart = (charts / "candidate_ranking.svg").read_text(encoding="utf-8")
+            self.assertIn("baseline: batch", ranking_chart)
 
     def test_rejects_unrelated_result_kind(self) -> None:
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
@@ -142,8 +175,26 @@ def _result() -> dict:
         "status": "recommended",
         "selected_candidate_id": "selected",
         "candidates": [
-            {"candidate_id": "baseline"},
-            {"candidate_id": "selected"},
+            {
+                "candidate_id": "baseline",
+                "stage": "baseline",
+                "knob_values": {
+                    "micro_batch_size": 8,
+                    "gradient_accumulation": 4,
+                    "dataloader_workers": 0,
+                    "cpu_threads": 1,
+                },
+            },
+            {
+                "candidate_id": "selected",
+                "stage": "batch_config",
+                "knob_values": {
+                    "micro_batch_size": 32,
+                    "gradient_accumulation": 1,
+                    "dataloader_workers": 0,
+                    "cpu_threads": 1,
+                },
+            },
         ],
         "trials": trials,
         "statistical_evidence": {
