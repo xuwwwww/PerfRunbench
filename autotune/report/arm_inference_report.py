@@ -96,6 +96,9 @@ def build_arm_inference_visual_summary(data: dict[str, Any]) -> dict[str, Any]:
                     analysis,
                 )
             )
+    screening_rejections = _screening_rejection_rows(
+        data.get("screening_summaries", [])
+    )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "kind": "arm_inference_visual_summary",
@@ -110,6 +113,7 @@ def build_arm_inference_visual_summary(data: dict[str, Any]) -> dict[str, Any]:
         "measured_http_requests": data.get("measured_http_requests"),
         "thread_scaling": thread_rows,
         "serving_comparisons": comparisons,
+        "screening_rejections": screening_rejections,
         "recommendation_count": len(data.get("recommendations", [])),
         "performance_passport_status": data.get("performance_passport_status"),
         "cleanup_passed": data.get("cleanup_passed"),
@@ -151,6 +155,17 @@ def format_arm_inference_report_html(
         "</tr>"
         for item in comparisons
     ) or '<tr><td colspan="6">No measured serving comparisons.</td></tr>'
+    rejection_rows = "".join(
+        "<tr>"
+        f"<td>{escape(item['profile_id'])}</td>"
+        f"<td>{escape(item['workload_id'])}</td>"
+        f"<td>{item['concurrency']}</td>"
+        f"<td>{item['failure_count']}</td>"
+        f"<td>{item['quality_failures']}</td>"
+        f"<td>{'yes' if item['client_limited'] else 'no'}</td>"
+        "</tr>"
+        for item in summary["screening_rejections"]
+    ) or '<tr><td colspan="6">No rejected screening slices.</td></tr>'
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -163,7 +178,7 @@ def format_arm_inference_report_html(
 .page{{max-width:1180px;margin:0 auto;padding:32px 28px 48px}}.hero{{border-bottom:3px solid var(--ink);padding-bottom:22px;margin-bottom:24px}}
 .eyebrow{{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--blue);margin:0 0 8px}}
 h1{{font-size:42px;line-height:1.08;margin:0 0 12px}}h2{{font-size:21px;margin:0 0 14px}}
-.lede,.note{{color:var(--muted);max-width:940px}}.stats{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}}
+.lede,.note{{color:var(--muted);max-width:940px}}.stats{{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:22px}}
 .stat,.panel{{border:1px solid var(--line);border-radius:8px;background:#fff}}.stat{{padding:14px}}
 .label{{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}}.value{{font-size:21px;font-weight:700;word-break:break-word}}
 .panel{{padding:18px;margin-bottom:16px}}.panel img{{display:block;width:100%;height:auto}}table{{width:100%;border-collapse:collapse}}
@@ -182,7 +197,8 @@ code{{font-family:Cascadia Mono,Consolas,monospace;font-size:.92em}}@media(max-w
 <div class="stat"><span class="label">Best eligible delta</span><span class="value">{_fmt(best)}%</span></div>
 <div class="stat"><span class="label">Measured requests</span><span class="value">{summary.get("measured_http_requests")}</span></div>
 <div class="stat"><span class="label">Candidates</span><span class="value">{summary.get("candidate_count_including_baseline")}</span></div>
-<div class="stat"><span class="label">Passport</span><span class="value">{escape(str(summary.get("performance_passport_status")))}</span></div>
+<div class="stat"><span class="label">Rejected slices</span><span class="value">{len(summary["screening_rejections"])}</span></div>
+<div class="stat"><span class="label">Passport</span><span class="value">{escape(str(summary.get("performance_passport_status")).replace("_", " "))}</span></div>
 </section>
 <section class="panel">
 <h2>Evidence boundary</h2>
@@ -201,6 +217,12 @@ code{{font-family:Cascadia Mono,Consolas,monospace;font-size:.92em}}@media(max-w
 <h2>Measured serving comparisons</h2>
 <table><thead><tr><th>Protocol</th><th>Workload</th><th>Baseline tok/s</th><th>Selected tok/s</th><th>Delta</th><th>Guard</th></tr></thead>
 <tbody>{comparison_rows}</tbody></table>
+</section>
+<section class="panel">
+<h2>Screening guards</h2>
+<p class="note">Failed and client-limited measurements remain visible and are excluded from recommendation selection.</p>
+<table><thead><tr><th>Profile</th><th>Workload</th><th>Concurrency</th><th>Failures</th><th>Quality failures</th><th>Client limited</th></tr></thead>
+<tbody>{rejection_rows}</tbody></table>
 </section>
 </main>
 </body>
@@ -239,6 +261,36 @@ def _comparison_rows(stage: str, analysis: dict[str, Any]) -> list[dict[str, Any
             "latency_eligible": item.get("latency_eligible") is True,
         })
     return rows
+
+
+def _screening_rejection_rows(items: Any) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        failure_count = int(item.get("failure_count") or 0)
+        quality_failures = int(item.get("quality_failures") or 0)
+        client_limited = item.get("client_limited") is True
+        if failure_count == 0 and quality_failures == 0 and not client_limited:
+            continue
+        rows.append({
+            "profile_id": str(item.get("profile_id") or "unknown"),
+            "workload_id": str(item.get("workload_id") or "unknown"),
+            "concurrency": int(item.get("concurrency") or 0),
+            "failure_count": failure_count,
+            "quality_failures": quality_failures,
+            "client_limited": client_limited,
+        })
+    return sorted(
+        rows,
+        key=lambda row: (
+            row["profile_id"],
+            row["workload_id"],
+            row["concurrency"],
+        ),
+    )
 
 
 def _thread_scaling_svg(rows: list[dict[str, Any]]) -> str:

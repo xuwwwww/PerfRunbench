@@ -27,10 +27,26 @@ class ArmInferenceReportTest(unittest.TestCase):
             self.assertEqual(summary["result_origin"], "measured")
             self.assertEqual(len(summary["thread_scaling"]), 4)
             self.assertEqual(len(summary["serving_comparisons"]), 2)
+            self.assertEqual(
+                summary["screening_rejections"],
+                [
+                    {
+                        "client_limited": True,
+                        "concurrency": 8,
+                        "failure_count": 12,
+                        "profile_id": "slots8-cont-on",
+                        "quality_failures": 12,
+                        "workload_id": "prefill-heavy",
+                    }
+                ],
+            )
             html = Path(outputs["report"]).read_text(encoding="utf-8")
             self.assertIn("Realistic Arm inference tuning", html)
             self.assertIn("Hardware scaling percentages and runtime-tuning percentages", html)
             self.assertIn("<code>summary.json</code>", html)
+            self.assertIn("Failed and client-limited measurements remain visible", html)
+            self.assertIn("eligible preliminary", html)
+            self.assertNotIn(">eligible_preliminary<", html)
             self.assertNotIn(str(root), html)
             charts = Path(outputs["charts"])
             self.assertIn("llama-bench thread scaling", (charts / "thread_scaling.svg").read_text(encoding="utf-8"))
@@ -128,6 +144,16 @@ def _result() -> dict:
                 {"threads": 8, "test": "tg128", "avg_tokens_per_second": 18.0, "stddev_tokens_per_second": 0.2},
             ]
         },
+        "screening_summaries": [
+            {
+                "profile_id": "slots8-cont-on",
+                "workload_id": "prefill-heavy",
+                "concurrency": 8,
+                "failure_count": 12,
+                "quality_failures": 12,
+                "client_limited": True,
+            }
+        ],
         "capacity_matched_7cpu": {
             "comparisons": [_comparison("interactive-short", 16.0, 30.0)]
         },
