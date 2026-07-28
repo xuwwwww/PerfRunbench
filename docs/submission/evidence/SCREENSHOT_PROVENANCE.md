@@ -52,13 +52,13 @@ cli-run-auto-fixture.png
 SHA-256 3d04aeb65bf246d1a5fdcbd6fedbf672c3fcba7452a20338327024377906d174
 
 PerfRunbench-Arm-AI-Challenge.pdf
-SHA-256 19b73708aa1d96b59f819421bfd48654744b39a487e34da43aa17b3006a3de78
-pages 9
+SHA-256 f9f4ecc8cdb33e13e62d5e2f12815e076644ba6f52c811b5c09ac1f7e88747bc
+pages 11
 media box 735.12 x 414 points
 ```
 
-Visual QA checked all nine slides at 1366x768 and 1920x1080. It reported zero
-overflow failures.
+Visual QA checked all eleven slides at 1366x768 and 1920x1080. It reported
+zero overflow failures.
 
 ## T4g Training Visual Evidence
 
@@ -90,4 +90,37 @@ SHA-256 53083edbee9e3d579c71ae4bbec3a72b0b98b332a0861a9d312535025cc91021
 
 paired_confirmation.csv
 SHA-256 0a4c0de57f462cbb0885cbf9c949b2105fe94c294438bcaa77567f1af9c69848
+```
+
+## C7g.4xlarge Realistic Arm Inference Evidence
+
+The eighth screenshot was rendered with headless Chrome at 1920x1080 from the
+sanitized checked-in HTML report. Its source is one measured C7g.4xlarge run:
+
+```text
+source_commit: fab3297a62e510cf33b4cf27771707514f8f8542
+result_origin: measured
+target: C7g.4xlarge / Linux aarch64 / Neoverse-V1
+measured_requests: 769
+server_startups: 17
+final_artifacts_checked_after_download: 278
+final_artifacts_failed_after_download: 0
+```
+
+The screenshot contains no AWS address, resource ID, SSH material, account
+identifier, model path, or private artifact path. It states that hardware
+scaling and runtime tuning use separate protocols and that loopback evidence
+is not remote-network evidence.
+
+Final artifacts:
+
+```text
+08-c7g4xlarge-workload-aware-evidence.png
+SHA-256 02a59badd80433c51951c132570ef3cfcb773d4c84fec2e98be8246eea76321b
+
+arm_inference_report.html
+SHA-256 a66d6f1b5c20fbe3a934477f7e421df1666d799302aabec2d08224d61cb013d0
+
+arm_inference_summary.json
+SHA-256 9ba49955ed27eb84eea44e2c5885be007346f4753af9d98e94b209f534683ee1
 ```

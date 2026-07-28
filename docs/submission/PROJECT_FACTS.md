@@ -115,6 +115,36 @@ by 69.375%-86.490% and reduced p95 TTFT by 91.128%-98.001%.
 This is not a universal speedup claim and must not be generalized to other
 models, hardware, concurrency levels, runtimes, or network paths.
 
+## Larger C7g Capacity Evidence
+
+A separate C7g.4xlarge loopback experiment used 16 logical Neoverse-V1 CPUs,
+one reserved local client CPU, 15 server CPUs, the same model digest, and a
+fresh pinned llama.cpp binary digest.
+
+The separate pp512/tg128 protocol scaled from 1 to 15 threads:
+
+```text
+prefill: 6.761 -> 73.669 tokens/s, 10.897x
+decode:  2.759 -> 30.089 tokens/s, 10.907x
+```
+
+Full-capacity concurrency-8 paired confirmation measured:
+
+| Workload | Baseline output tok/s | `slots4-cont-on` output tok/s | Delta | Eligibility |
+| --- | ---: | ---: | ---: | --- |
+| `decode-heavy` | 25.779 | 46.488 | +80.331% | eligible |
+| `interactive-short` | 25.600 | 43.712 | +70.749% | eligible |
+| `prefill-heavy` | 19.734 | 15.585 | -21.025% | rejected |
+
+The run recorded 769 measured HTTP requests, 17 fresh server starts, passed
+cleanup, and 278 independently revalidated downloaded artifacts. It also
+preserved HTTP 400 context-limit failures for the eight-slot long-prefill
+candidate.
+
+This result is loopback evidence, not remote-network evidence. It is not a
+direct C7g.2xlarge versus C7g.4xlarge comparison. Hardware-scaling and
+runtime-tuning percentages remain separate.
+
 ## Separate Measured Protocols
 
 Do not add, multiply, average, or otherwise combine these results with the
@@ -197,6 +227,7 @@ before that date. Significant work added during the submission period includes:
 - PyTorch training adapter and low-resource Arm validation
 - workload-aware llama-server serving autotuning
 - real C7g server plus T4g remote-client validation
+- larger C7g thread scaling and workload-aware loopback serving validation
 - config-free `run --auto` with quick, standard, and deep hard budgets
 - valid partial reports on timeout
 - portable `platform validate`
@@ -207,6 +238,7 @@ The repository history and evidence documents preserve these changes.
 ## Evidence Documents
 
 - `docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`
+- `docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md`
 - `docs/results/PHASE_21D3_SERVING_AUTOTUNING_PRODUCTIZATION.md`
 - `docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md`
 - `docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md`

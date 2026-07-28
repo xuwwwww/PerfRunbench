@@ -64,6 +64,18 @@ Slidev deck after its visual QA pass.
 - Scope: one T4g.small, CPU-only PyTorch 2.13.0, fixed effective batch size 32,
   5,000-step slices, 12 paired confirmations, T4g Unlimited surplus state
 
+### 8. Larger Arm Capacity And Workload-Aware Guards
+
+- File: `08-c7g4xlarge-workload-aware-evidence.png`
+- Caption:
+  `On one C7g.4xlarge and a pinned Qwen2.5-7B/llama.cpp loopback protocol, fifteen-thread throughput scaled about 10.9x over one thread; eligible concurrency-8 serving workloads improved 70.749%-80.331%, while prefill regression and context failures were rejected.`
+- Evidence class: measured
+- Scope: one C7g.4xlarge, Linux aarch64, Neoverse-V1, one pinned Qwen2.5-7B
+  Q4_K_M artifact, one pinned native llama.cpp build, one client CPU, fifteen
+  server CPUs, single-host loopback
+- Claim boundary: thread scaling and runtime tuning are separate protocols and
+  are not added; this is not remote-network evidence
+
 ## Supporting Assets
 
 - Deck source:

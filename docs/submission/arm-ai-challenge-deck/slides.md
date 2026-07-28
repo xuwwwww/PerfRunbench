@@ -301,10 +301,78 @@ class: slide-latency
 
 ---
 layout: default
+class: slide-scale
+---
+
+<div class="eyebrow">06 · LARGER ARM CAPACITY</div>
+<h2>Fifteen Arm cores delivered 10.9× single-stream throughput.</h2>
+
+<div class="scale-layout">
+  <div class="scale-chart">
+    <img src="/assets/c7g4xlarge-thread-scaling.svg" alt="Measured llama-bench prefill and decode throughput from one to fifteen threads" />
+  </div>
+  <div class="scale-facts">
+    <div class="scale-fact">
+      <span>PREFILL · PP512</span>
+      <strong>6.761 → 73.669</strong>
+      <b>10.897×</b>
+    </div>
+    <div class="scale-fact">
+      <span>DECODE · TG128</span>
+      <strong>2.759 → 30.089</strong>
+      <b>10.907×</b>
+    </div>
+    <div class="scale-efficiency">
+      <strong>72.6–72.7%</strong>
+      <span>parallel efficiency at 15 threads</span>
+    </div>
+  </div>
+</div>
+
+<div class="scope-note">Separate llama-bench protocol · one C7g.4xlarge · five measured repetitions per point · increasing shared-resource pressure is inferred, not proven by memory-controller counters.</div>
+
+<!--
+[Sources]
+- C7g.4xlarge measured scaling protocol and exact values: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md
+-->
+
+---
+layout: default
+class: slide-workload-guard
+---
+
+<div class="eyebrow">07 · WORKLOAD-AWARE RECOMMENDATION</div>
+<h2>One profile helped two workloads and hurt another.</h2>
+
+<div class="workload-guard-layout">
+  <div class="workload-guard-chart">
+    <img src="/assets/c7g4xlarge-serving-before-after.svg" alt="Paired serving throughput before and after on C7g.4xlarge" />
+  </div>
+  <div class="workload-guard-facts">
+    <div class="guard-result pass"><strong>+80.3%</strong><span>decode-heavy · eligible</span></div>
+    <div class="guard-result pass"><strong>+70.7%</strong><span>interactive-short · eligible</span></div>
+    <div class="guard-result reject"><strong>−21.0%</strong><span>prefill-heavy · rejected</span></div>
+    <div class="context-guard">
+      <span>8-SLOT CONTEXT GUARD</span>
+      <strong>412 required &gt; 256 available</strong>
+      <p>HTTP 400 failures preserved. No metric was invented.</p>
+    </div>
+  </div>
+</div>
+
+<div class="scope-note">Full-capacity loopback · concurrency 8 · three randomized paired blocks · fresh server restart per side · only interactive and decode enter the recommendation.</div>
+
+<!--
+[Sources]
+- C7g.4xlarge serving comparison, context failures, eligibility, cleanup, and artifact validation: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md
+-->
+
+---
+layout: default
 class: slide-no
 ---
 
-<div class="eyebrow">06 · STATISTICAL GUARD</div>
+<div class="eyebrow">08 · STATISTICAL GUARD</div>
 <h2>A trustworthy tuner must be able to say no.</h2>
 
 <div class="no-layout">
@@ -347,7 +415,7 @@ layout: default
 class: slide-platforms
 ---
 
-<div class="eyebrow">07 · ARM RELEVANCE + PORTABILITY</div>
+<div class="eyebrow">09 · ARM RELEVANCE + PORTABILITY</div>
 <h2>Performance evidence and compatibility validation are separate claims.</h2>
 
 <div class="platform-split">

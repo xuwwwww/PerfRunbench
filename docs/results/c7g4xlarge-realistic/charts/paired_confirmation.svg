@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620" role="img" aria-label="Paired confirmation deltas">
+<style>text{font-family:Segoe UI,Arial,sans-serif;fill:#0f172a;letter-spacing:0}.title{font-size:28px;font-weight:700}.subtitle{font-size:15px;fill:#64748b}.axis{font-size:12px;fill:#64748b}.note{font-size:14px;fill:#64748b}.legend{font-size:14px;font-weight:700}.row-label{font-size:14px;font-weight:600}.value{font-size:12px;font-weight:700}.status{font-size:15px;font-weight:700}</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="24" y="42" class="title">Paired confirmation deltas</text>
+<text x="24" y="70" class="subtitle">Median paired throughput delta; the dashed line is the 5% noise guard.</text>
+<line x1="250" y1="411.25" x2="1020" y2="411.25" stroke="#059669" stroke-dasharray="8 8" stroke-width="3"/>
+<line x1="346.25" y1="428.78" x2="346.25" y2="137.53" stroke="#dc2626" stroke-width="28"/>
+<text x="346.25" y="125.53" text-anchor="middle" class="value">83.089%</text>
+<text x="346.25" y="550" text-anchor="middle" class="axis">7-CPU capacity match / c4 / interactive-short</text>
+<line x1="538.75" y1="428.78" x2="538.75" y2="146.48" stroke="#dc2626" stroke-width="28"/>
+<text x="538.75" y="134.48" text-anchor="middle" class="value">80.535%</text>
+<text x="538.75" y="550" text-anchor="middle" class="axis">15-CPU full capacity / c8 / decode-heavy</text>
+<line x1="731.25" y1="428.78" x2="731.25" y2="180.78" stroke="#dc2626" stroke-width="28"/>
+<text x="731.25" y="168.78" text-anchor="middle" class="value">70.749%</text>
+<text x="731.25" y="550" text-anchor="middle" class="axis">15-CPU full capacity / c8 / interactive-short</text>
+<line x1="923.75" y1="428.78" x2="923.75" y2="502.47" stroke="#dc2626" stroke-width="28"/>
+<text x="923.75" y="490.47" text-anchor="middle" class="value">-21.025%</text>
+<text x="923.75" y="550" text-anchor="middle" class="axis">15-CPU full capacity / c8 / prefill-heavy</text>
+</svg>

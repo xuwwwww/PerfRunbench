@@ -16,6 +16,10 @@ The verified performance result is workload-aware serving autotuning:
 for the tested C7g server, T4g remote-client topology, Qwen2.5-7B Q4_K_M model,
 pinned binary, concurrency 4, and direct private network path.
 
+A later, separate C7g.4xlarge loopback experiment adds larger-target scaling
+and workload-aware guard evidence. It does not replace or extend the remote
+network claim.
+
 Recommended wording:
 
 ```text
@@ -42,6 +46,8 @@ binary, workload, concurrency, and measurement protocol.
 | Loopback serving | C7g local client/server loopback, `interactive-short` concurrency 4 | `slots4-cont-on` improved loopback output throughput by +67.602% and p95 TTFT by +91.064% | Loopback-only; not remote-network evidence |
 | Remote serving | C7g server, T4g remote client, direct private path, concurrency 4 | `slots4-cont-on` improved remote output throughput by +69.375% to +86.490% across the three J1 workloads, with p95 TTFT reductions above 91% | Validated remote-client serving recommendation |
 | Remote network tuning | C7g/T4g read-only network bottleneck evidence | No client or network bottleneck was observed, so IRQ/RPS/XPS/backlog tuning was not executed | No network recommendation |
+| Larger-target thread scaling | C7g.4xlarge, 1-15 threads, pp512/tg128, pinned Qwen2.5-7B Q4_K_M and fresh llama.cpp build | Prefill `6.761 -> 73.669 tok/s` (`10.897x`); decode `2.759 -> 30.089 tok/s` (`10.907x`) | Separate scaling protocol; not a cross-instance speedup |
+| Larger-target loopback serving | C7g.4xlarge, 15 server CPUs plus one client CPU, concurrency 8 | `slots4-cont-on` improved eligible interactive/decode throughput by `+70.749%` to `+80.331%`; prefill-heavy regressed `-21.025%` and was rejected | Loopback and workload scoped; not remote-network evidence |
 
 ## Remote Serving Result
 
@@ -69,6 +75,25 @@ artifact_validation: passed
 dual_host_restored: true
 ```
 
+## C7g.4xlarge Capacity Result
+
+The larger-target run used a separate binary digest and protocol. Its numbers
+must not be compared directly with, or added to, Phase 21D2B.
+
+| Protocol | Workload | Baseline output tok/s | Candidate output tok/s | Delta | TTFT p95 reduction | Eligible |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| 7-CPU capacity match / c4 | `interactive-short` | 14.297 | 26.168 | +83.033% | 71.791% | yes |
+| 15-CPU full capacity / c8 | `decode-heavy` | 25.779 | 46.488 | +80.331% | 67.736% | yes |
+| 15-CPU full capacity / c8 | `interactive-short` | 25.600 | 43.712 | +70.749% | 58.950% | yes |
+| 15-CPU full capacity / c8 | `prefill-heavy` | 19.734 | 15.585 | -21.025% | -109.684% | no |
+
+The full-capacity recommendation contains only `decode-heavy` and
+`interactive-short`. Eight slots failed long-prefill screening because the
+request required 412 context tokens while only 256 were available per slot.
+The run recorded 769 measured HTTP requests, zero eligible-confirmation
+failures, complete cleanup, and 278 independently revalidated downloaded
+artifacts.
+
 ## Recommendation Classes
 
 Eligible public serving recommendation classes:
@@ -93,5 +118,7 @@ Not created because evidence did not qualify:
 
 - `docs/results/PHASE_21D1_C7G_LOOPBACK_SERVING_VALIDATION.md`
 - `docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`
+- `docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md`
+- `docs/results/c7g4xlarge-realistic/`
 - `docs/results/VALIDATION_MATRIX.md`
 

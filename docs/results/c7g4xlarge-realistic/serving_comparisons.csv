@@ -1,0 +1,5 @@
+stage,workload_id,pair_count,baseline_output_tokens_per_second_median,candidate_output_tokens_per_second_median,ratio_of_medians_improvement_percent,baseline_ttft_p95_ms,candidate_ttft_p95_ms,ttft_p95_reduction_percent,guards_passed,cleanup_passed,throughput_eligible,latency_eligible
+7-CPU capacity match / c4,interactive-short,3,14.296658412619779,26.167595303033664,83.03294761477487,4628.442326399727,1305.6228022501955,71.79131314215196,True,True,True,True
+15-CPU full capacity / c8,decode-heavy,3,25.77915388286846,46.487845129137305,80.33115183051376,15816.690060500378,5103.116592450078,67.73587537638936,True,True,True,True
+15-CPU full capacity / c8,interactive-short,3,25.599882195487076,43.71155290374685,70.74903927273783,5978.607965750234,2454.2093437004496,58.95015432087326,True,True,True,True
+15-CPU full capacity / c8,prefill-heavy,3,19.73446180702333,15.58524355857617,-21.025241473626032,10106.897232950132,21192.544317249212,-109.68397945274506,True,True,False,False

@@ -275,6 +275,46 @@ docs/demo/SERVING_AUTOTUNING_COMMANDS.md
 docs/demo/SERVING_AUTOTUNING_TALK_TRACK.md
 ```
 
+## Larger Arm Capacity And Workload-Aware Guards
+
+A separate measured C7g.4xlarge experiment validates thread scaling and
+full-capacity serving behavior on 16 logical Neoverse-V1 CPUs. It uses a pinned
+Qwen2.5-7B Q4_K_M artifact, a pinned fresh llama.cpp build, one reserved local
+client CPU, and 15 server CPUs.
+
+The separate `llama-bench` pp512/tg128 protocol scaled from 1 to 15 threads:
+
+| Metric | 1 thread | 15 threads | Speedup | 15-thread efficiency |
+| --- | ---: | ---: | ---: | ---: |
+| prefill | `6.761 tok/s` | `73.669 tok/s` | `10.897x` | `72.6%` |
+| decode | `2.759 tok/s` | `30.089 tok/s` | `10.907x` | `72.7%` |
+
+Full-capacity loopback concurrency-8 paired confirmation produced a
+workload-scoped result:
+
+| Workload | Baseline output tok/s | `slots4-cont-on` output tok/s | Delta | Result |
+| --- | ---: | ---: | ---: | --- |
+| `decode-heavy` | `25.779` | `46.488` | `+80.331%` | eligible |
+| `interactive-short` | `25.600` | `43.712` | `+70.749%` | eligible |
+| `prefill-heavy` | `19.734` | `15.585` | `-21.025%` | rejected |
+
+The same run preserved two eight-slot long-prefill screening slices with HTTP
+400 context-limit failures and skipped full-capacity concurrency 4 because no
+candidate passed every screening guard. It recorded 769 measured HTTP
+requests, 17 fresh server starts, passed cleanup, and independently validated
+278 artifacts after download.
+
+![C7g.4xlarge serving before and after](docs/results/c7g4xlarge-realistic/charts/serving_before_after.svg)
+
+This is loopback evidence, not remote-network evidence. The hardware-scaling
+and runtime-tuning percentages are separate and are not combined. Detailed
+methodology, CSV data, charts, and the sanitized HTML report are in:
+
+```text
+docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md
+docs/results/c7g4xlarge-realistic/
+```
+
 ## Real Arm Evidence Snapshot
 
 The current measured Arm evidence is a preliminary single-target result on a

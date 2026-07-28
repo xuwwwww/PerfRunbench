@@ -37,4 +37,14 @@ concurrency 4
 direct private network path
 ```
 
+Slides 7 and 8 add a separate measured C7g.4xlarge protocol:
+
+- `llama-bench` pp512/tg128 scaling from 1 to 15 threads
+- 15-server-CPU loopback serving at concurrency 8
+- workload-scoped `slots4-cont-on` eligibility
+- explicit rejection of regressed and context-limited workloads
+
+The larger-target percentages are not added to the remote-client result and
+are not presented as a direct cross-instance comparison.
+
 Compatibility CI is shown separately and is not performance evidence.
