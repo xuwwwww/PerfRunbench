@@ -52,12 +52,14 @@ browser.
 ## Submission Status
 
 - [x] Official Rules and Devpost Terms accepted by the entrant.
-- [x] Project submitted to the Arm Create: AI Optimization Challenge.
-- [x] Submitted project page:
-  `https://devpost.com/software/project-9d2tryln4vo7`
-- [x] Anonymous HTTP access to the project page returns `200`.
-- [x] Public preview shows the Cloud AI track, six screenshots, repository link,
-  scoped Arm performance evidence, and no video embed.
+- [x] A withdrawal/disregard request was sent to the challenge manager after a
+  premature submission.
+- [ ] The challenge manager has confirmed withdrawal or disregard.
+- [ ] The entrant has completed a final review of all submission fields,
+  screenshots, links, and claims.
+- [ ] The demo video has been recorded and reviewed.
+- [ ] The entrant has explicitly approved final submission after review.
+- [ ] The final project has been submitted to the challenge.
 
 ## Evidence Integrity
 
@@ -88,5 +90,6 @@ browser.
 ## Optional Video
 
 - [x] Video is treated as optional under the competition rules.
-- [x] No placeholder, fake URL, or pending demo QR is submitted.
-- [x] Video is intentionally omitted from this submission package.
+- [x] No placeholder, fake URL, or pending demo QR is saved.
+- [ ] The final demo video has been recorded and reviewed.
+- [ ] Any entrant-approved video URL has been added to Devpost.

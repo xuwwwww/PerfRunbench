@@ -10,8 +10,6 @@ slides, release notes, and any later demo.
 - Submission version: `0.3.1`
 - Challenge track: `Cloud AI`
 - Product definition: guarded performance autotuning for repeatable workloads
-- Devpost submission: `https://devpost.com/software/project-9d2tryln4vo7`
-- Devpost status: submitted
 - Repository: `https://github.com/xuwwwww/PerfRunbench`
 - Release: `https://github.com/xuwwwww/PerfRunbench/releases/tag/v0.3.1`
 - License: MIT
