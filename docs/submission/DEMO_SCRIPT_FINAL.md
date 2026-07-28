@@ -146,7 +146,7 @@ Narration:
 Screen:
 
 - `docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md`
-- `docs/releases/v0.2.0.md`
+- `docs/releases/v0.3.1.md`
 
 Narration:
 

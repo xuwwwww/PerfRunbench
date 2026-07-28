@@ -1,102 +1,126 @@
 # PerfRunbench Competition Submission Facts
 
-This file is the source of truth for the competition submission package.
-Use these facts consistently across Devpost copy, screenshots, demo narration,
-charts, and release notes.
+This file is the claim source of truth for the Arm AI Optimization Challenge
+submission. Use these facts consistently across Devpost copy, screenshots,
+slides, release notes, and any later demo.
 
 ## Project Identity
 
 - Project title: `PerfRunbench`
-- Version: `0.2.0`
-- Product definition: PerfRunbench is a guarded performance autotuning system.
-- Repository URL: `https://github.com/xuwwwww/PerfRunbench`
-- GitHub Release URL: `https://github.com/xuwwwww/PerfRunbench/releases/tag/v0.2.0`
-- Related project: `https://github.com/xuwwwww/BootTraceBench` is external
-  experimental firmware-log work and is not part of the default tuning path.
+- Submission version: `0.3.1`
+- Challenge track: `Cloud AI`
+- Product definition: guarded performance autotuning for repeatable workloads
+- Repository: `https://github.com/xuwwwww/PerfRunbench`
+- Release: `https://github.com/xuwwwww/PerfRunbench/releases/tag/v0.3.1`
+- License: MIT
+- Submission language: English
 
-ArmTune is the Arm inference subsystem inside PerfRunbench. It should not be
-presented as a separate product competing with PerfRunbench.
+ArmTune is the Arm inference subsystem inside PerfRunbench. llama.cpp is the
+first inference adapter, not the product identity. BootTrace is preserved only
+as an optional experimental capability workload and is not part of the default
+tuning or recommendation path.
 
 ## One-Line Description
 
-One-command, guarded performance autotuning for Arm inference and PyTorch
-training workloads.
+Guarded autotuning for repeatable AI workloads on Arm, with bounded search,
+statistical confirmation, environment-bound reuse, and auditable evidence.
 
-## Product Narrative
+## Primary Flow
 
-A user wraps an existing workload with one command. PerfRunbench runs bounded
-tuning slices, evaluates declared configuration candidates, statistically
-confirms the best observed eligible configuration, caches the recommendation,
-and safely reuses it with environment validation, canary execution,
-process-scoped apply, and rollback.
+```text
+inspect target
+-> validate workload and environment
+-> establish baseline
+-> search a bounded candidate plan
+-> confirm the best observed eligible candidate
+-> generate a Performance Passport
+-> validate, canary, apply, lease, and roll back safely
+```
 
-## Core Commands
+The config-free public entry point is:
 
 ```bash
-autotuneai init --adapter pytorch-training --output autotune.yaml
-autotuneai doctor --config autotune.yaml -- python train.py
-autotuneai run --auto --config autotune.yaml -- python train.py
+autotuneai run --auto --preset quick -- python app.py
 ```
 
-First run:
+The serving path uses:
 
-```text
-cache miss
--> bounded tuning
--> fresh confirmation
--> recommendation
--> canary
--> full workload
+```bash
+autotuneai serve workload show interactive-short --json
+autotuneai serve recommend \
+  --workload interactive-short \
+  --concurrency 4 \
+  --recommendation-class maximum_throughput_remote
 ```
 
-Later runs:
+## Release And Compatibility Evidence
 
-```text
-cache lookup
--> environment validation
--> canary when required
--> reuse verified configuration
--> full workload
-```
-
-## Supported Platforms Validated For v0.2.0
-
-- Linux Arm64 C7g / Neoverse-V1 class target.
-- Linux Arm64 T4g / Neoverse-N1 class low-resource target.
-- Windows x86_64 controller and local CPU target.
-- GitHub Actions release validation matrix:
+- Public version: `0.3.1`
+- GitHub Actions release validation run:
+  `https://github.com/xuwwwww/PerfRunbench/actions/runs/30234620475`
+- Validated installed-wheel runners:
   - `windows-latest`
   - `ubuntu-latest`
   - `ubuntu-24.04-arm`
+- Release workflow head: `5ccab60b0db61d7d8473e2254eccd2c2457c5714`
 
-Do not compare throughput numbers across C7g, T4g, and Windows. These are
-different targets and validation protocols.
+Installed-wheel CI proves packaging and compatibility behavior. It is not
+measured performance evidence. Fixture values remain `result_origin:
+test_fixture`, including on a native Arm64 CI runner.
 
-## Supported Adapters In This Submission
+## Release Artifacts
 
-- `pytorch-training`: bounded synthetic CPU training slices and guarded cache
-  reuse.
-- `llama.cpp`: ArmTune inference build-profile and runtime tuning subsystem.
-- generic command workloads through existing PerfRunbench command wrappers.
+```text
+perfrunbench-0.3.1-py3-none-any.whl
+fe7a598305bfcc141ec9b20531f1083ad7254694d58d1a676cd124be55eaf33f
 
-## Core Differentiators
+perfrunbench-0.3.1.tar.gz
+83bf2f936c1e63f3c76768adc40d1e4ade550eb8373bf3026028714833609d8d
+```
 
-- One-command wrapping of existing workloads.
-- Architecture-aware tuning.
-- Bounded search instead of Cartesian explosion.
-- Preservation of training semantics.
-- Statistical confirmation.
-- Environment-bound recommendation cache.
-- Safe process-scoped apply.
-- Canary, lock, lease, and rollback.
-- Auditable Performance Passport.
-- Windows x86_64 and Linux Arm64 validation.
+These SHA-256 digests were independently verified against downloaded GitHub
+Release assets.
 
-## Measured Results To Use
+## Headline Measured Arm Serving Evidence
 
-Only use these measured results. Keep each protocol separate.
+The Phase 21D2B result is a real, protocol-specific remote-serving comparison:
 
-### C7g llama.cpp Build-Profile Comparison
+- Server: AWS C7g `c7g.2xlarge`, Linux Arm64, Neoverse-V1
+- Remote client: AWS T4g `t4g.small`, Linux Arm64, Neoverse-N1
+- Model: Qwen2.5-7B Instruct Q4_K_M
+- Runtime: pinned llama-server build
+- Traffic: closed-loop, concurrency 4
+- Network path: direct private target-to-target path
+- Candidate: `slots4-cont-on`
+- Measured requests: 608
+- Retries: 0
+- Request failures: 0
+- Quality failures: 0
+
+| Workload | J1 baseline output req/s | Candidate output req/s | Throughput improvement | Baseline p95 TTFT | Candidate p95 TTFT | p95 TTFT reduction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `interactive-short` | `17.032` | `31.355` | `84.092%` | `3055.682 ms` | `271.088 ms` | `91.128%` |
+| `decode-heavy` | `17.046` | `31.790` | `86.490%` | `10126.795 ms` | `202.424 ms` | `98.001%` |
+| `prefill-heavy` | `16.563` | `28.054` | `69.375%` | `3967.424 ms` | `341.693 ms` | `91.388%` |
+
+Approved headline wording:
+
+```text
+On the tested C7g Arm64 server, T4g Arm64 remote-client path, Qwen2.5-7B
+Q4_K_M model, closed-loop concurrency-4 workloads, and pinned measurement
+protocol, the validated slots4-cont-on candidate improved output throughput
+by 69.375%-86.490% and reduced p95 TTFT by 91.128%-98.001%.
+```
+
+This is not a universal speedup claim and must not be generalized to other
+models, hardware, concurrency levels, runtimes, or network paths.
+
+## Separate Measured Protocols
+
+Do not add, multiply, average, or otherwise combine these results with the
+remote-serving result.
+
+### C7g llama.cpp Build Profiles
 
 | Profile | Decode median |
 | --- | ---: |
@@ -112,89 +136,96 @@ Only use these measured results. Keep each protocol separate.
 | selected | `17.480 tokens/s` |
 | observed relative improvement | `28.246515%` |
 
-### C7g llama-server TTFT
+### C7g llama-server Secondary Measurement
 
 | Profile | TTFT median |
 | --- | ---: |
 | `portable-baseline` | `97.260 ms` |
 | `arm-native` | `62.826 ms` |
 
-### C7g Synthetic PyTorch Training
+### Synthetic Training Guard Validation
 
-| Item | Median |
-| --- | ---: |
-| baseline | `77859.454508 samples/s` |
-| selected | `203215.038822 samples/s` |
-| observed relative improvement | `161.002392%` |
+Synthetic PyTorch workloads validated tuning mechanics and guard behavior on
+C7g Arm64, T4g Arm64, and Windows x86-64. Those values are not production
+training performance claims and must not be compared across targets.
 
-### T4g Synthetic PyTorch Training
+## Safety And Guard Evidence
 
-| Item | Median |
-| --- | ---: |
-| baseline | `13796.607073 samples/s` |
-| selected | `28037.469976 samples/s` |
-| observed relative improvement | `103.220037%` |
+- Hard environment drift prevents recommendation reuse.
+- `run --best` never retunes.
+- Cache insertion requires eligible evidence.
+- Failed trials are not converted to zero.
+- Differences inside the configured noise band remain inconclusive.
+- Apply is process-scoped and covered by validation, canary, lease, cleanup,
+  and rollback.
+- System and kernel experiments are advanced opt-in.
+- Unsupported or unevidenced mechanisms are recorded without manufacturing a
+  recommendation.
+- Network tuning was not executed when prerequisite bottleneck evidence was
+  absent.
 
-### Windows x86 Synthetic PyTorch Paired Confirmation
+## Significant Updates During The Submission Period
 
-| Item | Median |
-| --- | ---: |
-| baseline | `41636.929876 samples/s` |
-| selected | `83556.804262 samples/s` |
+The challenge submission period began on June 10, 2026. The repository existed
+before that date. Significant work added during the submission period includes:
+
+- ArmTune Linux Arm64 local and SSH target inspection
+- versioned worker protocol and artifact validation
+- llama.cpp build-profile and bounded runtime autotuning
+- repeated paired comparison and noise-band classification
+- Performance Passport generation and verification
+- guarded recommendation validation, canary, lease, apply, and rollback
+- PyTorch training adapter and low-resource Arm validation
+- workload-aware llama-server serving autotuning
+- real C7g server plus T4g remote-client validation
+- config-free `run --auto` with quick, standard, and deep hard budgets
+- valid partial reports on timeout
+- portable `platform validate`
+- installed-wheel validation on Windows, Linux x86-64, and Linux Arm64
+
+The repository history and evidence documents preserve these changes.
 
 ## Evidence Documents
 
+- `docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`
+- `docs/results/PHASE_21D3_SERVING_AUTOTUNING_PRODUCTIZATION.md`
 - `docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md`
 - `docs/armtune/results/PHASE_10_GUARDED_APPLY_VALIDATION.md`
 - `docs/results/PHASE_14B_REAL_ARM_PYTORCH_VALIDATION.md`
 - `docs/results/PHASE_15A_T4G_LOW_RESOURCE_VALIDATION.md`
 - `docs/results/PHASE_15B_T4G_REAL_PYTORCH_VALIDATION.md`
 - `docs/results/PHASE_15C_WINDOWS_X86_PYTORCH_VALIDATION.md`
+- `docs/results/VALIDATED_PERFORMANCE_SUMMARY.md`
 - `docs/results/VALIDATION_MATRIX.md`
-- `docs/releases/v0.2.0.md`
-
-## Approved Result Wording
-
-Use this wording for recommendations:
-
-```text
-Best observed eligible configuration under the tested target, workload,
-runtime, and measurement protocol.
-```
-
-For Arm inference:
-
-```text
-Best observed eligible configuration under the tested Arm target, model,
-inference workload, and measurement protocol.
-```
+- `docs/releases/v0.3.1.md`
 
 ## Required Claim Boundaries
 
 Do not:
 
-- add improvements across protocols;
-- average improvements across machines;
-- compare samples/s with tokens/s;
-- rank C7g, T4g, and Windows by throughput;
-- claim that all PyTorch workloads improve by the measured synthetic amounts;
-- describe synthetic results as production training performance;
-- present fixture or CI smoke output as production Arm performance;
-- imply global optimality.
+- claim global optimality;
+- combine improvements from different protocols;
+- compare `samples/s` with `tokens/s` or requests/s;
+- rank C7g, T4g, and Windows using unrelated measurements;
+- describe synthetic or fixture output as production performance;
+- claim compiler, 64K-page, kernel, or network tuning improved performance;
+- claim KleidiAI without verified build and runtime evidence;
+- present CI compatibility as measured Arm performance;
+- expose private hosts, keys, model paths, or artifact locations.
 
-## Release Artifacts
-
-GitHub Release assets:
-
-- `perfrunbench-0.2.0-py3-none-any.whl`
-- `perfrunbench-0.2.0.tar.gz`
-
-Verified SHA-256 digests:
+Use this recommendation wording:
 
 ```text
-perfrunbench-0.2.0-py3-none-any.whl
-d1f4b01bc4251c13700f36deeae5deef982c778c33b2c8408a2883dc22e18e21
-
-perfrunbench-0.2.0.tar.gz
-da4e14021ef8daa8f214c575827fe9a07050685a89bb54f23746892ad7d0ee37
+Best observed eligible configuration under the tested target, model, workload,
+runtime, concurrency, topology, and measurement protocol.
 ```
+
+## Current Limitations
+
+- Headline serving evidence covers one C7g server, one T4g client, one model,
+  one pinned runtime, concurrency 4, and three declared workloads.
+- C7g and T4g are AWS Graviton targets; broader Arm server validation remains
+  future work.
+- PyTorch evidence uses public synthetic CPU workloads.
+- The project is published through GitHub Releases, not PyPI.
+- A demo video is optional and is not included in this submission package.

@@ -362,8 +362,9 @@ docs/SYSTEM_BENCHMARK_PROTOCOLS.md
 docs/ARM_4K_64K_KERNEL_COMPARISON.md
 ```
 
-Phase 21A is planning and fake-root validation only. It does not access AWS,
-does not modify a real host, and does not change the v0.2.0 release claims.
+The Phase 21A planning and fake-root validation artifacts do not modify a real
+host and do not create performance claims. Later real validations are
+documented separately under `docs/results/`.
 
 ## Related Historical Experiment
 
@@ -457,7 +458,13 @@ tests/            Unit, fixture, and fake integration tests.
 
 ## Current Status
 
-PerfRunbench ArmTune has a measured preliminary Arm build/runtime tuning result,
-a verified eligible preliminary Performance Passport, and a real guarded
-process-scoped apply validation. Release limitations are documented in
+PerfRunbench v0.3.1 includes real C7g Arm64 build/runtime evidence, a verified
+eligible preliminary Performance Passport, guarded process-scoped apply
+validation, and real C7g server plus T4g remote-client serving evidence.
+Protocol boundaries and release limitations are documented in
+`docs/results/VALIDATED_PERFORMANCE_SUMMARY.md` and
 `docs/armtune/LIMITATIONS.md`.
+
+## License
+
+PerfRunbench is available under the [MIT License](LICENSE).
