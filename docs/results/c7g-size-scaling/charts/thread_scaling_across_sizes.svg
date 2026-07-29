@@ -1,0 +1,76 @@
+<svg width="1200" height="650" viewBox="0 0 1200 650" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="llama-bench thread scaling across C7g sizes">
+<style>.title{font:700 29px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.axis{font:13px Segoe UI,Arial,sans-serif;fill:#64748b}.legend{font:600 14px Segoe UI,Arial,sans-serif;fill:#334155}.row-label{font:600 14px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 13px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:14px Segoe UI,Arial,sans-serif;fill:#64748b}</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="22" y="42" class="title">llama-bench thread scaling across C7g sizes</text>
+<text x="22" y="72" class="subtitle">Solid lines: prefill pp512. Dashed lines: decode tg128. Five measured repetitions per point.</text>
+<line x1="105" y1="545.00" x2="1150" y2="545.00" stroke="#dbe3ee"/>
+<text x="93" y="550.00" text-anchor="end" class="axis">0.000</text>
+<line x1="105" y1="459.00" x2="1150" y2="459.00" stroke="#dbe3ee"/>
+<text x="93" y="464.00" text-anchor="end" class="axis">16.486</text>
+<line x1="105" y1="373.00" x2="1150" y2="373.00" stroke="#dbe3ee"/>
+<text x="93" y="378.00" text-anchor="end" class="axis">32.972</text>
+<line x1="105" y1="287.00" x2="1150" y2="287.00" stroke="#dbe3ee"/>
+<text x="93" y="292.00" text-anchor="end" class="axis">49.458</text>
+<line x1="105" y1="201.00" x2="1150" y2="201.00" stroke="#dbe3ee"/>
+<text x="93" y="206.00" text-anchor="end" class="axis">65.944</text>
+<line x1="105" y1="115.00" x2="1150" y2="115.00" stroke="#dbe3ee"/>
+<text x="93" y="120.00" text-anchor="end" class="axis">82.429</text>
+<path d="M 105.00 510.02 L 179.64 483.71 L 254.29 459.22" fill="none" stroke="#2563eb" stroke-width="4"/>
+<circle cx="105.00" cy="510.02" r="5" fill="#2563eb"/>
+<circle cx="179.64" cy="483.71" r="5" fill="#2563eb"/>
+<circle cx="254.29" cy="459.22" r="5" fill="#2563eb"/>
+<path d="M 105.00 530.88 L 179.64 519.20 L 254.29 507.96" fill="none" stroke="#2563eb" stroke-width="4" stroke-dasharray="10 7"/>
+<circle cx="105.00" cy="530.88" r="5" fill="#2563eb"/>
+<circle cx="179.64" cy="519.20" r="5" fill="#2563eb"/>
+<circle cx="254.29" cy="507.96" r="5" fill="#2563eb"/>
+<path d="M 105.00 509.98 L 179.64 475.32 L 254.29 450.10 L 328.93 422.72 L 478.21 376.69 L 552.86 341.59" fill="none" stroke="#059669" stroke-width="4"/>
+<circle cx="105.00" cy="509.98" r="5" fill="#059669"/>
+<circle cx="179.64" cy="475.32" r="5" fill="#059669"/>
+<circle cx="254.29" cy="450.10" r="5" fill="#059669"/>
+<circle cx="328.93" cy="422.72" r="5" fill="#059669"/>
+<circle cx="478.21" cy="376.69" r="5" fill="#059669"/>
+<circle cx="552.86" cy="341.59" r="5" fill="#059669"/>
+<path d="M 105.00 530.73 L 179.64 517.05 L 254.29 505.60 L 328.93 494.89 L 478.21 474.24 L 552.86 463.93" fill="none" stroke="#059669" stroke-width="4" stroke-dasharray="10 7"/>
+<circle cx="105.00" cy="530.73" r="5" fill="#059669"/>
+<circle cx="179.64" cy="517.05" r="5" fill="#059669"/>
+<circle cx="254.29" cy="505.60" r="5" fill="#059669"/>
+<circle cx="328.93" cy="494.89" r="5" fill="#059669"/>
+<circle cx="478.21" cy="474.24" r="5" fill="#059669"/>
+<circle cx="552.86" cy="463.93" r="5" fill="#059669"/>
+<path d="M 105.00 509.98 L 179.64 473.72 L 254.29 441.10 L 328.93 405.86 L 478.21 359.69 L 552.86 322.35 L 627.50 300.32 L 926.07 221.04 L 1150.00 161.07" fill="none" stroke="#dc2626" stroke-width="4"/>
+<circle cx="105.00" cy="509.98" r="5" fill="#dc2626"/>
+<circle cx="179.64" cy="473.72" r="5" fill="#dc2626"/>
+<circle cx="254.29" cy="441.10" r="5" fill="#dc2626"/>
+<circle cx="328.93" cy="405.86" r="5" fill="#dc2626"/>
+<circle cx="478.21" cy="359.69" r="5" fill="#dc2626"/>
+<circle cx="552.86" cy="322.35" r="5" fill="#dc2626"/>
+<circle cx="627.50" cy="300.32" r="5" fill="#dc2626"/>
+<circle cx="926.07" cy="221.04" r="5" fill="#dc2626"/>
+<circle cx="1150.00" cy="161.07" r="5" fill="#dc2626"/>
+<path d="M 105.00 530.68 L 179.64 517.02 L 254.29 503.83 L 328.93 490.14 L 478.21 468.78 L 552.86 458.43 L 627.50 448.71 L 926.07 413.59 L 1150.00 389.18" fill="none" stroke="#dc2626" stroke-width="4" stroke-dasharray="10 7"/>
+<circle cx="105.00" cy="530.68" r="5" fill="#dc2626"/>
+<circle cx="179.64" cy="517.02" r="5" fill="#dc2626"/>
+<circle cx="254.29" cy="503.83" r="5" fill="#dc2626"/>
+<circle cx="328.93" cy="490.14" r="5" fill="#dc2626"/>
+<circle cx="478.21" cy="468.78" r="5" fill="#dc2626"/>
+<circle cx="552.86" cy="458.43" r="5" fill="#dc2626"/>
+<circle cx="627.50" cy="448.71" r="5" fill="#dc2626"/>
+<circle cx="926.07" cy="413.59" r="5" fill="#dc2626"/>
+<circle cx="1150.00" cy="389.18" r="5" fill="#dc2626"/>
+<text x="105.00" y="577" text-anchor="middle" class="axis">1</text>
+<text x="179.64" y="577" text-anchor="middle" class="axis">2</text>
+<text x="254.29" y="577" text-anchor="middle" class="axis">3</text>
+<text x="328.93" y="577" text-anchor="middle" class="axis">4</text>
+<text x="478.21" y="577" text-anchor="middle" class="axis">6</text>
+<text x="552.86" y="577" text-anchor="middle" class="axis">7</text>
+<text x="627.50" y="577" text-anchor="middle" class="axis">8</text>
+<text x="926.07" y="577" text-anchor="middle" class="axis">12</text>
+<text x="1150.00" y="577" text-anchor="middle" class="axis">15</text>
+<line x1="670" y1="82" x2="698" y2="82" stroke="#2563eb" stroke-width="5"/>
+<text x="706" y="87" class="legend">c7g.xlarge</text>
+<line x1="835" y1="82" x2="863" y2="82" stroke="#059669" stroke-width="5"/>
+<text x="871" y="87" class="legend">c7g.2xlarge</text>
+<line x1="1000" y1="82" x2="1028" y2="82" stroke="#dc2626" stroke-width="5"/>
+<text x="1036" y="87" class="legend">c7g.4xlarge</text>
+<text x="627.5" y="615" text-anchor="middle" class="note">server threads</text>
+</svg>

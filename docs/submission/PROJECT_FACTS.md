@@ -145,6 +145,39 @@ This result is loopback evidence, not remote-network evidence. It is not a
 direct C7g.2xlarge versus C7g.4xlarge comparison. Hardware-scaling and
 runtime-tuning percentages remain separate.
 
+## Same-Protocol C7g Size-Scaling Evidence
+
+A newer experiment used one pinned Qwen2.5-7B Q4_K_M artifact, llama.cpp
+runtime bundle, binary identity, client/server CPU-allocation rule, and
+concurrency-4 loopback protocol across `c7g.xlarge`, `c7g.2xlarge`, and
+`c7g.4xlarge`.
+
+| Target | Server threads | Decode baseline | Decode selected | Within-target delta |
+| --- | ---: | ---: | ---: | ---: |
+| `c7g.xlarge` | 3 | 6.237 tok/s | 12.136 tok/s | +94.585% |
+| `c7g.2xlarge` | 7 | 13.626 tok/s | 25.876 tok/s | +89.901% |
+| `c7g.4xlarge` | 15 | 25.475 tok/s | 46.186 tok/s | +81.296% |
+
+The formally confirmed interactive-short deltas were +84.866%, +81.040%, and
++73.324%. Four-slot prefill-heavy screening regressed by -38.977%, -38.039%,
+and -35.310%, so that workload was excluded on all three sizes.
+
+The three runs recorded 1,047 measured HTTP requests, 30 fresh server starts,
+zero request or quality failures, complete cleanup, and 514 successful
+controller-side digest checks after download.
+
+Approved wording:
+
+```text
+Under the tested C7g size, pinned model and llama.cpp runtime, single-host
+concurrency-4 protocol, and declared guards, four-slot continuous batching was
+the best observed eligible configuration for interactive-short and
+decode-heavy serving.
+```
+
+Do not combine the within-target tuning deltas with hardware-size scaling.
+These are loopback results, not remote-network evidence.
+
 ## Separate Measured Protocols
 
 Do not add, multiply, average, or otherwise combine these results with the

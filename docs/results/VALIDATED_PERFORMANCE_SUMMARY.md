@@ -20,6 +20,12 @@ A later, separate C7g.4xlarge loopback experiment adds larger-target scaling
 and workload-aware guard evidence. It does not replace or extend the remote
 network claim.
 
+A newer same-protocol C7g size-scaling experiment compares xlarge, 2xlarge,
+and 4xlarge with one pinned runtime and concurrency-4 loopback protocol. It
+confirms the same workload-aware result across three sizes: four-slot
+continuous batching is eligible for interactive/decode, while prefill-heavy is
+rejected.
+
 Recommended wording:
 
 ```text
@@ -48,6 +54,8 @@ binary, workload, concurrency, and measurement protocol.
 | Remote network tuning | C7g/T4g read-only network bottleneck evidence | No client or network bottleneck was observed, so IRQ/RPS/XPS/backlog tuning was not executed | No network recommendation |
 | Larger-target thread scaling | C7g.4xlarge, 1-15 threads, pp512/tg128, pinned Qwen2.5-7B Q4_K_M and fresh llama.cpp build | Prefill `6.761 -> 73.669 tok/s` (`10.897x`); decode `2.759 -> 30.089 tok/s` (`10.907x`) | Separate scaling protocol; not a cross-instance speedup |
 | Larger-target loopback serving | C7g.4xlarge, 15 server CPUs plus one client CPU, concurrency 8 | `slots4-cont-on` improved eligible interactive/decode throughput by `+70.749%` to `+80.331%`; prefill-heavy regressed `-21.025%` and was rejected | Loopback and workload scoped; not remote-network evidence |
+| Same-protocol C7g size scaling | C7g.xlarge, C7g.2xlarge, and C7g.4xlarge; pinned model/runtime; one client CPU; concurrency 4 | Decode baseline-to-selected medians were `6.237 -> 12.136`, `13.626 -> 25.876`, and `25.475 -> 46.186 tok/s`; within-target deltas were `+94.585%`, `+89.901%`, and `+81.296%` | Runtime tuning within each target; do not add to hardware scaling |
+| Cross-size workload guard | Same three-size protocol | Interactive/decode cleared the guard; four-slot prefill-heavy regressed `-38.977%`, `-38.039%`, and `-35.310%` and was rejected | No prefill-heavy recommendation |
 
 ## Remote Serving Result
 
@@ -94,6 +102,30 @@ The run recorded 769 measured HTTP requests, zero eligible-confirmation
 failures, complete cleanup, and 278 independently revalidated downloaded
 artifacts.
 
+## Three-Size C7g Result
+
+The newer three-size experiment uses one pinned model, source, runtime bundle,
+binary identity, CPU-allocation rule, and concurrency-4 loopback protocol.
+
+| Target | Server threads | Workload | Baseline tok/s | Selected tok/s | Delta | p95 TTFT reduction |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| `c7g.xlarge` | 3 | `interactive-short` | 6.204 | 11.470 | +84.866% | 74.005% |
+| `c7g.xlarge` | 3 | `decode-heavy` | 6.237 | 12.136 | +94.585% | 90.925% |
+| `c7g.2xlarge` | 7 | `interactive-short` | 13.554 | 24.539 | +81.040% | 75.229% |
+| `c7g.2xlarge` | 7 | `decode-heavy` | 13.626 | 25.876 | +89.901% | 90.404% |
+| `c7g.4xlarge` | 15 | `interactive-short` | 25.470 | 44.145 | +73.324% | 77.535% |
+| `c7g.4xlarge` | 15 | `decode-heavy` | 25.475 | 46.186 | +81.296% | 91.325% |
+
+All six 10,000-sample bootstrap intervals exclude zero. The protocol recorded
+1,047 measured HTTP requests, 30 fresh server starts, zero request or quality
+failures, complete cleanup, and 514 successful controller-side digest checks
+after download.
+
+The four-slot prefill-heavy candidate was rejected on every size. Detailed
+methodology and sanitized data are in
+`docs/results/C7G_SIZE_SCALING_VALIDATION.md` and
+`docs/results/c7g-size-scaling/`.
+
 ## Recommendation Classes
 
 Eligible public serving recommendation classes:
@@ -119,6 +151,7 @@ Not created because evidence did not qualify:
 - `docs/results/PHASE_21D1_C7G_LOOPBACK_SERVING_VALIDATION.md`
 - `docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md`
 - `docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md`
+- `docs/results/C7G_SIZE_SCALING_VALIDATION.md`
 - `docs/results/c7g4xlarge-realistic/`
 - `docs/results/VALIDATION_MATRIX.md`
 

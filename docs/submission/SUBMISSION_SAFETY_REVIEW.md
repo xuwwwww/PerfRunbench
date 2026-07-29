@@ -1,6 +1,6 @@
 # Submission Safety Review
 
-Review date: 2026-07-28
+Review date: 2026-07-29
 
 Scope:
 
@@ -27,6 +27,7 @@ from performance evidence.
 | v0.3.1 release documentation | present |
 | Validation matrix | present |
 | T4g visual training evidence | present |
+| C7g same-protocol size-scaling evidence | present |
 
 ## Public Links
 
@@ -54,6 +55,10 @@ Passed:
 - Compiler, kernel, 64K-page, and network experiments are not claimed as
   improvements.
 - No global-best or universal-speedup wording is used.
+- Same-protocol C7g hardware-scaling and runtime-tuning results remain separate
+  from the remote-client serving result and are not added or multiplied.
+- Prefill-heavy C7g results are reported as rejected negative evidence rather
+  than hidden or converted into an eligible recommendation.
 
 ## Privacy And Repository Review
 
@@ -71,8 +76,8 @@ The final scan covers text and generated assets for:
 Final scan result:
 
 ```text
-scanned_text_files: 36
-screenshots_validated: 7
+scanned_text_files: 33
+screenshots_validated: 10
 submission_failures: 0
 npm production vulnerabilities: 0
 ```
@@ -93,4 +98,4 @@ npm production vulnerabilities: 0
 - Save and re-open the Devpost project fields.
 - Confirm Cloud AI track selection.
 - Confirm signed-in account/team and Arm Developer Program registration.
-- Upload and inspect the seven final screenshots.
+- Review the eighth, ninth, and tenth screenshots before uploading them.

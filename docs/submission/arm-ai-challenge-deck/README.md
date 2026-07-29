@@ -37,14 +37,16 @@ concurrency 4
 direct private network path
 ```
 
-Slides 7 and 8 add a separate measured C7g.4xlarge protocol:
+Slides 5 through 7 add a same-identity, same-protocol C7g size-scaling
+validation:
 
-- `llama-bench` pp512/tg128 scaling from 1 to 15 threads
-- 15-server-CPU loopback serving at concurrency 8
-- workload-scoped `slots4-cont-on` eligibility
-- explicit rejection of regressed and context-limited workloads
+- `llama-bench` pp512/tg128 scaling on xlarge, 2xlarge, and 4xlarge
+- one client CPU reserved on every size
+- loopback serving at concurrency 4
+- workload-scoped four-slot continuous-batching eligibility
+- explicit rejection of prefill-heavy regressions
 
-The larger-target percentages are not added to the remote-client result and
-are not presented as a direct cross-instance comparison.
+Hardware-scaling values, loopback tuning percentages, and the Phase 21D2B
+remote-client percentages remain separate and are not added or multiplied.
 
 Compatibility CI is shown separately and is not performance evidence.

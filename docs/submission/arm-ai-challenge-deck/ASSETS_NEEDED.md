@@ -55,20 +55,21 @@ URL or placeholder demo QR.
 - Asset:
   `public/assets/repository-qr.svg`
 
-### C7g.4xlarge Measured Charts
+### C7g Same-Protocol Size-Scaling Charts
 
-- Slides: 7 and 8
+- Slides: 5, 6, and 7
 - Assets:
-  - `public/assets/c7g4xlarge-thread-scaling.svg`
-  - `public/assets/c7g4xlarge-serving-before-after.svg`
+  - `public/assets/c7g-size-thread-scaling.svg`
+  - `public/assets/c7g-size-serving-before-after.svg`
+  - `public/assets/c7g-size-workload-guard.svg`
 - Generated from:
-  `docs/results/c7g4xlarge-realistic/arm_inference_summary.json`
+  `docs/results/c7g-size-scaling/c7g_size_scaling_validation.json`
 - Source evidence:
-  `docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md`
+  `docs/results/C7G_SIZE_SCALING_VALIDATION.md`
 - Classification: measured Arm64 evidence
-- Claim boundary: one C7g.4xlarge, pinned model and binary, declared
-  llama-bench and loopback protocols; no cross-instance or remote-network
-  claim
+- Claim boundary: three C7g sizes with one pinned model/runtime identity and
+  declared llama-bench and loopback protocols; hardware scaling, runtime
+  tuning, and remote-client results remain separate
 
 ## Never Include
 

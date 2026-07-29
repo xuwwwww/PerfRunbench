@@ -1,0 +1,33 @@
+<svg width="1200" height="590" viewBox="0 0 1200 590" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Parallel efficiency at the largest measured server thread count">
+<style>.title{font:700 29px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.axis{font:13px Segoe UI,Arial,sans-serif;fill:#64748b}.legend{font:600 14px Segoe UI,Arial,sans-serif;fill:#334155}.row-label{font:600 14px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 13px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:14px Segoe UI,Arial,sans-serif;fill:#64748b}</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="22" y="42" class="title">Parallel efficiency at the largest measured server thread count</text>
+<text x="22" y="72" class="subtitle">Efficiency compares observed throughput with ideal linear scaling from the one-thread result.</text>
+<line x1="110" y1="500.00" x2="1140" y2="500.00" stroke="#dbe3ee"/>
+<text x="98" y="505.00" text-anchor="end" class="axis">0%</text>
+<line x1="110" y1="425.00" x2="1140" y2="425.00" stroke="#dbe3ee"/>
+<text x="98" y="430.00" text-anchor="end" class="axis">20%</text>
+<line x1="110" y1="350.00" x2="1140" y2="350.00" stroke="#dbe3ee"/>
+<text x="98" y="355.00" text-anchor="end" class="axis">40%</text>
+<line x1="110" y1="275.00" x2="1140" y2="275.00" stroke="#dbe3ee"/>
+<text x="98" y="280.00" text-anchor="end" class="axis">60%</text>
+<line x1="110" y1="200.00" x2="1140" y2="200.00" stroke="#dbe3ee"/>
+<text x="98" y="205.00" text-anchor="end" class="axis">80%</text>
+<line x1="110" y1="125.00" x2="1140" y2="125.00" stroke="#dbe3ee"/>
+<text x="98" y="130.00" text-anchor="end" class="axis">100%</text>
+<rect x="199.67" y="193.42" width="68" height="306.58" fill="#2563eb"/>
+<text x="233.67" y="183.42" text-anchor="middle" class="value">81.8%</text>
+<rect x="295.67" y="171.99" width="68" height="328.01" fill="#d97706"/>
+<text x="329.67" y="161.99" text-anchor="middle" class="value">87.5%</text>
+<text x="281.67" y="532" text-anchor="middle" class="legend">c7g.xlarge</text>
+<rect x="543.00" y="188.84" width="68" height="311.16" fill="#2563eb"/>
+<text x="577.00" y="178.84" text-anchor="middle" class="value">83.0%</text>
+<rect x="639.00" y="195.72" width="68" height="304.28" fill="#d97706"/>
+<text x="673.00" y="185.72" text-anchor="middle" class="value">81.1%</text>
+<text x="625.00" y="532" text-anchor="middle" class="legend">c7g.2xlarge</text>
+<rect x="886.33" y="225.95" width="68" height="274.05" fill="#2563eb"/>
+<text x="920.33" y="215.95" text-anchor="middle" class="value">73.1%</text>
+<rect x="982.33" y="227.92" width="68" height="272.08" fill="#d97706"/>
+<text x="1016.33" y="217.92" text-anchor="middle" class="value">72.6%</text>
+<text x="968.33" y="532" text-anchor="middle" class="legend">c7g.4xlarge</text>
+</svg>

@@ -23,6 +23,7 @@ Numbers from different targets or protocols must not be combined.
 | 21D1 | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama-server | loopback serving search | compatibility_verified | performance_improvement_verified | real measured loopback protocol |
 | 21D2A | synthetic dual-host plan | local fixture environment | CPU | serving network fixture | remote orchestration and drift guards | fixture_only | fixture_only | local fixture |
 | 21D2B | Arm64 / Neoverse-V1 server and Neoverse-N1 client | Linux | CPU | pinned llama-server | direct-private-path remote serving | compatibility_verified | performance_improvement_verified | real measured remote-client protocol |
+| C7g size scaling | Arm64 / Neoverse-V1 | Linux | CPU | pinned llama-bench and llama-server | same-identity scaling and guarded loopback serving on xlarge, 2xlarge, and 4xlarge | compatibility_verified | performance_improvement_verified | real measured same-protocol cross-size validation |
 | 22A local | AMD64 | Windows 10 | CPU | Python 3.11 generic command | bounded compatibility smoke | compatibility_verified | unavailable | local bounded validation |
 | 22A local | AMD64 | Windows 10 | NVIDIA GPU detected | PyTorch CPU/CUDA | dependency-preserving runtime probe | unavailable | unavailable | local bounded validation |
 | 22A local | AMD64 | Windows 10 | CPU | ONNX Runtime | dependency-preserving runtime probe | unavailable | unavailable | local bounded validation |
@@ -46,6 +47,34 @@ Numbers from different targets or protocols must not be combined.
 - Serving RecommendationBundles are bound to workload, traffic mode,
   concurrency class, server capability digest, binary/model digests, and
   loopback or remote-network topology.
+- The C7g size-scaling validation keeps one model, source revision, runtime
+  bundle, protocol, and client-CPU reservation fixed. Its loopback percentages
+  are separate from Phase 21D2B remote-client percentages and must not be
+  combined.
+
+## C7g Size-Scaling Summary
+
+The same pinned Qwen2.5-7B Q4_K_M artifact and llama.cpp runtime bundle were
+measured on `c7g.xlarge`, `c7g.2xlarge`, and `c7g.4xlarge`.
+
+```text
+targets: 3
+logical_cpus: 4, 8, 16
+maximum_server_threads: 3, 7, 15
+decode_tg128_at_max_threads_tok_s: 7.101, 15.541, 29.871
+formal_interactive_and_decode_comparisons: 6
+formal_comparisons_clearing_5_percent_noise_band: 6
+prefill_heavy_four_slot_slices_rejected: 3
+measured_http_requests: 1,047
+fresh_server_starts: 30
+downloaded_artifacts_revalidated: 514
+artifact_failures: 0
+cleanup_and_host_restoration: passed
+```
+
+The selected four-slot continuous-batching family was eligible only for
+`interactive-short` and `decode-heavy` at concurrency 4. `prefill-heavy`
+regressed on every size and was excluded from the recommendation.
 
 ## Phase 15C Summary
 
