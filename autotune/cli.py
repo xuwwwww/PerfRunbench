@@ -22,6 +22,7 @@ from autotune.report.run_report import generate_run_report
 from autotune.report.comparison_report import generate_comparison_report
 from autotune.report.training_tuning_report import generate_training_tuning_report
 from autotune.report.arm_inference_report import generate_arm_inference_report
+from autotune.report.arm_size_scaling_report import generate_arm_size_scaling_report
 from autotune.recommendation.optimizer import (
     LATEST_RECOMMENDATION,
     OPTIMIZATION_TARGETS,
@@ -209,6 +210,25 @@ def build_parser() -> argparse.ArgumentParser:
     report_arm_inference.add_argument("--input", required=True)
     report_arm_inference.add_argument("--output-dir")
     report_arm_inference.set_defaults(handler=_cmd_report_arm_inference)
+
+    report_arm_size_scaling = subparsers.add_parser(
+        "report-arm-size-scaling",
+        help="Export sanitized visual evidence from comparable measured Arm instance results.",
+    )
+    report_arm_size_scaling.add_argument(
+        "--input",
+        action="append",
+        required=True,
+        help="Measured per-instance summary JSON. Repeat once per instance.",
+    )
+    report_arm_size_scaling.add_argument(
+        "--controller-revalidation",
+        action="append",
+        required=True,
+        help="Controller artifact revalidation JSON paired by argument order with --input.",
+    )
+    report_arm_size_scaling.add_argument("--output-dir", required=True)
+    report_arm_size_scaling.set_defaults(handler=_cmd_report_arm_size_scaling)
 
     calibrate = subparsers.add_parser("calibrate-memory", help="Measure memory budget behavior on this machine.")
     calibrate.add_argument("--budget-gb", nargs="+", type=float, required=True)
@@ -611,6 +631,19 @@ def _cmd_report_arm_inference(args: argparse.Namespace) -> int:
     try:
         outputs = generate_arm_inference_report(
             args.input,
+            args.output_dir,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps(outputs, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_report_arm_size_scaling(args: argparse.Namespace) -> int:
+    try:
+        outputs = generate_arm_size_scaling_report(
+            args.input,
+            args.controller_revalidation,
             args.output_dir,
         )
     except (FileNotFoundError, ValueError) as exc:
