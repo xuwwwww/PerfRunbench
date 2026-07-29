@@ -1,0 +1,35 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Absolute decode serving throughput">
+<style>.title{font:700 29px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.axis{font:13px Segoe UI,Arial,sans-serif;fill:#64748b}.legend{font:600 14px Segoe UI,Arial,sans-serif;fill:#334155}.row-label{font:600 14px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 13px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:14px Segoe UI,Arial,sans-serif;fill:#64748b}</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="22" y="42" class="title">Absolute decode serving throughput</text>
+<text x="22" y="72" class="subtitle">Same pinned model and runtime; baseline and tuned values are shown separately for each instance size.</text>
+<line x1="100" y1="510.00" x2="1140" y2="510.00" stroke="#dbe3ee"/>
+<text x="88" y="515.00" text-anchor="end" class="axis">0.000</text>
+<line x1="100" y1="433.00" x2="1140" y2="433.00" stroke="#dbe3ee"/>
+<text x="88" y="438.00" text-anchor="end" class="axis">10.623</text>
+<line x1="100" y1="356.00" x2="1140" y2="356.00" stroke="#dbe3ee"/>
+<text x="88" y="361.00" text-anchor="end" class="axis">21.245</text>
+<line x1="100" y1="279.00" x2="1140" y2="279.00" stroke="#dbe3ee"/>
+<text x="88" y="284.00" text-anchor="end" class="axis">31.868</text>
+<line x1="100" y1="202.00" x2="1140" y2="202.00" stroke="#dbe3ee"/>
+<text x="88" y="207.00" text-anchor="end" class="axis">42.491</text>
+<line x1="100" y1="125.00" x2="1140" y2="125.00" stroke="#dbe3ee"/>
+<text x="88" y="130.00" text-anchor="end" class="axis">53.113</text>
+<rect x="196.33" y="464.79" width="64" height="45.21" fill="#2563eb"/>
+<text x="228.33" y="454.79" text-anchor="middle" class="value">6.237</text>
+<text x="228.33" y="566" text-anchor="middle" class="axis">baseline</text>
+<rect x="286.33" y="422.03" width="64" height="87.97" fill="#dc2626"/>
+<text x="318.33" y="412.03" text-anchor="middle" class="value">12.136</text>
+<text x="318.33" y="566" text-anchor="middle" class="axis">tuned</text>
+<text x="273.33" y="540" text-anchor="middle" class="legend">c7g.xlarge</text>
+<rect x="543.00" y="411.23" width="64" height="98.77" fill="#2563eb"/>
+<text x="575.00" y="401.23" text-anchor="middle" class="value">13.626</text>
+<rect x="633.00" y="322.44" width="64" height="187.56" fill="#dc2626"/>
+<text x="665.00" y="312.44" text-anchor="middle" class="value">25.876</text>
+<text x="620.00" y="540" text-anchor="middle" class="legend">c7g.2xlarge</text>
+<rect x="889.67" y="325.34" width="64" height="184.66" fill="#2563eb"/>
+<text x="921.67" y="315.34" text-anchor="middle" class="value">25.475</text>
+<rect x="979.67" y="175.22" width="64" height="334.78" fill="#dc2626"/>
+<text x="1011.67" y="165.22" text-anchor="middle" class="value">46.186</text>
+<text x="966.67" y="540" text-anchor="middle" class="legend">c7g.4xlarge</text>
+</svg>

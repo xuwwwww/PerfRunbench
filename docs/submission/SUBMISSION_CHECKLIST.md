@@ -50,6 +50,10 @@ browser.
 - [x] Final seven-image screenshot set uploaded to Devpost.
 - [x] C7g.4xlarge evidence overview is prepared as the eighth sanitized image.
 - [ ] The entrant has reviewed and uploaded the eighth screenshot to Devpost.
+- [x] Same-protocol C7g size-scaling images are prepared as the ninth and tenth
+  sanitized images.
+- [ ] The entrant has reviewed and uploaded the ninth and tenth screenshots to
+  Devpost.
 
 ## Submission Status
 

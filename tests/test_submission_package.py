@@ -33,7 +33,7 @@ class SubmissionPackageTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(payload["status"], "passed")
         self.assertEqual(payload["failures"], [])
-        self.assertEqual(len(payload["screenshots"]), 6)
+        self.assertEqual(len(payload["screenshots"]), 10)
         self.assertTrue(payload["pdf"]["path"].endswith(".pdf"))
 
 

@@ -275,6 +275,41 @@ docs/demo/SERVING_AUTOTUNING_COMMANDS.md
 docs/demo/SERVING_AUTOTUNING_TALK_TRACK.md
 ```
 
+## Same-Protocol C7g Size Scaling
+
+A separate measured experiment used the same pinned Qwen2.5-7B Q4_K_M model,
+llama.cpp runtime bundle, binaries, CPU-allocation rule, and concurrency-4
+loopback protocol on three AWS Graviton3 sizes:
+
+| Target | Logical CPUs | Server threads | Decode baseline tok/s | Tuned tok/s | Tuned delta |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `c7g.xlarge` | 4 | 3 | 6.237 | 12.136 | +94.585% |
+| `c7g.2xlarge` | 8 | 7 | 13.626 | 25.876 | +89.901% |
+| `c7g.4xlarge` | 16 | 15 | 25.475 | 46.186 | +81.296% |
+
+The same four-slot continuous-batching family also improved formally confirmed
+`interactive-short` throughput by `+73.324%` to `+84.866%`. It was not
+recommended for `prefill-heavy`: screening regressed by `-35.310%` to
+`-38.977%` and triggered the TTFT guard on all three sizes.
+
+![C7g size scaling and guarded serving](docs/results/c7g-size-scaling/charts/serving_before_after_by_size.svg)
+
+Across the three targets, the protocol recorded `1,047` measured HTTP
+requests, `30` fresh server starts, zero request or quality failures, complete
+cleanup, and `514` successful controller-side artifact digest checks after
+download.
+
+These percentages describe runtime tuning within each target. They are not
+added to hardware-size scaling, are not remote-network evidence, and are not a
+universal Arm or llama.cpp speedup claim.
+
+Detailed methodology, sanitized JSON/CSV data, charts, and the report are in:
+
+```text
+docs/results/C7G_SIZE_SCALING_VALIDATION.md
+docs/results/c7g-size-scaling/
+```
+
 ## Larger Arm Capacity And Workload-Aware Guards
 
 A separate measured C7g.4xlarge experiment validates thread scaling and

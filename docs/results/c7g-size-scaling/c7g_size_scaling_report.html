@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PerfRunbench C7g Size-Scaling Evidence</title>
+<style>
+:root{--ink:#0f172a;--muted:#64748b;--line:#dbe3ee;--blue:#2563eb;--red:#dc2626;--green:#059669;--paper:#ffffff;--wash:#f8fafc}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:Segoe UI,Arial,sans-serif;letter-spacing:0}
+.page{max-width:1220px;margin:0 auto;padding:34px 30px 54px}.hero{border-bottom:4px solid var(--ink);padding-bottom:24px;margin-bottom:24px}
+.eyebrow{margin:0 0 8px;color:var(--blue);font-size:13px;font-weight:700;text-transform:uppercase}
+h1{margin:0 0 12px;font-size:44px;line-height:1.08}h2{font-size:23px;margin:0 0 14px}h3{font-size:17px;margin:0 0 8px}
+.lede,.note{color:var(--muted);max-width:980px;line-height:1.55}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:24px 0}
+.metric{border-top:4px solid var(--blue);padding:13px 2px 8px}.metric strong{display:block;font-size:27px}.metric span{font-size:12px;color:var(--muted);text-transform:uppercase}
+.band{border-top:1px solid var(--line);padding:24px 0}.band img{display:block;width:100%;height:auto}.guard{border-left:5px solid var(--green);padding:14px 18px;background:var(--wash)}
+table{width:100%;border-collapse:collapse}th,td{padding:10px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--muted);text-transform:uppercase}code{font-family:Cascadia Mono,Consolas,monospace;font-size:.92em}
+dl{display:grid;grid-template-columns:190px 1fr;gap:10px 18px}dt{font-weight:700;text-transform:uppercase;font-size:12px}dd{margin:0;color:var(--muted);line-height:1.45}
+@media(max-width:800px){.page{padding:22px 14px}.metrics{grid-template-columns:1fr 1fr}h1{font-size:34px}table{font-size:13px}dl{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="page">
+<header class="hero">
+<p class="eyebrow">PerfRunbench measured Arm64 evidence</p>
+<h1>One workload, three C7g sizes, guarded tuning</h1>
+<p class="lede">The same pinned Qwen2.5-7B Q4_K_M model and llama.cpp runtime were measured on C7g.xlarge, C7g.2xlarge, and C7g.4xlarge. A fixed protocol separates hardware scaling from runtime tuning.</p>
+</header>
+<section class="metrics">
+<div class="metric"><strong>3</strong><span>Graviton3 sizes</span></div>
+<div class="metric"><strong>1047</strong><span>Measured HTTP requests</span></div>
+<div class="metric"><strong>30</strong><span>Fresh server starts</span></div>
+<div class="metric"><strong>514</strong><span>Artifacts revalidated</span></div>
+</section>
+<section class="band">
+<h2>Evidence boundary</h2>
+<p class="note">Measured results apply only to the tested C7g sizes, pinned model and runtime, reserved loopback client CPU, concurrency-4 workloads, and declared protocols. Hardware-size scaling and runtime-tuning percentages are reported separately and are never added. Prefill-heavy serving regressions were rejected by the guard.</p>
+<table><thead><tr><th>Instance</th><th>vCPU</th><th>Memory</th><th>Server threads</th><th>HTTP requests</th><th>Controller digest checks</th></tr></thead>
+<tbody><tr><td><strong>c7g.xlarge</strong></td><td>4</td><td>8 GiB</td><td>3</td><td>349</td><td>156 / 0</td></tr><tr><td><strong>c7g.2xlarge</strong></td><td>8</td><td>16 GiB</td><td>7</td><td>349</td><td>174 / 0</td></tr><tr><td><strong>c7g.4xlarge</strong></td><td>16</td><td>32 GiB</td><td>15</td><td>349</td><td>184 / 0</td></tr></tbody></table>
+</section>
+<section class="band"><h2>Thread scaling across three C7g sizes</h2><img src="charts/thread_scaling_across_sizes.svg" alt="Thread scaling across three C7g sizes"></section>
+<section class="band"><h2>Serving before and after by size</h2><img src="charts/serving_before_after_by_size.svg" alt="Serving before and after by size"></section>
+<section class="band"><h2>Absolute decode throughput by size</h2><img src="charts/absolute_throughput_by_size.svg" alt="Absolute decode throughput by size"></section>
+<section class="band"><h2>Interactive p95 TTFT before and after</h2><img src="charts/ttft_before_after_by_size.svg" alt="Interactive p95 TTFT before and after"></section>
+<section class="band"><h2>Workload-aware recommendation guard</h2><img src="charts/workload_guard_matrix.svg" alt="Workload-aware recommendation guard"></section>
+<section class="band"><h2>Parallel efficiency</h2><img src="charts/parallel_efficiency.svg" alt="Parallel efficiency"></section>
+<section class="band">
+<h2>Formal paired confirmation</h2>
+<table><thead><tr><th>Instance</th><th>Workload</th><th>Baseline tok/s</th><th>Tuned tok/s</th><th>Delta</th><th>Baseline p95 TTFT ms</th><th>Tuned p95 TTFT ms</th><th>Guard</th></tr></thead>
+<tbody><tr><td>c7g.xlarge</td><td>decode-heavy</td><td>6.237</td><td>12.136</td><td>94.585%</td><td>28153.010</td><td>2554.761</td><td>passed</td></tr><tr><td>c7g.xlarge</td><td>interactive-short</td><td>6.204</td><td>11.470</td><td>84.866%</td><td>10672.111</td><td>2774.197</td><td>passed</td></tr><tr><td>c7g.2xlarge</td><td>decode-heavy</td><td>13.626</td><td>25.876</td><td>89.901%</td><td>12879.642</td><td>1235.923</td><td>passed</td></tr><tr><td>c7g.2xlarge</td><td>interactive-short</td><td>13.554</td><td>24.539</td><td>81.040%</td><td>4880.742</td><td>1208.990</td><td>passed</td></tr><tr><td>c7g.4xlarge</td><td>decode-heavy</td><td>25.475</td><td>46.186</td><td>81.296%</td><td>7058.402</td><td>612.340</td><td>passed</td></tr><tr><td>c7g.4xlarge</td><td>interactive-short</td><td>25.470</td><td>44.145</td><td>73.324%</td><td>2607.447</td><td>585.763</td><td>passed</td></tr></tbody></table>
+</section>
+<section class="band">
+<h2>Why the guard matters</h2>
+<div class="guard"><strong>Prefill-heavy was not recommended.</strong> Four-slot serving increased interactive and decode throughput, but prefill-heavy screening regressed on all three sizes and triggered the TTFT guard.</div>
+</section>
+<section class="band">
+<h2>Glossary</h2>
+<dl><dt>prefill</dt><dd>Processing input prompt tokens before generation begins.</dd><dt>decode</dt><dd>Generating output tokens after prompt processing.</dd><dt>ttft</dt><dd>Time to first token, measured from request start to the first streamed token.</dd><dt>p95</dt><dd>The value at or below which 95% of observations fall.</dd><dt>continuous batching</dt><dd>Scheduling active requests together as token generation progresses.</dd><dt>noise band</dt><dd>A minimum change threshold used to avoid recommending measurement noise.</dd><dt>bootstrap interval</dt><dd>A resampled uncertainty interval computed from paired measurements.</dd><dt>parallel efficiency</dt><dd>Observed throughput divided by ideal linear throughput at the same thread count.</dd><dt>performance passport</dt><dd>A versioned evidence record binding results to target, model, runtime, protocol, and guards.</dd></dl>
+</section>
+</main>
+</body>
+</html>

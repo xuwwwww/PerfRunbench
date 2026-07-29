@@ -1,0 +1,42 @@
+<svg width="1200" height="590" viewBox="0 0 1200 590" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Serving before and after by C7g size">
+<style>.title{font:700 29px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.axis{font:13px Segoe UI,Arial,sans-serif;fill:#64748b}.legend{font:600 14px Segoe UI,Arial,sans-serif;fill:#334155}.row-label{font:600 14px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 13px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:14px Segoe UI,Arial,sans-serif;fill:#64748b}</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="22" y="42" class="title">Serving before and after by C7g size</text>
+<text x="22" y="72" class="subtitle">Formal paired confirmation, concurrency 4. Blue is one-slot baseline; red is four-slot continuous batching.</text>
+<text x="22" y="130" class="row-label">c7g.xlarge / decode-heavy</text>
+<line x1="410.07" y1="125" x2="504.73" y2="125" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="410.07" cy="125" r="8" fill="#2563eb"/>
+<circle cx="504.73" cy="125" r="8" fill="#dc2626"/>
+<text x="410.07" y="111" text-anchor="middle" class="value">6.237</text>
+<text x="504.73" y="152" text-anchor="middle" class="value">12.136</text>
+<text x="22" y="198" class="row-label">c7g.xlarge / interactive-short</text>
+<line x1="409.55" y1="193" x2="494.04" y2="193" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="409.55" cy="193" r="8" fill="#2563eb"/>
+<circle cx="494.04" cy="193" r="8" fill="#dc2626"/>
+<text x="409.55" y="179" text-anchor="middle" class="value">6.204</text>
+<text x="494.04" y="220" text-anchor="middle" class="value">11.470</text>
+<text x="22" y="266" class="row-label">c7g.2xlarge / decode-heavy</text>
+<line x1="528.63" y1="261" x2="725.19" y2="261" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="528.63" cy="261" r="8" fill="#2563eb"/>
+<circle cx="725.19" cy="261" r="8" fill="#dc2626"/>
+<text x="528.63" y="247" text-anchor="middle" class="value">13.626</text>
+<text x="725.19" y="288" text-anchor="middle" class="value">25.876</text>
+<text x="22" y="334" class="row-label">c7g.2xlarge / interactive-short</text>
+<line x1="527.49" y1="329" x2="703.73" y2="329" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="527.49" cy="329" r="8" fill="#2563eb"/>
+<circle cx="703.73" cy="329" r="8" fill="#dc2626"/>
+<text x="527.49" y="315" text-anchor="middle" class="value">13.554</text>
+<text x="703.73" y="356" text-anchor="middle" class="value">24.539</text>
+<text x="22" y="402" class="row-label">c7g.4xlarge / decode-heavy</text>
+<line x1="718.76" y1="397" x2="1051.07" y2="397" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="718.76" cy="397" r="8" fill="#2563eb"/>
+<circle cx="1051.07" cy="397" r="8" fill="#dc2626"/>
+<text x="718.76" y="383" text-anchor="middle" class="value">25.475</text>
+<text x="1051.07" y="424" text-anchor="middle" class="value">46.186</text>
+<text x="22" y="470" class="row-label">c7g.4xlarge / interactive-short</text>
+<line x1="718.68" y1="465" x2="1018.34" y2="465" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="718.68" cy="465" r="8" fill="#2563eb"/>
+<circle cx="1018.34" cy="465" r="8" fill="#dc2626"/>
+<text x="718.68" y="451" text-anchor="middle" class="value">25.470</text>
+<text x="1018.34" y="492" text-anchor="middle" class="value">44.145</text>
+</svg>

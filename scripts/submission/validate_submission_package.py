@@ -32,6 +32,10 @@ EXPECTED_SCREENSHOTS = (
     "04-public-fixture-run-auto.png",
     "05-recommendation-guards.png",
     "06-arm-and-platform-validation.png",
+    "07-t4g-training-tuning-evidence.png",
+    "08-c7g4xlarge-workload-aware-evidence.png",
+    "09-c7g-size-thread-scaling.png",
+    "10-c7g-size-before-after.png",
 )
 
 TEXT_SUFFIXES = {".md", ".json", ".py", ".css", ".mjs", ".svg"}

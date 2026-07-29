@@ -52,7 +52,7 @@ cli-run-auto-fixture.png
 SHA-256 3d04aeb65bf246d1a5fdcbd6fedbf672c3fcba7452a20338327024377906d174
 
 PerfRunbench-Arm-AI-Challenge.pdf
-SHA-256 f9f4ecc8cdb33e13e62d5e2f12815e076644ba6f52c811b5c09ac1f7e88747bc
+SHA-256 2d6b7361f62a2c2c94262ee65aa68e92680adfb2181470c8a924c1547fb831c4
 pages 11
 media box 735.12 x 414 points
 ```
@@ -123,4 +123,46 @@ SHA-256 a66d6f1b5c20fbe3a934477f7e421df1666d799302aabec2d08224d61cb013d0
 
 arm_inference_summary.json
 SHA-256 9ba49955ed27eb84eea44e2c5885be007346f4753af9d98e94b209f534683ee1
+```
+
+## C7g Same-Protocol Size-Scaling Evidence
+
+The ninth and tenth screenshots are the 1920x1080 headless-Chrome renders of
+slides 5 and 6 from the checked-in Slidev deck. Those slides embed charts
+generated from the sanitized C7g size-scaling report. The report combines
+three independently preserved measured summaries only after validating their
+shared model, source, binary, runtime-bundle, topology, protocol, cleanup, and
+artifact identities. The complete deck passed viewport QA at 1366x768 and
+1920x1080 with zero overflow failures.
+
+```text
+source_under_test: 93b179a1c8a2370c1d6d3042909054af7ccfe666
+result_origin: measured
+targets: c7g.xlarge, c7g.2xlarge, c7g.4xlarge
+measured_http_requests: 1,047
+fresh_server_starts: 30
+downloaded_artifacts_revalidated: 514
+downloaded_artifact_failures: 0
+```
+
+The screenshots contain no AWS address or resource ID, SSH material, account
+identifier, model path, private artifact path, or local absolute path. The
+thread-scaling chart and runtime-tuning chart are explicitly separate
+protocols. The tuning percentages are loopback results and are not combined
+with the Phase 21D2B remote-client result.
+
+Final artifacts:
+
+```text
+09-c7g-size-thread-scaling.png
+SHA-256 5ecb437962fa944f0ca6be8061b8d7565667ca9e1781b92b78b172220b31a173
+
+10-c7g-size-before-after.png
+SHA-256 3d5abc639d6d8f500ee908d03ed858397407f977a400ca2bcfc536b7e72cc026
+
+c7g_size_scaling_report.html
+SHA-256 d1e0dd61b69f1bd3873ca3d01dc4c1359a2dc30e9a5f70a6e0ab59572f08a2c2
+
+c7g_size_scaling_validation.json
+SHA-256 d5e5f352c0210b79172682aea6d9eb1069f1b0e6c639518cf504000c838a63e4
 ```

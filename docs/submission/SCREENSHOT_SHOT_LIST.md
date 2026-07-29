@@ -76,6 +76,29 @@ Slidev deck after its visual QA pass.
 - Claim boundary: thread scaling and runtime tuning are separate protocols and
   are not added; this is not remote-network evidence
 
+### 9. Same-Protocol C7g Thread Scaling
+
+- File: `09-c7g-size-thread-scaling.png`
+- Caption:
+  `With one pinned model and llama.cpp runtime, measured pp512/tg128 throughput scales across C7g.xlarge, C7g.2xlarge, and C7g.4xlarge while the largest thread point reserves one CPU for the client.`
+- Evidence class: measured
+- Scope: three AWS C7g sizes, Linux aarch64 / Neoverse-V1, one pinned
+  Qwen2.5-7B Q4_K_M artifact, one pinned llama.cpp runtime bundle, one warm-up
+  and five measured repetitions per thread point
+- Claim boundary: absolute hardware scaling; not a runtime-tuning percentage
+
+### 10. C7g Before And After With Workload Guards
+
+- File: `10-c7g-size-before-after.png`
+- Caption:
+  `Across three tested C7g sizes, four-slot continuous batching improved eligible interactive and decode serving under the same concurrency-4 loopback protocol; prefill-heavy traffic was rejected separately.`
+- Evidence class: measured
+- Scope: three AWS C7g sizes, pinned identity, single-host loopback,
+  concurrency 4, three randomized paired blocks and 20 measured requests per
+  workload and side
+- Claim boundary: loopback serving only; percentages are not added to
+  cross-size scaling or remote-client results
+
 ## Supporting Assets
 
 - Deck source:
@@ -86,6 +109,8 @@ Slidev deck after its visual QA pass.
   `docs/submission/evidence/public_fixture_run_auto.json`
 - Screenshot provenance:
   `docs/submission/evidence/SCREENSHOT_PROVENANCE.md`
+- C7g size-scaling report:
+  `docs/results/C7G_SIZE_SCALING_VALIDATION.md`
 
 ## Never Include
 

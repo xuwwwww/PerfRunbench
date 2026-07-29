@@ -1,6 +1,6 @@
 ---
 theme: default
-title: PerfRunbench — Guarded Autotuning for Repeatable AI Workloads
+title: PerfRunbench - Guarded Autotuning for Repeatable AI Workloads
 info: |
   Arm AI Optimization Challenge
   Cloud AI category
@@ -13,37 +13,28 @@ mdc: true
 
 <div class="hero-grid">
   <div class="hero-copy">
-    <div class="eyebrow light">ARM AI OPTIMIZATION CHALLENGE · CLOUD AI</div>
+    <div class="eyebrow light">ARM AI OPTIMIZATION CHALLENGE | CLOUD AI</div>
     <h1>PerfRunbench</h1>
     <p class="hero-subtitle">Guarded autotuning for repeatable AI workloads</p>
     <p class="hero-definition">Bounded search, statistical confirmation, and safe recommendation reuse.</p>
   </div>
   <div class="hero-image">
     <img src="/assets/server-cpu-hero.png" alt="Unbranded editorial server CPU and motherboard visual" />
-    <div class="hero-image-label">REAL ARM64 DATA · GENERIC HARDWARE VISUAL</div>
+    <div class="hero-image-label">REAL ARM64 DATA | GENERIC HARDWARE VISUAL</div>
   </div>
 </div>
 
 <div class="hero-metrics">
-  <div class="hero-metric">
-    <strong>+86.5%</strong>
-    <span>output throughput</span>
-  </div>
-  <div class="hero-metric">
-    <strong>−98.0%</strong>
-    <span>p95 TTFT</span>
-  </div>
-  <div class="hero-metric reliability">
-    <strong>608</strong>
-    <span>measured requests · 0 failures</span>
-  </div>
+  <div class="hero-metric"><strong>3 sizes</strong><span>C7g measured</span></div>
+  <div class="hero-metric"><strong>1,047</strong><span>HTTP measurements</span></div>
+  <div class="hero-metric reliability"><strong>514 / 0</strong><span>artifact checks / failures</span></div>
 </div>
 
-<div class="hero-scope">C7g Arm64 server · T4g Arm64 remote client · Qwen2.5-7B Q4_K_M · concurrency 4 · direct private path</div>
+<div class="hero-scope">C7g.xlarge to C7g.4xlarge | Qwen2.5-7B Q4_K_M | pinned llama.cpp runtime | guarded concurrency 4</div>
 
 <!--
 [Sources]
-- PerfRunbench Phase 21D2B evidence: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md
+- Same-protocol C7g size-scaling evidence: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G_SIZE_SCALING_VALIDATION.md
 - Hero image: original unbranded image generated for this deck; no third-party logo or product image.
 -->
 
@@ -52,45 +43,44 @@ layout: default
 class: slide-problem
 ---
 
-<div class="eyebrow">01 · THE ACTUAL PROBLEM</div>
+<div class="eyebrow">01 | THE ACTUAL PROBLEM</div>
 <h2>The fastest run is not automatically the safest recommendation.</h2>
 
 <div class="problem-layout">
   <div class="problem-thesis">
     <p>The best setting depends on the target, workload, runtime, and measurement protocol.</p>
     <div class="thesis-lines">
-      <span>The fastest run may be noise.</span>
+      <span>The fastest point may be noise.</span>
       <span>The environment may drift.</span>
-      <span>The apply step may be unsafe.</span>
+      <span>One workload may improve while another regresses.</span>
     </div>
   </div>
-
   <div class="evidence-stack">
     <div class="evidence-excerpt">
-      <div class="excerpt-head"><span>RUNTIME SEARCH</span><span>2% noise band</span></div>
-      <div class="excerpt-value">17.495 <i>single point</i></div>
-      <div class="excerpt-value selected">17.480 <i>staged eligible candidate</i></div>
-      <div class="excerpt-note">Fastest observed point ≠ globally optimal recommendation</div>
+      <div class="excerpt-head"><span>RUNTIME SEARCH</span><span>5% noise guard</span></div>
+      <div class="excerpt-value">candidate <i>observed</i></div>
+      <div class="excerpt-value selected">paired confirmation <i>eligible</i></div>
+      <div class="excerpt-note">Fastest observed point is not a global optimum.</div>
+    </div>
+    <div class="evidence-excerpt">
+      <div class="excerpt-head"><span>WORKLOAD GUARD</span><span>same profile</span></div>
+      <div class="drift-line"><b>interactive + decode</b><span>eligible</span></div>
+      <div class="drift-arrow">different traffic shape</div>
+      <div class="drift-line refused"><b>prefill-heavy</b><span>rejected</span></div>
     </div>
     <div class="evidence-excerpt">
       <div class="excerpt-head"><span>ENVIRONMENT VALIDATION</span><span>hard drift</span></div>
-      <div class="drift-line"><b>C7g / Neoverse-V1</b><span>recommendation bound</span></div>
-      <div class="drift-arrow">↓ different CPU class</div>
-      <div class="drift-line refused"><b>T4g / Neoverse-N1</b><span>reuse refused</span></div>
-    </div>
-    <div class="evidence-excerpt">
-      <div class="excerpt-head"><span>SYSTEM EXPERIMENTS</span><span>guarded</span></div>
-      <div class="mono-line">no-mmap: +3.014% &lt; 5% guard</div>
-      <div class="mono-line">network tuning: not executed</div>
-      <div class="excerpt-note">No eligible recommendation was manufactured.</div>
+      <div class="mono-line">C7g recommendation on T4g: refused</div>
+      <div class="mono-line">failed runs remain failures</div>
+      <div class="excerpt-note">No recommendation is manufactured.</div>
     </div>
   </div>
 </div>
 
 <!--
 [Sources]
-- Runtime search evidence: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/armtune/results/PHASE_9_FIRST_REAL_ARM_TUNING.md
-- Drift and system guard summary: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/VALIDATED_PERFORMANCE_SUMMARY.md
+- Guard and negative-evidence summary: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/VALIDATED_PERFORMANCE_SUMMARY.md
+- Same-protocol workload guard: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G_SIZE_SCALING_VALIDATION.md
 -->
 
 ---
@@ -98,7 +88,7 @@ layout: default
 class: slide-interaction
 ---
 
-<div class="eyebrow">02 · PRODUCT INTERACTION</div>
+<div class="eyebrow">02 | PRODUCT INTERACTION</div>
 <h2>One command starts a bounded, process-scoped tuning run.</h2>
 
 <div class="interaction-grid">
@@ -116,17 +106,16 @@ class: slide-interaction
       <div><strong>03</strong><span>No machine-wide state change</span></div>
     </div>
   </div>
-
   <div class="cli-capture">
     <img src="/assets/cli-run-auto-fixture.png" alt="Actual public fixture run-auto output showing an inconclusive result and cleanup" />
     <div class="cli-capture-label">
       <strong>ACTUAL PUBLIC FIXTURE RUN</strong>
-      <span>UX and guard evidence only · not Arm performance</span>
+      <span>UX and guard evidence only | not Arm performance</span>
     </div>
   </div>
 </div>
 
-<div class="scope-note">When the hard budget expires, PerfRunbench still writes a valid partial report and runs cleanup; invalid evidence is not cached.</div>
+<div class="scope-note">When the hard budget expires, PerfRunbench still writes a valid partial report and runs cleanup. Invalid evidence is not cached.</div>
 
 <!--
 [Sources]
@@ -139,51 +128,22 @@ layout: default
 class: slide-pipeline
 ---
 
-<div class="eyebrow">03 · GUARDED PIPELINE</div>
+<div class="eyebrow">03 | GUARDED PIPELINE</div>
 <h2>Every recommendation carries the evidence needed to reuse it safely.</h2>
 
 <div class="pipeline">
   <div class="pipeline-rail"></div>
-  <div class="pipeline-stage">
-    <span class="stage-index">01</span>
-    <strong>Fingerprint</strong>
-    <p>Command, config, target, runtime</p>
-  </div>
-  <div class="pipeline-stage">
-    <span class="stage-index">02</span>
-    <strong>Search</strong>
-    <p>Deterministic plan, hard budget</p>
-  </div>
-  <div class="pipeline-stage">
-    <span class="stage-index">03</span>
-    <strong>Repeat</strong>
-    <p>Warm-up exclusion, paired runs</p>
-  </div>
-  <div class="pipeline-stage">
-    <span class="stage-index">04</span>
-    <strong>Confirm</strong>
-    <p>Noise band, failures, sample guard</p>
-  </div>
-  <div class="pipeline-stage">
-    <span class="stage-index">05</span>
-    <strong>Passport</strong>
-    <p>Digests, provenance, statistics</p>
-  </div>
-  <div class="pipeline-stage selected-stage">
-    <span class="stage-index">06</span>
-    <strong>Guarded reuse</strong>
-    <p>Validate, canary, lease, rollback</p>
-  </div>
+  <div class="pipeline-stage"><span class="stage-index">01</span><strong>Fingerprint</strong><p>Command, target, runtime</p></div>
+  <div class="pipeline-stage"><span class="stage-index">02</span><strong>Search</strong><p>Deterministic plan, hard budget</p></div>
+  <div class="pipeline-stage"><span class="stage-index">03</span><strong>Repeat</strong><p>Warm-up exclusion, paired runs</p></div>
+  <div class="pipeline-stage"><span class="stage-index">04</span><strong>Confirm</strong><p>Noise band, failures, samples</p></div>
+  <div class="pipeline-stage"><span class="stage-index">05</span><strong>Passport</strong><p>Digests, provenance, statistics</p></div>
+  <div class="pipeline-stage selected-stage"><span class="stage-index">06</span><strong>Guarded reuse</strong><p>Validate, canary, lease, rollback</p></div>
 </div>
 
 <div class="pipeline-bottom">
   <div class="pipeline-quote">Measure once. Reuse only when identity still matches.</div>
-  <div class="pipeline-rejections">
-    <span>parser failure</span>
-    <span>inside noise band</span>
-    <span>hard drift</span>
-    <span>cleanup failure</span>
-  </div>
+  <div class="pipeline-rejections"><span>parser failure</span><span>inside noise band</span><span>hard drift</span><span>cleanup failure</span></div>
 </div>
 
 <!--
@@ -194,52 +154,113 @@ class: slide-pipeline
 
 ---
 layout: default
+class: slide-scale
+---
+
+<div class="eyebrow">04 | SAME-PROTOCOL HARDWARE SCALING</div>
+<h2>One pinned workload scales from 3 to 15 Arm server threads.</h2>
+
+<div class="scale-layout">
+  <div class="scale-chart">
+    <img src="/assets/c7g-size-thread-scaling.svg" alt="Measured llama-bench prefill and decode throughput across three C7g sizes" />
+  </div>
+  <div class="scale-facts">
+    <div class="scale-fact"><span>C7G.XLARGE | 3 THREADS</span><strong>16.444 / 7.101</strong><b>prefill / decode tok/s</b></div>
+    <div class="scale-fact"><span>C7G.2XLARGE | 7 THREADS</span><strong>38.993 / 15.541</strong><b>prefill / decode tok/s</b></div>
+    <div class="scale-fact"><span>C7G.4XLARGE | 15 THREADS</span><strong>73.598 / 29.871</strong><b>prefill / decode tok/s</b></div>
+  </div>
+</div>
+
+<div class="scope-note">pp512 and tg128 are separate llama-bench tests | one warm-up plus five measured repetitions per point | one client CPU reserved | absolute scaling is not added to runtime-tuning percentages.</div>
+
+<!--
+[Sources]
+- Exact cross-size protocol and results: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G_SIZE_SCALING_VALIDATION.md
+-->
+
+---
+layout: default
+class: slide-size-serving
+---
+
+<div class="eyebrow">05 | BEFORE / AFTER ACROSS THREE SIZES</div>
+<h2>Four-slot continuous batching improved interactive and decode serving.</h2>
+
+<div class="size-serving-layout">
+  <div class="size-serving-chart">
+    <img src="/assets/c7g-size-serving-before-after.svg" alt="Baseline and tuned serving throughput across three C7g sizes" />
+  </div>
+  <div class="size-serving-facts">
+    <div><span>XLARGE DECODE</span><strong>6.237 to 12.136</strong><b>+94.6%</b></div>
+    <div><span>2XLARGE DECODE</span><strong>13.626 to 25.876</strong><b>+89.9%</b></div>
+    <div><span>4XLARGE DECODE</span><strong>25.475 to 46.186</strong><b>+81.3%</b></div>
+  </div>
+</div>
+
+<div class="scope-note">Formal paired confirmation | three randomized pairs | fresh server restart between blocks | 20 measured requests per workload and side | 10,000-sample bootstrap intervals exclude zero.</div>
+
+<!--
+[Sources]
+- Same-protocol paired confirmation: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G_SIZE_SCALING_VALIDATION.md
+-->
+
+---
+layout: default
+class: slide-workload-guard
+---
+
+<div class="eyebrow">06 | WORKLOAD-AWARE GUARD</div>
+<h2>The tuner refuses a profile when the traffic shape changes.</h2>
+
+<div class="workload-guard-layout">
+  <div class="workload-guard-chart">
+    <img src="/assets/c7g-size-workload-guard.svg" alt="Workload-aware screening matrix across three C7g sizes" />
+  </div>
+  <div class="workload-guard-facts">
+    <div class="guard-result pass"><strong>6 / 6</strong><span>formal interactive + decode comparisons eligible</span></div>
+    <div class="guard-result reject"><strong>3 / 3</strong><span>four-slot prefill-heavy slices rejected</span></div>
+    <div class="context-guard"><span>WHY REJECTED</span><strong>-35.3% to -39.0%</strong><p>Throughput regressed and p95 TTFT worsened. No global recommendation was created.</p></div>
+  </div>
+</div>
+
+<div class="scope-note">The selected family is eligible only for interactive-short and decode-heavy under this model, target size, concurrency, and protocol.</div>
+
+<!--
+[Sources]
+- Screening guard matrix and rejection reasons: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G_SIZE_SCALING_VALIDATION.md
+-->
+
+---
+layout: default
 class: slide-throughput
 ---
 
-<div class="eyebrow">04 · REMOTE SERVING THROUGHPUT</div>
+<div class="eyebrow">07 | REAL REMOTE SERVING</div>
 <div class="chart-title-row">
-  <h2>69.4–86.5% more output throughput.</h2>
+  <h2>69.4% to 86.5% more remote output throughput.</h2>
   <div class="chart-legend"><span class="legend-base"></span> baseline <span class="legend-selected"></span> selected</div>
 </div>
 
 <div class="dumbbell-chart">
-  <div class="axis">
-    <span>0</span><span>10</span><span>20</span><span>30</span><span>35 tok/s</span>
-  </div>
+  <div class="axis"><span>0</span><span>10</span><span>20</span><span>30</span><span>35 tok/s</span></div>
   <div class="dumbbell-row" style="--base:48.66%; --selected:89.59%;">
     <div class="row-label"><strong>Interactive-short</strong><span>+84.1%</span></div>
-    <div class="dumbbell-plot">
-      <div class="gridlines"></div>
-      <div class="dumbbell-link"></div>
-      <div class="plot-point base-point"><span>17.032</span></div>
-      <div class="plot-point selected-point"><span>31.355</span></div>
-    </div>
+    <div class="dumbbell-plot"><div class="gridlines"></div><div class="dumbbell-link"></div><div class="plot-point base-point"><span>17.032</span></div><div class="plot-point selected-point"><span>31.355</span></div></div>
   </div>
   <div class="dumbbell-row" style="--base:48.70%; --selected:90.83%;">
     <div class="row-label"><strong>Decode-heavy</strong><span>+86.5%</span></div>
-    <div class="dumbbell-plot">
-      <div class="gridlines"></div>
-      <div class="dumbbell-link"></div>
-      <div class="plot-point base-point"><span>17.046</span></div>
-      <div class="plot-point selected-point"><span>31.790</span></div>
-    </div>
+    <div class="dumbbell-plot"><div class="gridlines"></div><div class="dumbbell-link"></div><div class="plot-point base-point"><span>17.046</span></div><div class="plot-point selected-point"><span>31.790</span></div></div>
   </div>
   <div class="dumbbell-row" style="--base:47.32%; --selected:80.15%;">
     <div class="row-label"><strong>Prefill-heavy</strong><span>+69.4%</span></div>
-    <div class="dumbbell-plot">
-      <div class="gridlines"></div>
-      <div class="dumbbell-link"></div>
-      <div class="plot-point base-point"><span>16.563</span></div>
-      <div class="plot-point selected-point"><span>28.054</span></div>
-    </div>
+    <div class="dumbbell-plot"><div class="gridlines"></div><div class="dumbbell-link"></div><div class="plot-point base-point"><span>16.563</span></div><div class="plot-point selected-point"><span>28.054</span></div></div>
   </div>
 </div>
 
 <div class="chart-scope">
-  <strong>Selected runtime</strong>
-  <span>4 parallel slots · continuous batching on · ctx 2048 · batch 512 · ubatch 128</span>
-  <span>C7g server · T4g client · direct private path · concurrency 4</span>
+  <strong>Validated remote topology</strong>
+  <span>4 parallel slots | continuous batching | C7g server | T4g client</span>
+  <span>direct private path | concurrency 4 | 608 measured requests | 0 failures</span>
 </div>
 
 <!--
@@ -249,156 +270,23 @@ class: slide-throughput
 
 ---
 layout: default
-class: slide-latency
----
-
-<div class="eyebrow">05 · LATENCY + RELIABILITY</div>
-<h2>p95 time-to-first-token fell by 91.1–98.0%.</h2>
-
-<div class="latency-layout">
-  <div class="latency-chart">
-    <div class="latency-row" style="--candidate:8.87%;">
-      <div class="latency-label">Interactive-short</div>
-      <div class="latency-bars">
-        <div class="latency-bar baseline-bar"><span>3056 ms baseline</span></div>
-        <div class="latency-bar candidate-bar"><span>271 ms selected</span></div>
-      </div>
-      <div class="reduction">−91.1%</div>
-    </div>
-    <div class="latency-row" style="--candidate:2.00%;">
-      <div class="latency-label">Decode-heavy</div>
-      <div class="latency-bars">
-        <div class="latency-bar baseline-bar"><span>10127 ms baseline</span></div>
-        <div class="latency-bar candidate-bar"><span>202 ms selected</span></div>
-      </div>
-      <div class="reduction">−98.0%</div>
-    </div>
-    <div class="latency-row" style="--candidate:8.61%;">
-      <div class="latency-label">Prefill-heavy</div>
-      <div class="latency-bars">
-        <div class="latency-bar baseline-bar"><span>3967 ms baseline</span></div>
-        <div class="latency-bar candidate-bar"><span>342 ms selected</span></div>
-      </div>
-      <div class="reduction">−91.4%</div>
-    </div>
-  </div>
-
-  <div class="reliability-column">
-    <div class="reliability-primary"><strong>608</strong><span>measured requests</span></div>
-    <div class="reliability-row"><strong>0</strong><span>retries</span></div>
-    <div class="reliability-row"><strong>0</strong><span>request failures</span></div>
-    <div class="reliability-row"><strong>0</strong><span>quality failures</span></div>
-    <div class="reliability-pass">Artifacts validated · both hosts restored</div>
-  </div>
-</div>
-
-<div class="scope-note">Client-observed TTFT · fresh server restart between blocks · deterministic randomized block order · same concurrency and workload protocol per comparison.</div>
-
-<!--
-[Sources]
-- Phase 21D2B protocol, reliability, artifact validation, and cleanup: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md
--->
-
----
-layout: default
-class: slide-scale
----
-
-<div class="eyebrow">06 · LARGER ARM CAPACITY</div>
-<h2>Fifteen Arm cores delivered 10.9× single-stream throughput.</h2>
-
-<div class="scale-layout">
-  <div class="scale-chart">
-    <img src="/assets/c7g4xlarge-thread-scaling.svg" alt="Measured llama-bench prefill and decode throughput from one to fifteen threads" />
-  </div>
-  <div class="scale-facts">
-    <div class="scale-fact">
-      <span>PREFILL · PP512</span>
-      <strong>6.761 → 73.669</strong>
-      <b>10.897×</b>
-    </div>
-    <div class="scale-fact">
-      <span>DECODE · TG128</span>
-      <strong>2.759 → 30.089</strong>
-      <b>10.907×</b>
-    </div>
-    <div class="scale-efficiency">
-      <strong>72.6–72.7%</strong>
-      <span>parallel efficiency at 15 threads</span>
-    </div>
-  </div>
-</div>
-
-<div class="scope-note">Separate llama-bench protocol · one C7g.4xlarge · five measured repetitions per point · increasing shared-resource pressure is inferred, not proven by memory-controller counters.</div>
-
-<!--
-[Sources]
-- C7g.4xlarge measured scaling protocol and exact values: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md
--->
-
----
-layout: default
-class: slide-workload-guard
----
-
-<div class="eyebrow">07 · WORKLOAD-AWARE RECOMMENDATION</div>
-<h2>One profile helped two workloads and hurt another.</h2>
-
-<div class="workload-guard-layout">
-  <div class="workload-guard-chart">
-    <img src="/assets/c7g4xlarge-serving-before-after.svg" alt="Paired serving throughput before and after on C7g.4xlarge" />
-  </div>
-  <div class="workload-guard-facts">
-    <div class="guard-result pass"><strong>+80.3%</strong><span>decode-heavy · eligible</span></div>
-    <div class="guard-result pass"><strong>+70.7%</strong><span>interactive-short · eligible</span></div>
-    <div class="guard-result reject"><strong>−21.0%</strong><span>prefill-heavy · rejected</span></div>
-    <div class="context-guard">
-      <span>8-SLOT CONTEXT GUARD</span>
-      <strong>412 required &gt; 256 available</strong>
-      <p>HTTP 400 failures preserved. No metric was invented.</p>
-    </div>
-  </div>
-</div>
-
-<div class="scope-note">Full-capacity loopback · concurrency 8 · three randomized paired blocks · fresh server restart per side · only interactive and decode enter the recommendation.</div>
-
-<!--
-[Sources]
-- C7g.4xlarge serving comparison, context failures, eligibility, cleanup, and artifact validation: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G4XLARGE_REALISTIC_ARM_INFERENCE_VALIDATION.md
--->
-
----
-layout: default
 class: slide-no
 ---
 
-<div class="eyebrow">08 · STATISTICAL GUARD</div>
+<div class="eyebrow">08 | STATISTICAL GUARD</div>
 <h2>A trustworthy tuner must be able to say no.</h2>
 
 <div class="no-layout">
   <div class="no-statement">
-    <div class="not-equal">Measured <span>≠</span> eligible</div>
+    <div class="not-equal">Measured <span>is not</span> eligible</div>
     <p>PerfRunbench recommends only candidates that clear evidence, provenance, correctness, and cleanup gates.</p>
     <div class="no-verdict">NO ELIGIBLE RECOMMENDATION</div>
   </div>
-
   <div class="rejected-list">
-    <div class="rejected-row">
-      <strong>Later compiler / backend rerun</strong>
-      <span>inside 5% noise band</span>
-    </div>
-    <div class="rejected-row">
-      <strong>no-mmap</strong>
-      <span>+3.014% · below guard</span>
-    </div>
-    <div class="rejected-row">
-      <strong>4K / 64K kernel profiles</strong>
-      <span>no qualified improvement</span>
-    </div>
-    <div class="rejected-row">
-      <strong>Network tuning</strong>
-      <span>not executed · no bottleneck evidence</span>
-    </div>
+    <div class="rejected-row"><strong>Prefill-heavy serving</strong><span>regressed across all three C7g sizes</span></div>
+    <div class="rejected-row"><strong>Later compiler / backend rerun</strong><span>inside 5% noise band</span></div>
+    <div class="rejected-row"><strong>no-mmap</strong><span>+3.014% | below guard</span></div>
+    <div class="rejected-row"><strong>Network tuning</strong><span>not executed | no bottleneck evidence</span></div>
   </div>
 </div>
 
@@ -406,8 +294,8 @@ class: slide-no
 
 <!--
 [Sources]
-- Validated negative evidence: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/VALIDATED_PERFORMANCE_SUMMARY.md
-- Network tuning gate: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md
+- Validated positive and negative evidence: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/VALIDATED_PERFORMANCE_SUMMARY.md
+- Cross-size prefill rejection: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G_SIZE_SCALING_VALIDATION.md
 -->
 
 ---
@@ -415,46 +303,36 @@ layout: default
 class: slide-platforms
 ---
 
-<div class="eyebrow">09 · ARM RELEVANCE + PORTABILITY</div>
-<h2>Performance evidence and compatibility validation are separate claims.</h2>
+<div class="eyebrow">09 | EVIDENCE, NOT JUST NUMBERS</div>
+<h2>Performance results remain bound to identity, protocol, and cleanup.</h2>
 
 <div class="platform-split">
   <div class="platform-half measured-half">
     <div class="platform-kicker">MEASURED ON ARM64</div>
-    <div class="platform-main">AWS C7g</div>
-    <div class="platform-sub">Arm Neoverse-V1 server</div>
-    <div class="path-line"><span>C7g server</span><i>direct private path</i><span>T4g client</span></div>
-    <ul>
-      <li>Qwen2.5-7B Q4_K_M</li>
-      <li>pinned llama-server binary</li>
-      <li>608 remote measured requests</li>
-    </ul>
+    <div class="platform-main">3 C7g sizes</div>
+    <div class="platform-sub">Arm Neoverse-V1 / Graviton3</div>
+    <ul><li>same model and binary digests</li><li>1,047 measured HTTP requests</li><li>30 fresh server starts</li></ul>
   </div>
-
   <div class="platform-half compatibility-half">
-    <div class="platform-kicker">COMPATIBILITY VALIDATED</div>
+    <div class="platform-kicker">INDEPENDENT VERIFICATION</div>
     <div class="compat-list">
-      <div><strong>Ubuntu</strong><span>Arm64</span><b>PASS</b></div>
-      <div><strong>Ubuntu</strong><span>x86-64</span><b>PASS</b></div>
-      <div><strong>Windows</strong><span>x86-64</span><b>PASS</b></div>
+      <div><strong>Artifacts</strong><span>514 checked</span><b>PASS</b></div>
+      <div><strong>HTTP</strong><span>0 failures</span><b>PASS</b></div>
+      <div><strong>Cleanup</strong><span>all targets</span><b>PASS</b></div>
     </div>
-    <p>Installed-wheel CI validates packaging and behavior. It is not a performance benchmark.</p>
+    <p>Performance Passport status is eligible preliminary. The result is not a global optimum.</p>
   </div>
 </div>
 
 <div class="ci-strip">
   <img src="/assets/github-actions-release-validation.png" alt="GitHub Actions release validation jobs" />
-  <div>
-    <strong>Release validation · all three runners succeeded</strong>
-    <span>GitHub Actions run 30234620475 · commit 5ccab60</span>
-  </div>
+  <div><strong>Compatibility stays separate from performance</strong><span>Windows x86-64, Ubuntu x86-64, and Ubuntu Arm64 installed-wheel validation</span></div>
 </div>
 
 <!--
 [Sources]
-- Cross-platform CI run: https://github.com/xuwwwww/PerfRunbench/actions/runs/30234620475
-- Validation matrix: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/VALIDATION_MATRIX.md
-- Arm remote performance evidence: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/PHASE_21D2B_C7G_T4G_REMOTE_SERVING_VALIDATION.md
+- Cross-size artifact validation and cleanup: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/C7G_SIZE_SCALING_VALIDATION.md
+- Cross-platform validation matrix: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/results/VALIDATION_MATRIX.md
 -->
 
 ---
@@ -464,25 +342,24 @@ class: slide-close
 
 <div class="close-grid">
   <div class="close-copy">
-    <div class="eyebrow light">PERFRUNBENCH · v0.3.1</div>
+    <div class="eyebrow light">PERFRUNBENCH | v0.3.1</div>
     <h2>Measure once.<br/>Reject false gains.<br/><span>Reuse safely.</span></h2>
     <p>Best observed eligible configuration under the tested target, model, workload, runtime, concurrency, topology, and measurement protocol.</p>
     <div class="close-links">
       <div><span>REPOSITORY</span><b>github.com/xuwwwww/PerfRunbench</b></div>
       <div><span>RELEASE</span><b>github.com/xuwwwww/PerfRunbench/releases/tag/v0.3.1</b></div>
     </div>
-    <div class="author-line">@xuwwwww · Arm AI Optimization Challenge · Cloud AI</div>
+    <div class="author-line">@xuwwwww | Arm AI Optimization Challenge | Cloud AI</div>
   </div>
-
   <div class="close-assets">
     <div class="release-shot">
       <img src="/assets/github-release-v0.3.1.png" alt="PerfRunbench v0.3.1 GitHub Release" />
-      <span>Published GitHub Release · verified wheel + sdist digests</span>
+      <span>Published GitHub Release | verified wheel and sdist digests</span>
     </div>
     <div class="qr-row">
       <div class="qr-block repository-qr">
         <img src="/assets/repository-qr.svg" alt="QR code for PerfRunbench repository" />
-        <span>OPEN SOURCE · MIT LICENSE</span>
+        <span>OPEN SOURCE | MIT LICENSE</span>
       </div>
     </div>
   </div>

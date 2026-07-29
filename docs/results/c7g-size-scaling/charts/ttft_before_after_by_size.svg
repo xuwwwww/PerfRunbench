@@ -1,0 +1,24 @@
+<svg width="1200" height="560" viewBox="0 0 1200 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interactive p95 time to first token">
+<style>.title{font:700 29px Segoe UI,Arial,sans-serif;fill:#0f172a}.subtitle{font:16px Segoe UI,Arial,sans-serif;fill:#64748b}.axis{font:13px Segoe UI,Arial,sans-serif;fill:#64748b}.legend{font:600 14px Segoe UI,Arial,sans-serif;fill:#334155}.row-label{font:600 14px Segoe UI,Arial,sans-serif;fill:#0f172a}.value{font:700 13px Segoe UI,Arial,sans-serif;fill:#0f172a}.note{font:14px Segoe UI,Arial,sans-serif;fill:#64748b}</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="22" y="42" class="title">Interactive p95 time to first token</text>
+<text x="22" y="72" class="subtitle">Lower is better. Each point is the median of block-level p95 TTFT across three paired confirmations.</text>
+<text x="22" y="125" class="row-label">c7g.xlarge</text>
+<line x1="521.16" y1="120" x2="1079.63" y2="120" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="1079.63" cy="120" r="9" fill="#2563eb"/>
+<circle cx="521.16" cy="120" r="9" fill="#059669"/>
+<text x="1079.63" y="103" text-anchor="middle" class="value">10672.111 ms</text>
+<text x="521.16" y="149" text-anchor="middle" class="value">2774.197 ms</text>
+<text x="22" y="230" class="row-label">c7g.2xlarge</text>
+<line x1="410.49" y1="225" x2="670.12" y2="225" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="670.12" cy="225" r="9" fill="#2563eb"/>
+<circle cx="410.49" cy="225" r="9" fill="#059669"/>
+<text x="670.12" y="208" text-anchor="middle" class="value">4880.742 ms</text>
+<text x="410.49" y="254" text-anchor="middle" class="value">1208.990 ms</text>
+<text x="22" y="335" class="row-label">c7g.4xlarge</text>
+<line x1="366.42" y1="330" x2="509.37" y2="330" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="509.37" cy="330" r="9" fill="#2563eb"/>
+<circle cx="366.42" cy="330" r="9" fill="#059669"/>
+<text x="509.37" y="313" text-anchor="middle" class="value">2607.447 ms</text>
+<text x="366.42" y="359" text-anchor="middle" class="value">585.763 ms</text>
+</svg>

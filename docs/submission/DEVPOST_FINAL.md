@@ -126,6 +126,22 @@ This larger-target result is loopback evidence, not remote-network evidence,
 and is not a direct C7g.2xlarge versus C7g.4xlarge comparison. Hardware
 scaling and runtime tuning remain separate protocols.
 
+A newer same-protocol experiment repeated one pinned Qwen2.5-7B artifact,
+llama.cpp runtime bundle, CPU-allocation rule, and concurrency-4 loopback
+protocol on C7g.xlarge, C7g.2xlarge, and C7g.4xlarge. Four-slot continuous
+batching improved formally confirmed decode throughput from 6.237 to 12.136,
+13.626 to 25.876, and 25.475 to 46.186 tokens/s respectively. The within-target
+deltas were 94.585%, 89.901%, and 81.296%.
+
+The result remained workload-aware: four-slot prefill-heavy screening regressed
+by 38.977%, 38.039%, and 35.310% and was rejected on all three sizes. Across
+the three targets, the protocol recorded 1,047 measured HTTP requests, 30 fresh
+server starts, zero request or quality failures, complete cleanup, and 514
+successful controller-side artifact digest checks after download.
+
+These within-target tuning percentages are not added to hardware scaling and
+are not remote-network evidence.
+
 Separate earlier protocols established a C7g llama.cpp build-profile decode
 median of 10.825 tokens/s for `portable-baseline` and 17.530 tokens/s for
 `arm-native`; a bounded runtime search measured 13.630 to 17.480 tokens/s
@@ -288,8 +304,11 @@ validation chronology.
 
 - The headline result covers one C7g server, one T4g client, one model, one
   pinned runtime, concurrency 4, and three declared workloads.
-- The larger-target result covers one C7g.4xlarge, one loopback client CPU,
-  one pinned model/runtime, and declared c4/c8 protocols.
+- The same-protocol size-scaling result covers C7g.xlarge, C7g.2xlarge, and
+  C7g.4xlarge with one loopback client CPU, one pinned model/runtime identity,
+  and a declared concurrency-4 protocol.
+- A separate larger-target result covers one C7g.4xlarge and declared c4/c8
+  protocols. Its percentages are not combined with the size-scaling result.
 - Broader Arm hardware, model, and concurrency validation remains future work.
 - Synthetic training evidence validates mechanics and guards, not production
   training speed.
@@ -314,3 +333,7 @@ proprietary logs.
 4. `An actual public fixture run demonstrates config-free run --auto; fixture output is not performance evidence.`
 5. `Hard drift, noise-band, cleanup, and no-evidence guards prevent unsafe recommendations.`
 6. `Real Arm64 performance evidence is separated from installed-wheel compatibility validation on Windows, Linux x86-64, and Linux Arm64.`
+7. `On one T4g.small and one public synthetic CPU PyTorch protocol, 12 paired confirmations measured 14,430 to 33,275 samples/s while preserving failures, CPU-credit state, and guard evidence.`
+8. `On one C7g.4xlarge and a pinned Qwen2.5-7B/llama.cpp loopback protocol, fifteen-thread throughput scaled about 10.9x over one thread; eligible serving workloads improved while prefill regression and context failures were rejected.`
+9. `With one pinned model and llama.cpp runtime, measured pp512/tg128 throughput scales across C7g.xlarge, C7g.2xlarge, and C7g.4xlarge while the largest thread point reserves one CPU for the client.`
+10. `Across three tested C7g sizes, four-slot continuous batching improved eligible interactive and decode serving under the same concurrency-4 loopback protocol; prefill-heavy traffic was rejected separately.`
