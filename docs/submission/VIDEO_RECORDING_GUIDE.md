@@ -41,11 +41,12 @@ Pretype these commands in a local text file so the recording does not include
 typing mistakes:
 
 ```powershell
-autotuneai arm init --output .autotuneai/demo-armtune --preset quick
-autotuneai arm guide --project .autotuneai/demo-armtune
-autotuneai arm explain interactive-short
-autotuneai arm explain decode-heavy
-autotuneai arm explain prefill-heavy
+autotuneai guide
+autotuneai init --adapter llama-bench --target ssh --output .autotuneai/demo-armtune --preset quick
+autotuneai guide --project .autotuneai/demo-armtune
+autotuneai explain interactive-short
+autotuneai explain decode-heavy
+autotuneai explain prefill-heavy
 ```
 
 The generated starter contains placeholders and `result_origin: unverified`.
@@ -58,8 +59,8 @@ Record short clips rather than one fragile continuous take:
 | clip | duration | content | required label |
 | --- | ---: | --- | --- |
 | 1 | 20 s | Problem statement and ArmTune cover | `ArmTune: guarded Arm AI inference autotuning` |
-| 2 | 30 s | `arm init` and `arm guide` | `LIVE LOCAL UX - NO PERFORMANCE CLAIM` |
-| 3 | 25 s | three `arm explain` commands | `WORKLOAD DEFINITIONS` |
+| 2 | 30 s | unified `guide`, `init`, and project `guide` | `LIVE LOCAL UX - NO PERFORMANCE CLAIM` |
+| 3 | 25 s | three top-level `explain` commands | `WORKLOAD DEFINITIONS` |
 | 4 | 25 s | target inspection command shape | `PREPARED OUTPUT - PRIVATE DETAILS HIDDEN` |
 | 5 | 35 s | measured cross-size before/after chart | `PREVIOUSLY MEASURED REAL ARM EVIDENCE` |
 | 6 | 25 s | prefill-heavy rejection chart | `WORKLOAD-SPECIFIC GUARD` |

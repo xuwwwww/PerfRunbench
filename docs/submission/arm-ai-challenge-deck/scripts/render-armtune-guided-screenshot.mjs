@@ -23,10 +23,12 @@ const run = (args) => {
 let initOutput;
 let guideOutput;
 let explainOutput;
+let controllerGuideOutput;
 try {
-  initOutput = run(["arm", "init", "--output", project, "--preset", "quick"]);
-  guideOutput = run(["arm", "guide", "--project", project]);
-  explainOutput = run(["arm", "explain", "decode-heavy"]);
+  controllerGuideOutput = run(["guide"]);
+  initOutput = run(["init", "--adapter", "llama-bench", "--target", "ssh", "--output", project, "--preset", "quick"]);
+  guideOutput = run(["guide", "--project", project]);
+  explainOutput = run(["explain", "decode-heavy"]);
 } finally {
   await fs.rm(project, { recursive: true, force: true });
 }
@@ -50,7 +52,16 @@ const compactInit = initOutput
   )
   .join("\n");
 
-const terminalOutput = `$ autotuneai arm init --preset quick\n${compactInit}\n\n$ autotuneai arm guide\n${compactGuide}\n\n$ autotuneai arm explain decode-heavy\n${explainOutput}`;
+const compactControllerGuide = controllerGuideOutput
+  .split(/\r?\n/)
+  .filter((line) =>
+    line.startsWith("controller:") ||
+    line.startsWith("local_command_workloads:") ||
+    line.startsWith("armtune_local_target:")
+  )
+  .join("\n");
+
+const terminalOutput = `$ autotuneai guide\n${compactControllerGuide}\n\n$ autotuneai init --adapter llama-bench --preset quick\n${compactInit}\n\n$ autotuneai guide --project .autotuneai/demo-armtune\n${compactGuide}\n\n$ autotuneai explain decode-heavy\n${explainOutput}`;
 
 const escapeHtml = (value) =>
   String(value)
@@ -86,13 +97,13 @@ const html = `<!doctype html>
 <body>
 <main>
   <header>
-    <div><div class="kicker">ACTUAL SANITIZED LOCAL CLI</div><h1>ArmTune begins with a bounded workflow.</h1></div>
+    <div><div class="kicker">ACTUAL SANITIZED LOCAL CLI</div><h1>One entry, workload-aware routing.</h1></div>
     <div class="badge">NO TARGET ACCESS</div>
   </header>
   <section class="layout">
     <div class="terminal"><div class="bar">isolated local project | paths sanitized</div><pre>${escapeHtml(terminalOutput)}</pre></div>
     <aside class="side">
-      <div class="fact"><span>STARTER</span><strong>4 versioned files</strong><small>private placeholders, no credentials</small></div>
+      <div class="fact"><span>CONTROLLER</span><strong>x86 or Arm</strong><small>local workloads or a remote Arm target</small></div>
       <div class="fact alert"><span>READINESS</span><strong>needs configuration</strong><small>target access remains blocked</small></div>
       <div class="fact"><span>QUICK PRESET</span><strong>4 candidates max</strong><small>1 warm-up, 3 confirmations, 5% noise band</small></div>
       <div class="fact"><span>EXPLAIN</span><strong>terms at the CLI</strong><small>workload shape, metric, and guard meaning</small></div>
