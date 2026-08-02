@@ -87,10 +87,10 @@ const html = `<!doctype html>
   .bar { height: 43px; padding: 13px 18px; border-bottom: 1px solid #2c4133; background: #17261d; color: #9eb1a4; font: 13px Consolas, monospace; }
   pre { margin: 0; padding: 22px 26px; color: #c5d3ca; white-space: pre-wrap; font: 15px/1.42 "Cascadia Mono", Consolas, monospace; }
   .side { display: grid; gap: 12px; grid-template-rows: repeat(4, 1fr); }
-  .fact { display: flex; flex-direction: column; justify-content: center; padding: 17px 19px; border: 1px solid #d8ddd8; background: rgba(255,255,255,.9); }
-  .fact span { color: #66746a; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
-  .fact strong { margin-top: 7px; font-size: 22px; line-height: 1.08; }
-  .fact small { margin-top: 6px; color: #5f6d63; font-size: 12px; line-height: 1.35; }
+  .fact { display: flex; flex-direction: column; justify-content: center; padding: 9px 12px; border: 1px solid #d8ddd8; background: rgba(255,255,255,.9); }
+  .fact span { color: #66746a; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
+  .fact strong { margin-top: 5px; font-size: 26px; line-height: 1.08; }
+  .fact small { margin-top: 4px; color: #5f6d63; font-size: 14px; line-height: 1.3; }
 </style>
 </head>
 <body>
