@@ -1,143 +1,155 @@
 # PerfRunbench ArmTune Demo Script
 
-This demo shows the default release workflow. External workload-quality projects may
-be mentioned as optional experimental evidence, but they do not block or drive
-the default build/runtime tuning recommendation.
+Target duration: 3 minutes 15 seconds. The product story is ArmTune. Generic
+PerfRunbench capabilities are supporting infrastructure, not the opening topic.
 
-## Pre-Demo Requirements
+Do not access AWS during recording. Use the local guided CLI for live UX and
+the committed measured evidence for performance claims. Label the two evidence
+types on screen.
 
-- PerfRunbench is installed in an isolated Python environment.
-- Public placeholder configs are visible under `configs/armtune/`.
-- Any real target config, SSH identity, model path, and raw private run
-  artifacts remain outside git.
-- The presenter uses measured Phase 9 and Phase 10 documentation for result
-  claims, not live fixture numbers.
+## 0:00-0:20 - Problem And Product
 
-## Storyboard
+Screen: challenge deck cover, then the repository README.
 
-### 0:00-0:25 - Product Identity
+Narration:
 
-Show `README.md`.
+> AI inference settings that are faster for one Arm workload can be slower for
+> another. ArmTune inspects the target, runs bounded measurements, confirms a
+> candidate statistically, and keeps the recommendation tied to its evidence.
 
-Say:
+## 0:20-0:50 - Guided ArmTune Entry
 
-```text
-PerfRunbench is the reproducible benchmarking and tuning toolkit. ArmTune is
-its Arm AI inference subsystem. The workflow is inspect, benchmark, build,
-search, confirm, passport, and guarded apply.
+Screen: a clean local terminal.
+
+```powershell
+autotuneai arm init --output .autotuneai/demo-armtune --preset quick
+autotuneai arm guide --project .autotuneai/demo-armtune
 ```
 
-### 0:25-0:55 - Arm Target Inspection
+Narration:
+
+> The guided entry creates private starter configs with strict SSH checking,
+> raw artifact preservation, a four-candidate cost cap, confirmation runs, and
+> a five-percent noise band. Guide reports exactly what remains before target
+> access. This live run creates configuration only; it is not an Arm
+> performance measurement.
 
 Show:
 
-```bash
-autotuneai arm doctor --target-config configs/armtune/target_ssh.example.json --require-production
-autotuneai arm inspect-host --target-config configs/armtune/target_ssh.example.json
+- `result_origin: unverified` in a starter file;
+- `readiness: needs_configuration`;
+- the five workflow steps;
+- no network or workload process.
+
+## 0:50-1:15 - Terms Before Numbers
+
+Screen:
+
+```powershell
+autotuneai arm explain interactive-short
+autotuneai arm explain decode-heavy
+autotuneai arm explain prefill-heavy
 ```
 
-Highlight:
+Narration:
 
-- Controller may be x86.
-- Production benchmark execution must validate as Linux Arm64.
-- Host capability evidence is separate from workload execution evidence.
+> Interactive-short represents a normal assistant turn. Decode-heavy uses a
+> short prompt and long output. Prefill-heavy uses a long prompt and short
+> output. TTFT measures responsiveness before the first token. ArmTune keeps
+> these traffic shapes separate because one setting is not universally best.
 
-### 0:55-1:25 - Reproducible Baseline
+## 1:15-1:40 - Target And Evidence Boundary
 
-Show:
+Screen: prepared output or README commands.
 
-```bash
-autotuneai arm benchmark --config configs/armtune/llama_bench.example.json
+```powershell
+autotuneai arm doctor --target-config <private-target.json> --require-production --summary
+autotuneai arm inspect-host --target-config <private-target.json> --summary
 ```
 
-Highlight:
+Narration:
 
-- Raw stdout and stderr are preserved.
-- Parser failures remain failures, not zero metrics.
-- Model, binary, target, and protocol digests are compatibility boundaries.
+> The controller can be Windows or x86, but production measurements require a
+> real Linux Arm64 target. Host features remain separate from proof that the
+> workload actually used an optimized path.
 
-### 1:25-1:55 - Build Profiles
+Do not expose the real host, identity-file path, model path, or SSH command.
 
-Show:
+## 1:40-2:15 - Measured Before And After
 
-```bash
-autotuneai arm build-plan --config configs/armtune/build_profiles.example.json
-autotuneai arm build-profile --config configs/armtune/build_profiles.example.json
-```
+Screen: C7g cross-size thread-scaling and serving before/after charts.
 
-Highlight:
+Narration:
 
-- Profiles are `portable-baseline`, `arm-native`, and `arm-optimized`.
-- `arm-optimized` needs build/runtime evidence before optimized-path claims.
-- The measured Phase 9 fixed `llama-bench` profile comparison was:
+> Under one pinned Qwen2.5-7B and llama.cpp protocol, decode serving improved
+> from 6.237 to 12.136 tokens per second on C7g.xlarge, 13.626 to 25.876 on
+> C7g.2xlarge, and 25.475 to 46.186 on C7g.4xlarge. These are within-target
+> runtime-tuning deltas, not a universal Arm speedup and not hardware scaling
+> percentages added together.
+
+On-screen label:
 
 ```text
-portable-baseline decode median: 10.825 tok/s
-arm-native decode median: 17.530 tok/s
-arm-optimized decode median: 17.380 tok/s
+PREVIOUSLY MEASURED REAL ARM EVIDENCE
+same model, runtime, CPU allocation rule, concurrency, and protocol
 ```
 
-### 1:55-2:20 - Runtime Search
-
-Show:
-
-```bash
-autotuneai arm optimize \
-  --config configs/armtune/llama_bench_optimize.example.json \
-  --max-candidates 12 \
-  --affinity-modes scheduler-default,compact,spread,reserve-one-core
-```
-
-Highlight:
+Keep the earlier Phase 9 build/runtime protocol visible as a separate evidence
+card, not as part of the serving percentage:
 
 ```text
-runtime-search baseline decode: 13.630 tok/s
-selected decode: 17.480 tok/s
-observed runtime-search improvement: 28.246515%
-```
-
-This is a separate `llama-bench` staged-search protocol and must not be
-combined with build-profile or server latency deltas.
-
-### 2:20-2:40 - Secondary Server Timing
-
-Show the Phase 9 evidence summary:
-
-```text
-portable llama-server TTFT median: 97.260 ms
-arm-native llama-server TTFT median: 62.826 ms
-```
-
-Highlight request completion, nonempty output, streaming parse, TTFT, E2E
-latency, cleanup, and port release. External semantic correctness is not part
-of default candidate eligibility.
-
-### 2:40-3:10 - Passport And Guarded Apply
-
-Show:
-
-```bash
-autotuneai arm passport --comparison-result .autotuneai/runs/<run_id>/armtune/profile_comparison/profile_comparison_result.json
-autotuneai arm verify-passport --passport .autotuneai/runs/<run_id>/armtune/passport/performance_passport.json
-autotuneai recommendation show --bundle .autotuneai/recommendations/<bundle_id>.json
-autotuneai recommendation validate --bundle .autotuneai/recommendations/<bundle_id>.json
-autotuneai recommendation apply --bundle .autotuneai/recommendations/<bundle_id>.json --scope process --dry-run
-autotuneai recommendation rollback --bundle .autotuneai/recommendations/<bundle_id>.json
-```
-
-Highlight:
-
-```text
-Performance Passport: eligible_preliminary / verification passed
+Phase 9 build profile: portable 10.825 tok/s
+                       arm-native 17.530 tok/s
+                       arm-optimized 17.380 tok/s
+Phase 9 runtime search: 13.630 tok/s -> 17.480 tok/s
+Observed within-protocol improvement: 28.246515%
+Secondary llama-server TTFT: 97.260 ms -> 62.826 ms
+Passport: eligible_preliminary | verification passed
 guarded apply validation: passed
 ```
 
-## Demo Integrity Checklist
+These build, runtime-search, secondary-server, and C7g serving results use
+different protocols and must not be combined into one improvement claim.
 
-- Do not show placeholder configs as private target details.
-- Do not combine improvements from different protocols.
-- Do not claim global optimality.
-- Do not claim KleidiAI from a requested flag alone.
-- Do not present external semantic workloads as the default performance gate.
-- Do not reveal endpoint details, identity-file paths, tokens, model weights,
-  or private artifact locations.
+## 2:15-2:40 - The Guard Matters
+
+Screen: workload guard chart.
+
+Narration:
+
+> Four-slot continuous batching passed paired confirmation for interactive and
+> decode traffic. The same family regressed prefill-heavy screening by 35.3 to
+> 39.0 percent and worsened TTFT, so ArmTune rejected it for that workload. The
+> product result is not just a bigger number; it is a scoped recommendation and
+> preserved negative evidence.
+
+## 2:40-3:00 - Passport And Safe Reuse
+
+Screen: architecture flow and Performance Passport evidence.
+
+Narration:
+
+> A Performance Passport binds the selected result to target, model, binary,
+> protocol, distributions, guards, and artifact digests. Environment drift,
+> parser failure, cleanup failure, or a result inside the noise band blocks
+> reuse. Apply remains process-scoped, validated, canaried, leased, and
+> rollback-capable.
+
+## 3:00-3:15 - Close
+
+Screen: GitHub repository and final slide.
+
+Narration:
+
+> ArmTune makes Arm AI inference tuning repeatable: inspect, measure, search,
+> confirm, passport, and reuse only when the evidence still matches.
+
+## Recording Integrity Checklist
+
+- Label live starter/fixture output separately from measured Arm evidence.
+- Do not show AWS Console, public or private IP addresses, PEM paths, tokens,
+  private configs, model paths, or raw private artifacts.
+- Do not combine percentages from different protocols.
+- Do not claim global optimality, generic Arm acceleration, or KleidiAI without
+  sufficient build and runtime evidence.
+- Keep the repository and release URL visible in the closing frame.

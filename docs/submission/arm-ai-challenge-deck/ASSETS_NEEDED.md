@@ -5,6 +5,23 @@ The deck has no required placeholder assets.
 ## Actual CLI Capture
 
 - Slide: 3
+- Commands:
+
+  ```bash
+  autotuneai arm init --preset quick
+  autotuneai arm guide
+  autotuneai arm explain decode-heavy
+  ```
+
+- Asset: `public/assets/armtune-guided-cli.png`
+- Provenance: generated locally by
+  `scripts/render-armtune-guided-screenshot.mjs` from the installed source tree
+- Classification: public configuration-only UX demonstration
+- Claim boundary: no SSH, network, workload, AWS, or measured result
+
+## Generic Fixture CLI Capture
+
+- Slide: appendix/reference only
 - Command:
 
   ```bash
@@ -57,7 +74,7 @@ URL or placeholder demo QR.
 
 ### C7g Same-Protocol Size-Scaling Charts
 
-- Slides: 5, 6, and 7
+- Slides: 6, 7, and 8
 - Assets:
   - `public/assets/c7g-size-thread-scaling.svg`
   - `public/assets/c7g-size-serving-before-after.svg`

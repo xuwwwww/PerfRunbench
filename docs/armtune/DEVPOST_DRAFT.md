@@ -27,6 +27,17 @@ pipeline: platform inspection, reproducible benchmarking, build/runtime
 autotuning, statistical comparison, Performance Passport, and recommendation
 safety.
 
+The public UX starts with three discoverable commands:
+
+```bash
+autotuneai arm init --output .autotuneai/armtune-project --preset quick
+autotuneai arm guide --project .autotuneai/armtune-project
+autotuneai arm explain decode-heavy
+```
+
+The generated project is versioned, bounded, strict-SSH by default, and marked
+unverified until the user supplies private target and workload details.
+
 ## Problem
 
 AI inference can run on Arm servers, but performance claims are often hard to
@@ -101,6 +112,22 @@ These results must not be combined across protocols. The supported claim is:
 > Best observed eligible configuration under the tested Arm target, model,
 > inference workload, and measurement protocol.
 
+## How To Read The Workloads
+
+- `interactive-short`: short prompt and short-to-medium answer; responsiveness,
+  p95 TTFT, E2E latency, and output throughput matter.
+- `decode-heavy`: short prompt and long answer; sustained token generation is
+  the dominant workload phase.
+- `prefill-heavy`: long prompt and short answer; prompt ingestion, memory
+  traffic, queueing, and TTFT dominate.
+- `TTFT`: time from request submission to the first generated token.
+- `p95`: the value at or below which 95 percent of measured samples fall.
+
+This distinction is operational, not cosmetic. In the same C7g size-scaling
+protocol, four-slot continuous batching was eligible for interactive and
+decode traffic but regressed prefill-heavy screening on all three sizes. ArmTune
+preserved the negative evidence and did not create a universal recommendation.
+
 ## What Is New During The Competition Window
 
 ArmTune adds Arm target validation, SSH worker execution, host inspection,
@@ -111,13 +138,16 @@ and reporting infrastructure.
 
 ## Demo Flow
 
-1. Inspect the Arm target with `autotuneai arm doctor` and
+1. Create a safe starter project with `autotuneai arm init` and inspect its
+   readiness with `autotuneai arm guide`.
+2. Explain the traffic shape with `autotuneai arm explain`.
+3. Inspect the Arm target with `autotuneai arm doctor` and
    `autotuneai arm inspect-host`.
-2. Run a placeholder `llama-bench` baseline.
-3. Generate build-profile evidence for portable and Arm profiles.
-4. Run bounded runtime search and show the statistical guard result.
-5. Generate and verify the Performance Passport.
-6. Show, validate, dry-run apply, and rollback a guarded RecommendationBundle.
+4. Run a placeholder `llama-bench` baseline.
+5. Generate build-profile evidence for portable and Arm profiles.
+6. Run bounded runtime search and show the statistical guard result.
+7. Generate and verify the Performance Passport.
+8. Show, validate, dry-run apply, and rollback a guarded RecommendationBundle.
 
 ## Claim Boundaries
 

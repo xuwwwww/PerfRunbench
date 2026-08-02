@@ -15,6 +15,10 @@ details.
   phase-by-phase execution plan.
 - `IMPLEMENTATION_PLAN.md`: Reviewable implementation phases and expected code
   surfaces.
+- `USER_GUIDE.md`: Guided ArmTune onboarding from starter project to bounded
+  optimization and guarded apply.
+- `GLOSSARY.md`: Plain-language definitions for inference stages, workload
+  profiles, metrics, statistics, and safety guards.
 - `ARCHITECTURE.md`: Controller/target design, release architecture, and
   package boundaries.
 - `REUSE_MAP.md`: Exact existing PerfRunbench symbols planned for ArmTune

@@ -1,6 +1,6 @@
 ---
 theme: default
-title: PerfRunbench - Guarded Autotuning for Repeatable AI Workloads
+title: PerfRunbench ArmTune - Guarded Arm AI Inference Autotuning
 info: |
   Arm AI Optimization Challenge
   Cloud AI category
@@ -14,9 +14,9 @@ mdc: true
 <div class="hero-grid">
   <div class="hero-copy">
     <div class="eyebrow light">ARM AI OPTIMIZATION CHALLENGE | CLOUD AI</div>
-    <h1>PerfRunbench</h1>
-    <p class="hero-subtitle">Guarded autotuning for repeatable AI workloads</p>
-    <p class="hero-definition">Bounded search, statistical confirmation, and safe recommendation reuse.</p>
+    <h1>ArmTune</h1>
+    <p class="hero-subtitle">Guarded Arm AI inference autotuning</p>
+    <p class="hero-definition">PerfRunbench target inspection, bounded search, statistical confirmation, and auditable recommendation reuse.</p>
   </div>
   <div class="hero-image">
     <img src="/assets/server-cpu-hero.png" alt="Unbranded editorial server CPU and motherboard visual" />
@@ -88,39 +88,41 @@ layout: default
 class: slide-interaction
 ---
 
-<div class="eyebrow">02 | PRODUCT INTERACTION</div>
-<h2>One command starts a bounded, process-scoped tuning run.</h2>
+<div class="eyebrow">02 | GUIDED ARM EXPERIENCE</div>
+<h2>Start with the workflow, not a wall of research configuration.</h2>
 
 <div class="interaction-grid">
   <div class="command-column">
-    <div class="command-label">CONFIG-FREE ENTRY</div>
-    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai run --auto --preset quick -- python app.py</span></div>
+    <div class="command-label">ARMTUNE STARTER</div>
+    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai arm init --preset quick</span></div>
+    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai arm guide</span></div>
+    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai arm explain decode-heavy</span></div>
     <div class="preset-line">
-      <span><b>quick</b> 5 min / 3 candidates</span>
-      <span><b>standard</b> 20 min / 8 candidates</span>
-      <span><b>deep</b> 60 min / 16 candidates</span>
+      <span><b>quick</b> 4 candidates</span>
+      <span><b>standard</b> 8 candidates</span>
+      <span><b>deep</b> 12 candidates</span>
     </div>
     <div class="interaction-points">
-      <div><strong>01</strong><span>No configuration file</span></div>
-      <div><strong>02</strong><span>Hard execution budget</span></div>
-      <div><strong>03</strong><span>No machine-wide state change</span></div>
+      <div><strong>01</strong><span>Versioned private starter</span></div>
+      <div><strong>02</strong><span>Readiness and exact next steps</span></div>
+      <div><strong>03</strong><span>Plain-language workload help</span></div>
     </div>
   </div>
   <div class="cli-capture">
-    <img src="/assets/cli-run-auto-fixture.png" alt="Actual public fixture run-auto output showing an inconclusive result and cleanup" />
+    <img src="/assets/armtune-guided-cli.png" alt="Actual ArmTune init, guide, and explain CLI output" />
     <div class="cli-capture-label">
-      <strong>ACTUAL PUBLIC FIXTURE RUN</strong>
-      <span>UX and guard evidence only | not Arm performance</span>
+      <strong>ACTUAL LOCAL GUIDED UX</strong>
+      <span>configuration evidence only | no target access</span>
     </div>
   </div>
 </div>
 
-<div class="scope-note">When the hard budget expires, PerfRunbench still writes a valid partial report and runs cleanup. Invalid evidence is not cached.</div>
+<div class="scope-note">Generated configs are strict-SSH by default, preserve raw output, cap search cost, and remain result_origin: unverified until the private target is configured.</div>
 
 <!--
 [Sources]
-- Public CLI and preset semantics: https://github.com/xuwwwww/PerfRunbench/blob/main/README.md
-- Release v0.3.1 notes: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/releases/v0.3.1.md
+- Guided ArmTune UX: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/armtune/USER_GUIDE.md
+- ArmTune glossary: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/armtune/GLOSSARY.md
 -->
 
 ---
@@ -154,10 +156,38 @@ class: slide-pipeline
 
 ---
 layout: default
+class: slide-concepts
+---
+
+<div class="eyebrow">04 | HOW TO READ THE WORKLOAD</div>
+<h2>Prompt processing and token generation stress different bottlenecks.</h2>
+
+<div class="inference-flow">
+  <div class="flow-stage prefill-stage"><span>INPUT</span><strong>Prefill</strong><p>Read the prompt before the first output token</p><b>prefill tok/s + TTFT</b></div>
+  <div class="flow-arrow"><span>first token</span><b>→</b></div>
+  <div class="flow-stage decode-stage"><span>OUTPUT</span><strong>Decode</strong><p>Generate response tokens one at a time</p><b>output tok/s + E2E</b></div>
+</div>
+
+<div class="concept-cards">
+  <div><span>INTERACTIVE-SHORT</span><strong>short prompt → short answer</strong><p>Responsiveness and p95 TTFT dominate.</p></div>
+  <div><span>DECODE-HEAVY</span><strong>short prompt → long answer</strong><p>Sustained generation throughput dominates.</p></div>
+  <div><span>PREFILL-HEAVY</span><strong>long prompt → short answer</strong><p>Prompt ingestion, memory traffic, and queueing dominate.</p></div>
+</div>
+
+<div class="scope-note">A serving profile can pass one traffic shape and fail another. ArmTune evaluates eligibility per workload instead of creating one universal score.</div>
+
+<!--
+[Sources]
+- Plain-language definitions: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/armtune/GLOSSARY.md
+- Workload protocol definitions: https://github.com/xuwwwww/PerfRunbench/blob/main/docs/SERVING_AUTOTUNING.md
+-->
+
+---
+layout: default
 class: slide-scale
 ---
 
-<div class="eyebrow">04 | SAME-PROTOCOL HARDWARE SCALING</div>
+<div class="eyebrow">05 | SAME-PROTOCOL HARDWARE SCALING</div>
 <h2>One pinned workload scales from 3 to 15 Arm server threads.</h2>
 
 <div class="scale-layout">
@@ -183,7 +213,7 @@ layout: default
 class: slide-size-serving
 ---
 
-<div class="eyebrow">05 | BEFORE / AFTER ACROSS THREE SIZES</div>
+<div class="eyebrow">06 | BEFORE / AFTER ACROSS THREE SIZES</div>
 <h2>Four-slot continuous batching improved interactive and decode serving.</h2>
 
 <div class="size-serving-layout">
@@ -209,7 +239,7 @@ layout: default
 class: slide-workload-guard
 ---
 
-<div class="eyebrow">06 | WORKLOAD-AWARE GUARD</div>
+<div class="eyebrow">07 | WORKLOAD-AWARE GUARD</div>
 <h2>The tuner refuses a profile when the traffic shape changes.</h2>
 
 <div class="workload-guard-layout">
@@ -235,7 +265,7 @@ layout: default
 class: slide-throughput
 ---
 
-<div class="eyebrow">07 | REAL REMOTE SERVING</div>
+<div class="eyebrow">08 | REAL REMOTE SERVING</div>
 <div class="chart-title-row">
   <h2>69.4% to 86.5% more remote output throughput.</h2>
   <div class="chart-legend"><span class="legend-base"></span> baseline <span class="legend-selected"></span> selected</div>
@@ -273,7 +303,7 @@ layout: default
 class: slide-no
 ---
 
-<div class="eyebrow">08 | STATISTICAL GUARD</div>
+<div class="eyebrow">09 | STATISTICAL GUARD</div>
 <h2>A trustworthy tuner must be able to say no.</h2>
 
 <div class="no-layout">
@@ -303,7 +333,7 @@ layout: default
 class: slide-platforms
 ---
 
-<div class="eyebrow">09 | EVIDENCE, NOT JUST NUMBERS</div>
+<div class="eyebrow">10 | EVIDENCE, NOT JUST NUMBERS</div>
 <h2>Performance results remain bound to identity, protocol, and cleanup.</h2>
 
 <div class="platform-split">

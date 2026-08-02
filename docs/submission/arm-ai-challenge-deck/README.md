@@ -8,6 +8,7 @@ Cloud AI category.
 ```bash
 npm install
 npm run render:fixture
+npm run render:armtune-ux
 npm run dev
 ```
 
@@ -37,7 +38,7 @@ concurrency 4
 direct private network path
 ```
 
-Slides 5 through 7 add a same-identity, same-protocol C7g size-scaling
+Slides 6 through 8 add a same-identity, same-protocol C7g size-scaling
 validation:
 
 - `llama-bench` pp512/tg128 scaling on xlarge, 2xlarge, and 4xlarge
