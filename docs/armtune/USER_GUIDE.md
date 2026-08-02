@@ -1,8 +1,17 @@
-# ArmTune Operator Guide
+# PerfRunbench And ArmTune Operator Guide
 
-ArmTune turns Arm AI inference tuning into a guided, evidence-preserving
-workflow. The default experience is intentionally smaller than the complete
-research command surface:
+PerfRunbench has one guided product entrance. Users choose a workload adapter,
+not an Arm or x86 edition. ArmTune activates when the selected target and
+inference workflow need Arm-specific inspection, search, and evidence.
+
+Start on any controller with:
+
+```bash
+autotuneai guide
+```
+
+The default Arm inference experience remains intentionally smaller than the
+complete research command surface:
 
 ```text
 initialize a private project
@@ -21,10 +30,10 @@ Arm performance result must come from a real Linux Arm64 target.
 ## 1. Create A Starter Project
 
 ```bash
-autotuneai arm init \
-  --output .autotuneai/armtune-project \
+autotuneai init \
+  --adapter llama-bench \
+  --output .autotuneai/perfrunbench-project \
   --target ssh \
-  --workload llama-bench \
   --preset quick
 ```
 
@@ -60,7 +69,7 @@ confirmation executions are additional measurements.
 ## 3. Check Configuration Readiness
 
 ```bash
-autotuneai arm guide --project .autotuneai/armtune-project
+autotuneai guide --project .autotuneai/perfrunbench-project
 ```
 
 Possible readiness states:
@@ -78,13 +87,13 @@ runtime, or apply a recommendation.
 ## 4. Validate And Inspect The Target
 
 ```bash
-autotuneai arm doctor \
-  --target-config .autotuneai/armtune-project/target.json \
+autotuneai doctor \
+  --target-config .autotuneai/perfrunbench-project/target.json \
   --require-production \
   --summary
 
-autotuneai arm inspect-host \
-  --target-config .autotuneai/armtune-project/target.json \
+autotuneai inference inspect-host \
+  --target-config .autotuneai/perfrunbench-project/target.json \
   --summary
 ```
 
@@ -103,8 +112,8 @@ workload path executed.
 ## 5. Establish A Fixed Baseline
 
 ```bash
-autotuneai arm benchmark \
-  --config .autotuneai/armtune-project/benchmark.json
+autotuneai inference benchmark \
+  --config .autotuneai/perfrunbench-project/benchmark.json
 ```
 
 The fixed baseline records target identity, model and executable digests,
@@ -114,8 +123,8 @@ A parser failure remains a failure; it is never converted to a zero metric.
 ## 6. Run Bounded Optimization
 
 ```bash
-autotuneai arm optimize \
-  --config .autotuneai/armtune-project/optimize.json
+autotuneai inference optimize \
+  --config .autotuneai/perfrunbench-project/optimize.json
 ```
 
 The generated search uses deterministic order, warm-up exclusion, paired
@@ -123,12 +132,16 @@ baseline insertion, bounded affinity modes, confirmation runs, cooldown, and a
 noise band. The result may be `recommended` or `inconclusive`. An inconclusive
 result is valid when no tested candidate clears the configured evidence guard.
 
+`autotuneai arm ...` remains a backward-compatible alias for this inference
+command surface. New operator instructions use `autotuneai inference ...` so
+the namespace describes the workload instead of the controller architecture.
+
 ## 7. Understand The Workload Before Reading A Chart
 
 ```bash
-autotuneai arm explain
-autotuneai arm explain prefill
-autotuneai arm explain decode-heavy --json
+autotuneai explain
+autotuneai explain prefill
+autotuneai explain decode-heavy --json
 ```
 
 The short version:

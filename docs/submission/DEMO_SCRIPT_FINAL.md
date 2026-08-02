@@ -18,9 +18,10 @@ guided project initialization
 The live commands are local UX evidence only:
 
 ```powershell
-autotuneai arm init --output .autotuneai/demo-armtune --preset quick
-autotuneai arm guide --project .autotuneai/demo-armtune
-autotuneai arm explain decode-heavy
+autotuneai guide
+autotuneai init --adapter llama-bench --target ssh --output .autotuneai/demo-armtune --preset quick
+autotuneai guide --project .autotuneai/demo-armtune
+autotuneai explain decode-heavy
 ```
 
 The performance segment uses committed measured evidence and must display the

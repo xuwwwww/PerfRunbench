@@ -1,7 +1,7 @@
 # ArmTune Plain-Language Glossary
 
 This glossary explains the terms used in ArmTune reports, charts, and CLI
-output. Run `autotuneai arm explain [term]` for the same core definitions at the
+output. Run `autotuneai explain [term]` for the same core definitions at the
 terminal.
 
 ## Inference Stages

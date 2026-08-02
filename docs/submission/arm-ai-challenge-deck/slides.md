@@ -94,9 +94,9 @@ class: slide-interaction
 <div class="interaction-grid">
   <div class="command-column">
     <div class="command-label">ARMTUNE STARTER</div>
-    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai arm init --preset quick</span></div>
-    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai arm guide</span></div>
-    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai arm explain decode-heavy</span></div>
+    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai guide</span></div>
+    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai init --adapter llama-bench --preset quick</span></div>
+    <div class="command-block"><span class="shell-prompt">$</span><span>autotuneai explain decode-heavy</span></div>
     <div class="preset-line">
       <span><b>quick</b> 4 candidates</span>
       <span><b>standard</b> 8 candidates</span>

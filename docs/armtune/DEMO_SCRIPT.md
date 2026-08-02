@@ -22,8 +22,9 @@ Narration:
 Screen: a clean local terminal.
 
 ```powershell
-autotuneai arm init --output .autotuneai/demo-armtune --preset quick
-autotuneai arm guide --project .autotuneai/demo-armtune
+autotuneai guide
+autotuneai init --adapter llama-bench --target ssh --output .autotuneai/demo-armtune --preset quick
+autotuneai guide --project .autotuneai/demo-armtune
 ```
 
 Narration:
@@ -46,9 +47,9 @@ Show:
 Screen:
 
 ```powershell
-autotuneai arm explain interactive-short
-autotuneai arm explain decode-heavy
-autotuneai arm explain prefill-heavy
+autotuneai explain interactive-short
+autotuneai explain decode-heavy
+autotuneai explain prefill-heavy
 ```
 
 Narration:
@@ -63,8 +64,8 @@ Narration:
 Screen: prepared output or README commands.
 
 ```powershell
-autotuneai arm doctor --target-config <private-target.json> --require-production --summary
-autotuneai arm inspect-host --target-config <private-target.json> --summary
+autotuneai doctor --target-config <private-target.json> --require-production --summary
+autotuneai inference inspect-host --target-config <private-target.json> --summary
 ```
 
 Narration:

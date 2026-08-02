@@ -1,8 +1,16 @@
 import fs from "node:fs/promises";
+import http from "node:http";
 import path from "node:path";
 import { chromium } from "playwright-chromium";
 
-const baseUrl = process.env.SLIDEV_URL || "http://localhost:3037";
+const source = await fs.readFile(path.resolve("slides.md"), "utf8");
+const slideCount = (source.match(/^---\s*$/gm) || []).length / 2;
+if (!Number.isInteger(slideCount) || slideCount < 1) {
+  throw new Error(`unable to determine slide count from slides.md: ${slideCount}`);
+}
+
+const localServer = process.env.SLIDEV_URL ? null : await startStaticServer(path.resolve("dist"));
+const baseUrl = process.env.SLIDEV_URL || localServer.url;
 const outputRoot = path.resolve(".qa");
 const viewports = [
   { name: "1366x768", width: 1366, height: 768 },
@@ -24,7 +32,7 @@ try {
     const viewportDir = path.join(outputRoot, viewport.name);
     await fs.mkdir(viewportDir, { recursive: true });
 
-    for (let slide = 1; slide <= 11; slide += 1) {
+    for (let slide = 1; slide <= slideCount; slide += 1) {
       await page.goto(`${baseUrl}/${slide}`, { waitUntil: "networkidle" });
       await page.waitForTimeout(300);
 
@@ -90,6 +98,11 @@ try {
   }
 } finally {
   await browser.close();
+  if (localServer) {
+    await new Promise((resolve, reject) =>
+      localServer.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
 }
 
 await fs.writeFile(
@@ -116,4 +129,49 @@ console.log(
 
 if (failures.length > 0) {
   process.exitCode = 1;
+}
+
+async function startStaticServer(root) {
+  const server = http.createServer(async (request, response) => {
+    try {
+      const requestUrl = new URL(request.url || "/", "http://localhost");
+      const relative = decodeURIComponent(requestUrl.pathname).replace(/^\/+/, "");
+      let candidate = path.resolve(root, relative || "index.html");
+      if (!candidate.startsWith(`${root}${path.sep}`) && candidate !== path.join(root, "index.html")) {
+        response.writeHead(403).end("forbidden");
+        return;
+      }
+      try {
+        const info = await fs.stat(candidate);
+        if (info.isDirectory()) candidate = path.join(candidate, "index.html");
+      } catch {
+        candidate = path.join(root, "index.html");
+      }
+      const body = await fs.readFile(candidate);
+      response.writeHead(200, { "content-type": contentType(candidate) });
+      response.end(body);
+    } catch (error) {
+      response.writeHead(500).end(String(error));
+    }
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "localhost", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("static server did not expose a TCP port");
+  return { server, url: `http://localhost:${address.port}` };
+}
+
+function contentType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  return {
+    ".css": "text/css; charset=utf-8",
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
+  }[extension] || "application/octet-stream";
 }

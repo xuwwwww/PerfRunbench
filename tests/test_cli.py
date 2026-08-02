@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -11,6 +12,91 @@ from autotune.cli import main
 
 
 class CliTest(unittest.TestCase):
+    def test_unified_guide_keeps_x86_controller_usable(self) -> None:
+        output = io.StringIO()
+        with (
+            patch("autotune.cli.platform.system", return_value="Windows"),
+            patch("autotune.cli.platform.machine", return_value="AMD64"),
+            redirect_stdout(output),
+        ):
+            code = main(["guide", "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["local_command_workloads_supported"])
+        self.assertFalse(payload["local_arm_target_ready"])
+        self.assertIn("run --auto", payload["workflows"][0]["command"])
+
+    def test_unified_init_creates_inference_project_without_arm_namespace(self) -> None:
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir, redirect_stdout(output):
+            project = Path(temp_dir) / "project"
+            code = main(
+                [
+                    "init",
+                    "--adapter",
+                    "llama-bench",
+                    "--target",
+                    "ssh",
+                    "--preset",
+                    "quick",
+                    "--output",
+                    str(project),
+                    "--json",
+                ]
+            )
+            target = json.loads((project / "target.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(output.getvalue())["kind"], "armtune_starter_bundle_result")
+        self.assertEqual(target["target"]["type"], "ssh")
+        self.assertTrue(target["target"]["strict_host_key_checking"])
+
+    def test_unified_explain_routes_inference_terms(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["explain", "prefill-heavy", "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertIn("prefill-heavy", payload["concepts"])
+
+    def test_unified_target_doctor_routes_to_arm_target_validation(self) -> None:
+        with patch("autotune.cli._run_arm_cli", return_value=2) as run_arm:
+            code = main(["doctor", "--target-config", "target.json", "--require-production", "--summary"])
+
+        self.assertEqual(code, 2)
+        run_arm.assert_called_once_with(
+            ["doctor", "--target-config", "target.json", "--require-production", "--summary"]
+        )
+
+    def test_unified_project_guide_uses_inference_workload_namespace(self) -> None:
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project = Path(temp_dir) / "project"
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    main(["init", "--adapter", "llama-bench", "--output", str(project), "--json"]),
+                    0,
+                )
+            with redirect_stdout(output):
+                code = main(["guide", "--project", str(project), "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["workflow"])
+        self.assertTrue(all(step["command"].startswith("autotuneai inference ") for step in payload["workflow"]))
+
+    def test_inference_namespace_routes_to_existing_arm_implementation(self) -> None:
+        with patch("autotune.cli._run_arm_cli", return_value=0) as run_arm:
+            code = main(["inference", "benchmark", "--config", "benchmark.json"])
+
+        self.assertEqual(code, 0)
+        run_arm.assert_called_once_with(
+            ["benchmark", "--config", "benchmark.json"],
+            prog="autotuneai inference",
+        )
+
     def test_executors_command_prints_capabilities(self) -> None:
         with patch("autotune.cli.collect_executor_capabilities") as collect:
             collect.return_value = {"recommended_executor": "local", "executors": {}}

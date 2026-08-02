@@ -15,40 +15,55 @@ ArmTune is the Arm-focused counterpart to the generic PerfRunbench resource and
 recommendation infrastructure. `llama.cpp` is the first workload adapter, not
 the product identity.
 
-## ArmTune Guided Start
+## One Guided Start
 
-ArmTune provides a guided entry that keeps the detailed research controls
-available without requiring a new user to understand every config field first:
+PerfRunbench does not require users to choose an Arm or x86 edition. Start with
+the workload; the controller and target architecture are detected and validated
+by the relevant adapter:
 
 ```bash
-autotuneai arm init --output .autotuneai/armtune-project --preset quick
-autotuneai arm guide --project .autotuneai/armtune-project
-autotuneai arm explain decode-heavy
+autotuneai guide
+autotuneai run --auto --preset quick -- python app.py
+
+autotuneai init --adapter llama-bench --target ssh \
+  --output .autotuneai/perfrunbench-project --preset quick
+autotuneai guide --project .autotuneai/perfrunbench-project
+autotuneai explain decode-heavy
 ```
 
-`arm init` creates versioned `target.json`, `benchmark.json`, and
+For arbitrary local commands, `run --auto` works on supported x86-64 and Arm64
+platforms. For llama.cpp inference, `init` creates versioned `target.json`,
+`benchmark.json`, and
 `optimize.json` starter files with strict SSH host-key checking, preserved raw
 output, bounded candidate counts, confirmation runs, and a noise band. The
 files are deliberately marked `result_origin: unverified` and contain only
 placeholders. Replace the placeholders in a private location before accessing
 a target.
 
-`arm guide` does not connect to SSH or launch a workload. It reports missing or
+`guide` without a project explains the available workflows on the current
+controller. With a project it does not connect to SSH or launch a workload; it
+reports missing or
 placeholder fields and prints the exact sequence for target validation,
 inspection, baseline measurement, and bounded optimization. Add `--json` for
-automation. Use `--summary` with `arm doctor` and `arm inspect-host` for a
-concise operator view while retaining the existing JSON output by default.
+automation. Use the unified `doctor` for target readiness and the workload-based
+`inference` namespace for the generated benchmark, build, search, and Passport
+workflow. The `arm` namespace remains a backward-compatible alias for existing
+automation and advanced ArmTune operations.
 
 ```bash
-autotuneai arm doctor \
-  --target-config .autotuneai/armtune-project/target.json \
+autotuneai doctor \
+  --target-config .autotuneai/perfrunbench-project/target.json \
   --require-production \
   --summary
 
-autotuneai arm inspect-host \
-  --target-config .autotuneai/armtune-project/target.json \
+autotuneai inference inspect-host \
+  --target-config .autotuneai/perfrunbench-project/target.json \
   --summary
 ```
+
+An x86 controller remains fully usable: it can tune local command workloads or
+control a remote Linux Arm64 target. ArmTune activates when Arm-specific target,
+build, topology, and inference evidence is required.
 
 The complete operator guide and plain-language workload glossary are in
 [`docs/armtune/USER_GUIDE.md`](docs/armtune/USER_GUIDE.md) and
@@ -156,45 +171,47 @@ PyTorch, ONNX, and GPU benchmark examples.
 Public examples are placeholders. Keep real hostnames, identity files, model
 paths, and private target configs outside git.
 
-The commands below are the explicit advanced path. New users can create the
-same bounded workflow with `autotuneai arm init` and inspect it with
-`autotuneai arm guide` first.
+The commands below are the explicit inference path. New users can create the
+same bounded workflow with `autotuneai init --adapter llama-bench` and inspect
+it with `autotuneai guide --project <project>` first. PerfRunbench chooses the
+Arm-aware implementation from the target configuration; users do not select an
+Arm or x86 product edition.
 
 Inspect the controller and an Arm SSH target:
 
 ```bash
-autotuneai arm doctor \
+autotuneai doctor \
   --target-config configs/armtune/target_ssh.example.json \
   --require-production
 
-autotuneai arm inspect-host \
+autotuneai inference inspect-host \
   --target-config configs/armtune/target_ssh.example.json
 ```
 
 Run a fixed `llama-bench` baseline:
 
 ```bash
-autotuneai arm benchmark \
+autotuneai inference benchmark \
   --config configs/armtune/llama_bench.example.json
 ```
 
 Generate and inspect Arm build-profile evidence:
 
 ```bash
-autotuneai arm build-doctor \
+autotuneai inference build-doctor \
   --config configs/armtune/build_profiles.example.json
 
-autotuneai arm build-plan \
+autotuneai inference build-plan \
   --config configs/armtune/build_profiles.example.json
 
-autotuneai arm tune-build \
+autotuneai inference tune-build \
   --config configs/armtune/build_profiles.example.json
 ```
 
 Run bounded runtime optimization:
 
 ```bash
-autotuneai arm optimize \
+autotuneai inference optimize \
   --config configs/armtune/llama_bench_optimize.example.json \
   --max-candidates 12 \
   --affinity-modes scheduler-default,compact,spread,reserve-one-core
@@ -203,13 +220,13 @@ autotuneai arm optimize \
 Compare profiles and generate a Passport:
 
 ```bash
-autotuneai arm compare-builds \
+autotuneai inference compare-builds \
   --config configs/armtune/profile_comparison.example.json
 
-autotuneai arm passport \
+autotuneai inference passport \
   --comparison-result .autotuneai/runs/<run_id>/armtune/profile_comparison/profile_comparison_result.json
 
-autotuneai arm verify-passport \
+autotuneai inference verify-passport \
   --passport .autotuneai/runs/<run_id>/armtune/passport/performance_passport.json
 ```
 

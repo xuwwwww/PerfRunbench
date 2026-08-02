@@ -30,9 +30,10 @@ safety.
 The public UX starts with three discoverable commands:
 
 ```bash
-autotuneai arm init --output .autotuneai/armtune-project --preset quick
-autotuneai arm guide --project .autotuneai/armtune-project
-autotuneai arm explain decode-heavy
+autotuneai guide
+autotuneai init --adapter llama-bench --target ssh --output .autotuneai/perfrunbench-project --preset quick
+autotuneai guide --project .autotuneai/perfrunbench-project
+autotuneai explain decode-heavy
 ```
 
 The generated project is versioned, bounded, strict-SSH by default, and marked
@@ -138,11 +139,11 @@ and reporting infrastructure.
 
 ## Demo Flow
 
-1. Create a safe starter project with `autotuneai arm init` and inspect its
-   readiness with `autotuneai arm guide`.
-2. Explain the traffic shape with `autotuneai arm explain`.
-3. Inspect the Arm target with `autotuneai arm doctor` and
-   `autotuneai arm inspect-host`.
+1. Start with `autotuneai guide`, create a workload-specific project with
+   `autotuneai init`, and inspect its readiness with the same guided entrance.
+2. Explain the traffic shape with `autotuneai explain`.
+3. Validate the Arm target with the unified `autotuneai doctor` and inspect it with
+   `autotuneai inference inspect-host`.
 4. Run a placeholder `llama-bench` baseline.
 5. Generate build-profile evidence for portable and Arm profiles.
 6. Run bounded runtime search and show the statistical guard result.

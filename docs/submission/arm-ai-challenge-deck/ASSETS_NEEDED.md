@@ -8,9 +8,10 @@ The deck has no required placeholder assets.
 - Commands:
 
   ```bash
-  autotuneai arm init --preset quick
-  autotuneai arm guide
-  autotuneai arm explain decode-heavy
+  autotuneai guide
+  autotuneai init --adapter llama-bench --target ssh --preset quick
+  autotuneai guide --project .autotuneai/perfrunbench-project
+  autotuneai explain decode-heavy
   ```
 
 - Asset: `public/assets/armtune-guided-cli.png`

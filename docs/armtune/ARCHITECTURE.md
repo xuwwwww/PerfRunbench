@@ -167,7 +167,19 @@ ArmTune-specific artifacts live under:
 
 ## CLI Shape
 
-The top-level CLI remains `autotuneai`. ArmTune adds one isolated group:
+The top-level CLI remains `autotuneai`. The guided product entry asks for a
+workload adapter and detects architecture from the controller and target:
+
+```text
+autotuneai guide
+autotuneai init --adapter llama-bench
+autotuneai inference doctor
+autotuneai inference inspect-host
+autotuneai inference benchmark
+autotuneai inference optimize
+```
+
+The historical ArmTune command group remains a backward-compatible alias:
 
 ```text
 autotuneai arm doctor
@@ -182,7 +194,9 @@ autotuneai arm ci-check
 autotuneai arm demo
 ```
 
-`autotune/cli.py` should only receive a thin dispatcher for the `arm` group.
+`autotune/cli.py` contains thin dispatchers for both `inference` and the legacy
+`arm` alias. Both route to the same ArmTune implementation and therefore cannot
+diverge in benchmark or evidence semantics.
 
 ## Doctor Status Semantics
 
@@ -790,16 +804,18 @@ The architecture behaved correctly under a real measured run:
 This is a successful pipeline validation, not an eligible performance
 improvement claim.
 
-## Guided Operator Layer
+## Unified Guided Operator Layer
 
 The public ArmTune experience adds a thin guidance layer above the existing
 controller. It does not replace or bypass the evidence-producing subsystems:
 
 ```text
-arm init
+guide
+-> controller and workflow discovery
+-> init --adapter llama-bench
 -> versioned placeholder-only project bundle
--> arm guide readiness inspection
--> arm doctor / inspect-host
+-> project readiness inspection
+-> unified doctor / advanced ArmTune inspect-host
 -> workload inspection and measured baseline
 -> bounded build/runtime search
 -> statistical confirmation
@@ -807,9 +823,16 @@ arm init
 -> recommendation validate / dry-run apply / canary / rollback
 ```
 
-`autotuneai arm init` writes configuration only. `autotuneai arm guide` reads
-and validates the local project bundle only. Neither command contacts an SSH
+`autotuneai init --adapter llama-bench` writes configuration only.
+`autotuneai guide` either describes local workflows or reads and validates a
+generated project bundle. Neither command contacts an SSH
 target, executes a benchmark, creates cloud resources, or promotes evidence.
+
+The entrypoint is architecture-neutral. A Windows or Linux x86-64 controller
+can run local command workloads and can orchestrate a remote Linux Arm64
+target. ArmTune activates when target inspection, build profiles, topology, or
+inference evidence is Arm-specific. The `autotuneai arm` namespace remains an
+advanced and backward-compatible command surface.
 
 The `quick`, `standard`, and `deep` presets constrain warm-up, measured,
 confirmation, candidate-count, and noise-band settings. They are search-budget
