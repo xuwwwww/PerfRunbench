@@ -8,6 +8,7 @@
     "build": "slidev build",
     "export": "slidev export --output PerfRunbench-Arm-AI-Challenge.pdf --timeout 60000",
     "render:fixture": "node scripts/render-fixture-screenshot.mjs",
+    "render:armtune-ux": "node scripts/render-armtune-guided-screenshot.mjs",
     "qa": "node scripts/visual-qa.mjs",
     "screenshots:size-scaling": "node scripts/render-size-scaling-screenshots.mjs"
   },

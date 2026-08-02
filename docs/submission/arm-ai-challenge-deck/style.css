@@ -352,6 +352,16 @@ pre,
   white-space: nowrap;
 }
 
+.slide-interaction .command-block {
+  padding: 11px 15px;
+  font-size: 10.5px;
+}
+
+.slide-interaction .command-block + .command-block {
+  margin-top: 7px;
+  background: #245e51;
+}
+
 .shell-prompt {
   color: var(--red);
   font-weight: 800;
@@ -393,6 +403,110 @@ pre,
   color: var(--green);
   font-size: 15px;
   font-weight: 680;
+}
+
+/* Slide 5 */
+
+.inference-flow {
+  display: grid;
+  grid-template-columns: 1fr 90px 1fr;
+  align-items: stretch;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.flow-stage {
+  min-height: 132px;
+  padding: 20px 22px;
+  border-left: 5px solid var(--green);
+  background: var(--paper);
+}
+
+.flow-stage > span,
+.concept-cards span {
+  display: block;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.flow-stage strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.flow-stage p {
+  margin: 7px 0 10px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.flow-stage b {
+  color: var(--red);
+  font-size: 10px;
+}
+
+.decode-stage {
+  border-left-color: var(--red);
+}
+
+.flow-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.flow-arrow span {
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.flow-arrow b {
+  margin-top: 4px;
+  color: var(--red);
+  font-size: 28px;
+}
+
+.concept-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.concept-cards > div {
+  min-height: 104px;
+  padding: 15px 16px;
+  border-top: 3px solid var(--green);
+  background: #ffffff;
+}
+
+.concept-cards > div:nth-child(2) {
+  border-top-color: var(--red);
+}
+
+.concept-cards > div:nth-child(3) {
+  border-top-color: #b89345;
+}
+
+.concept-cards strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.concept-cards p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.35;
 }
 
 .asset-placeholder {
