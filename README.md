@@ -15,6 +15,45 @@ ArmTune is the Arm-focused counterpart to the generic PerfRunbench resource and
 recommendation infrastructure. `llama.cpp` is the first workload adapter, not
 the product identity.
 
+## ArmTune Guided Start
+
+ArmTune provides a guided entry that keeps the detailed research controls
+available without requiring a new user to understand every config field first:
+
+```bash
+autotuneai arm init --output .autotuneai/armtune-project --preset quick
+autotuneai arm guide --project .autotuneai/armtune-project
+autotuneai arm explain decode-heavy
+```
+
+`arm init` creates versioned `target.json`, `benchmark.json`, and
+`optimize.json` starter files with strict SSH host-key checking, preserved raw
+output, bounded candidate counts, confirmation runs, and a noise band. The
+files are deliberately marked `result_origin: unverified` and contain only
+placeholders. Replace the placeholders in a private location before accessing
+a target.
+
+`arm guide` does not connect to SSH or launch a workload. It reports missing or
+placeholder fields and prints the exact sequence for target validation,
+inspection, baseline measurement, and bounded optimization. Add `--json` for
+automation. Use `--summary` with `arm doctor` and `arm inspect-host` for a
+concise operator view while retaining the existing JSON output by default.
+
+```bash
+autotuneai arm doctor \
+  --target-config .autotuneai/armtune-project/target.json \
+  --require-production \
+  --summary
+
+autotuneai arm inspect-host \
+  --target-config .autotuneai/armtune-project/target.json \
+  --summary
+```
+
+The complete operator guide and plain-language workload glossary are in
+[`docs/armtune/USER_GUIDE.md`](docs/armtune/USER_GUIDE.md) and
+[`docs/armtune/GLOSSARY.md`](docs/armtune/GLOSSARY.md).
+
 ## Primary Workflow
 
 The shortest public workflow for a new user is:
@@ -116,6 +155,10 @@ PyTorch, ONNX, and GPU benchmark examples.
 
 Public examples are placeholders. Keep real hostnames, identity files, model
 paths, and private target configs outside git.
+
+The commands below are the explicit advanced path. New users can create the
+same bounded workflow with `autotuneai arm init` and inspect it with
+`autotuneai arm guide` first.
 
 Inspect the controller and an Arm SSH target:
 

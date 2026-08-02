@@ -789,3 +789,34 @@ The architecture behaved correctly under a real measured run:
 
 This is a successful pipeline validation, not an eligible performance
 improvement claim.
+
+## Guided Operator Layer
+
+The public ArmTune experience adds a thin guidance layer above the existing
+controller. It does not replace or bypass the evidence-producing subsystems:
+
+```text
+arm init
+-> versioned placeholder-only project bundle
+-> arm guide readiness inspection
+-> arm doctor / inspect-host
+-> workload inspection and measured baseline
+-> bounded build/runtime search
+-> statistical confirmation
+-> Performance Passport
+-> recommendation validate / dry-run apply / canary / rollback
+```
+
+`autotuneai arm init` writes configuration only. `autotuneai arm guide` reads
+and validates the local project bundle only. Neither command contacts an SSH
+target, executes a benchmark, creates cloud resources, or promotes evidence.
+
+The `quick`, `standard`, and `deep` presets constrain warm-up, measured,
+confirmation, candidate-count, and noise-band settings. They are search-budget
+profiles, not workload profiles. Workload profiles such as `interactive-short`,
+`decode-heavy`, and `prefill-heavy` continue to describe traffic shape and
+remain separate from the search budget.
+
+The operator layer deliberately preserves the existing machine-readable JSON
+interfaces. Optional summaries are presentation views over the same validated
+schemas; they are not alternate evidence formats.

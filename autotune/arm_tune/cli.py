@@ -19,6 +19,18 @@ from autotune.arm_tune.build_profiles.validation import (
 )
 from autotune.arm_tune.config import AFFINITY_MODE_CHOICES, default_local_target, load_benchmark_config, load_optimize_config, load_target_spec
 from autotune.arm_tune.errors import ArmTuneError
+from autotune.arm_tune.experience import (
+    CONCEPTS,
+    STARTER_PRESETS,
+    STARTER_TARGET_TYPES,
+    STARTER_WORKLOADS,
+    concept_payload,
+    create_starter_bundle,
+    format_concepts,
+    format_guided_status,
+    format_starter_result,
+    guided_project_status,
+)
 from autotune.arm_tune.passport.generator import generate_passport
 from autotune.arm_tune.passport.verification import verify_passport
 from autotune.arm_tune.schemas import (
@@ -62,13 +74,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="arm_command")
 
+    init = subparsers.add_parser("init", help="Create a safe ArmTune starter project with bounded search defaults.")
+    init.add_argument("--output", default=".autotuneai/armtune-project")
+    init.add_argument("--target", choices=STARTER_TARGET_TYPES, default="ssh")
+    init.add_argument("--workload", choices=STARTER_WORKLOADS, default="llama-bench")
+    init.add_argument("--preset", choices=STARTER_PRESETS, default="quick")
+    init.add_argument("--overwrite", action="store_true")
+    init.add_argument("--json", action="store_true", help="Print the starter result as JSON.")
+    init.set_defaults(handler=_cmd_init)
+
+    guide = subparsers.add_parser("guide", help="Show configuration readiness and the next safe ArmTune steps.")
+    guide.add_argument("--project", default=".autotuneai/armtune-project")
+    guide.add_argument("--json", action="store_true", help="Print the guided workflow as JSON.")
+    guide.set_defaults(handler=_cmd_guide)
+
+    explain = subparsers.add_parser("explain", help="Explain Arm inference workloads, metrics, and statistical guards.")
+    explain.add_argument("term", nargs="?", choices=sorted(CONCEPTS))
+    explain.add_argument("--json", action="store_true", help="Print concepts as versioned JSON.")
+    explain.set_defaults(handler=_cmd_explain)
+
     doctor = subparsers.add_parser("doctor", help="Validate ArmTune controller and target configuration.")
     doctor.add_argument("--target-config")
     doctor.add_argument("--require-production", action="store_true")
+    doctor.add_argument("--summary", action="store_true", help="Print a concise human-readable readiness summary.")
     doctor.set_defaults(handler=_cmd_doctor)
 
     inspect_host = subparsers.add_parser("inspect-host", help="Inspect an ArmTune local or SSH target host.")
     inspect_host.add_argument("--target-config")
+    inspect_host.add_argument("--summary", action="store_true", help="Print a concise human-readable host summary.")
     inspect_host.set_defaults(handler=_cmd_inspect_host)
 
     benchmark = subparsers.add_parser("benchmark", help="Run a fixed ArmTune benchmark job.")
@@ -133,6 +166,30 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _cmd_init(args: argparse.Namespace) -> int:
+    result = create_starter_bundle(
+        args.output,
+        target_type=args.target,
+        workload=args.workload,
+        preset_name=args.preset,
+        overwrite=bool(args.overwrite),
+    )
+    print(json.dumps(result, indent=2, sort_keys=True) if args.json else format_starter_result(result))
+    return 0
+
+
+def _cmd_guide(args: argparse.Namespace) -> int:
+    status = guided_project_status(args.project)
+    print(json.dumps(status, indent=2, sort_keys=True) if args.json else format_guided_status(status))
+    return 0 if status["readiness"] in {"needs_configuration", "ready_for_doctor"} else 1
+
+
+def _cmd_explain(args: argparse.Namespace) -> int:
+    payload = concept_payload(args.term)
+    print(json.dumps(payload, indent=2, sort_keys=True) if args.json else format_concepts(payload))
+    return 0
+
+
 def _cmd_doctor(args: argparse.Namespace) -> int:
     target_configured = bool(getattr(args, "target_config", None))
     spec = _target_spec_from_args(args)
@@ -183,7 +240,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         "production_validation": configured_validation.to_dict() if configured_validation else None,
         "notes": _doctor_notes(spec, statuses),
     }
-    print(json.dumps(payload, indent=2, sort_keys=True))
+    print(_doctor_summary(payload) if args.summary else json.dumps(payload, indent=2, sort_keys=True))
     if args.require_production and not statuses.production_benchmark_ready:
         return 2
     return 0
@@ -193,7 +250,8 @@ def _cmd_inspect_host(args: argparse.Namespace) -> int:
     spec = _target_spec_from_args(args)
     target = _target_from_spec(spec)
     result = target.inspect()
-    print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    payload = result.to_dict()
+    print(_host_summary(payload) if args.summary else json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
 
@@ -578,6 +636,55 @@ def _doctor_notes(spec: TargetSpec, statuses: DoctorStatuses) -> list[str]:
     if not statuses.production_benchmark_ready:
         notes.append("Production benchmark execution requires a configured Linux Arm64 target.")
     return notes
+
+
+def _doctor_summary(payload: dict[str, Any]) -> str:
+    target = payload["target"]
+    configured = payload["configured_target_status"]
+    local = payload["local_target_status"]
+    selected = configured if configured["status"] != "not_configured" else local
+    next_step = (
+        "autotuneai arm inspect-host --target-config <target.json> --summary"
+        if payload["production_benchmark_ready"]
+        else "configure a Linux Arm64 target, then rerun doctor with --require-production"
+    )
+    return "\n".join(
+        [
+            "ArmTune doctor",
+            f"controller: {payload['controller_status']['status']}",
+            f"target_type: {target['type']}",
+            f"target_status: {selected['status']}",
+            f"target_reason: {selected['reason']}",
+            f"production_benchmark_ready: {str(payload['production_benchmark_ready']).lower()}",
+            f"next_step: {next_step}",
+        ]
+    )
+
+
+def _host_summary(payload: dict[str, Any]) -> str:
+    host = payload["host"]
+    architecture = host["architecture"]
+    identity = host["cpu_identity"]
+    topology = host["topology"]
+    validation = payload["production_validation"]
+    return "\n".join(
+        [
+            "ArmTune target inspection",
+            f"target_type: {payload['target_type']}",
+            f"system: {architecture['system']}",
+            f"architecture: {architecture['normalized_machine']}",
+            f"cpu_model: {identity['model_name']}",
+            f"logical_cpus: {_display_unknown(topology['logical_cpus'])}",
+            f"numa_nodes: {_display_unknown(topology['numa_nodes'])}",
+            f"production_benchmark_ready: {str(validation['valid']).lower()}",
+            f"validation_reason: {validation['reason']}",
+            f"workload_execution_evidence: {payload['workload_execution_evidence']['status']}",
+        ]
+    )
+
+
+def _display_unknown(value: object) -> str:
+    return "unknown" if value is None else str(value)
 
 
 def _benchmark_exit_code(result: ArmBenchmarkResult) -> int:

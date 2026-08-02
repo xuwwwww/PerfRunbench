@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import io
 import json
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 from autotune.arm_tune.schemas import ProductionValidation
@@ -123,6 +125,9 @@ class ArmTuneCliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         text = output.getvalue()
         for command in [
+            "init",
+            "guide",
+            "explain",
             "build-doctor",
             "build-plan",
             "build-profile",
@@ -135,6 +140,80 @@ class ArmTuneCliTest(unittest.TestCase):
         ]:
             self.assertIn(command, text)
         self.assertNotIn("quality-calibrate", text)
+
+    def test_arm_init_creates_versioned_guarded_starter_bundle(self) -> None:
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project = Path(temp_dir) / "armtune"
+            with redirect_stdout(output):
+                code = main(
+                    [
+                        "arm",
+                        "init",
+                        "--output",
+                        str(project),
+                        "--target",
+                        "ssh",
+                        "--workload",
+                        "llama-bench",
+                        "--preset",
+                        "quick",
+                        "--json",
+                    ]
+                )
+
+            result = json.loads(output.getvalue())
+            manifest = json.loads((project / "armtune-project.json").read_text(encoding="utf-8"))
+            optimize = json.loads((project / "optimize.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(code, 0)
+            self.assertEqual(result["schema_version"], "1.0")
+            self.assertEqual(manifest["kind"], "armtune_starter_project")
+            self.assertEqual(manifest["result_origin"], "unverified")
+            self.assertEqual(optimize["result_origin"], "unverified")
+            self.assertEqual(optimize["search"]["max_candidates"], 4)
+            self.assertEqual(optimize["search"]["noise_band_percent"], 5.0)
+            self.assertTrue(optimize["target"]["strict_host_key_checking"])
+
+    def test_arm_guide_reports_placeholders_without_target_access(self) -> None:
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project = Path(temp_dir) / "armtune"
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["arm", "init", "--output", str(project)]), 0)
+            with redirect_stdout(output):
+                code = main(["arm", "guide", "--project", str(project), "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["readiness"], "needs_configuration")
+        self.assertGreater(len(payload["placeholder_fields"]), 0)
+        self.assertIn("--require-production", payload["workflow"][0]["command"])
+
+    def test_arm_explain_makes_decode_heavy_human_readable(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = main(["arm", "explain", "decode-heavy", "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["kind"], "armtune_concepts")
+        self.assertIn("longer response", payload["concepts"]["decode-heavy"]["meaning"])
+        self.assertIn("latency regression guards", payload["concepts"]["decode-heavy"]["primary_metric"])
+
+    def test_arm_doctor_and_inspect_host_offer_readable_summaries(self) -> None:
+        doctor_output = io.StringIO()
+        inspect_output = io.StringIO()
+        with patch("autotune.arm_tune.cli.collect_executor_capabilities", return_value={"recommended_executor": "local"}):
+            with redirect_stdout(doctor_output):
+                doctor_code = main(["arm", "doctor", "--summary"])
+        with redirect_stdout(inspect_output):
+            inspect_code = main(["arm", "inspect-host", "--summary"])
+
+        self.assertEqual(doctor_code, 0)
+        self.assertEqual(inspect_code, 0)
+        self.assertIn("production_benchmark_ready:", doctor_output.getvalue())
+        self.assertIn("workload_execution_evidence: not_collected", inspect_output.getvalue())
 
 
 if __name__ == "__main__":
