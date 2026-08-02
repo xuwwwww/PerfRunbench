@@ -87,8 +87,7 @@ const html = `<!doctype html>
   .bar { height: 43px; padding: 13px 18px; border-bottom: 1px solid #2c4133; background: #17261d; color: #9eb1a4; font: 13px Consolas, monospace; }
   pre { margin: 0; padding: 22px 26px; color: #c5d3ca; white-space: pre-wrap; font: 15px/1.42 "Cascadia Mono", Consolas, monospace; }
   .side { display: grid; gap: 12px; grid-template-rows: repeat(4, 1fr); }
-  .fact { display: flex; flex-direction: column; justify-content: center; padding: 17px 19px; border-left: 4px solid #2f5b40; background: rgba(255,255,255,.86); }
-  .fact.alert { border-left-color: #ba3b2f; }
+  .fact { display: flex; flex-direction: column; justify-content: center; padding: 17px 19px; border: 1px solid #d8ddd8; background: rgba(255,255,255,.9); }
   .fact span { color: #66746a; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
   .fact strong { margin-top: 7px; font-size: 22px; line-height: 1.08; }
   .fact small { margin-top: 6px; color: #5f6d63; font-size: 12px; line-height: 1.35; }
@@ -104,7 +103,7 @@ const html = `<!doctype html>
     <div class="terminal"><div class="bar">isolated local project | paths sanitized</div><pre>${escapeHtml(terminalOutput)}</pre></div>
     <aside class="side">
       <div class="fact"><span>CONTROLLER</span><strong>x86 or Arm</strong><small>local workloads or a remote Arm target</small></div>
-      <div class="fact alert"><span>READINESS</span><strong>needs configuration</strong><small>target access remains blocked</small></div>
+      <div class="fact"><span>READINESS</span><strong>needs configuration</strong><small>target access remains blocked</small></div>
       <div class="fact"><span>QUICK PRESET</span><strong>4 candidates max</strong><small>1 warm-up, 3 confirmations, 5% noise band</small></div>
       <div class="fact"><span>EXPLAIN</span><strong>terms at the CLI</strong><small>workload shape, metric, and guard meaning</small></div>
     </aside>
