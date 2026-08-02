@@ -266,18 +266,20 @@ KleidiAI-requested profiles were not eligible because runtime backend evidence
 was not proven. BootTrace quality remained out of scope and did not block
 performance tuning.
 
-## Guided ArmTune Operator Experience
+## Unified PerfRunbench And ArmTune Operator Experience
 
 Status: implemented as a productization layer over the existing ArmTune
 inspection, benchmark, search, evidence, Passport, and guarded-apply paths.
 
 Goals:
 
-- make the safe first action discoverable with `autotuneai arm init`
+- make the safe first action discoverable with `autotuneai guide`
+- select a workload adapter instead of asking users to select an architecture
+- create inference projects with top-level `autotuneai init`
 - generate a versioned, placeholder-only project bundle without contacting a
   target or starting a workload
-- expose readiness and the next exact command through `autotuneai arm guide`
-- explain benchmark terminology through `autotuneai arm explain`
+- expose readiness and the next exact command through top-level `autotuneai guide`
+- explain benchmark terminology through top-level `autotuneai explain`
 - provide `quick`, `standard`, and `deep` bounded search presets
 - keep machine-readable JSON as the default for existing inspection commands
   while offering an optional operator summary
@@ -294,5 +296,7 @@ Safety boundaries:
 - presets bound cost but do not weaken provenance, cleanup, quality, noise, or
   compatibility guards
 - BootTrace remains optional and experimental
+- the existing `autotuneai arm` namespace remains backward compatible for
+  advanced ArmTune operations
 
 This phase adds no benchmark results and changes no historical evidence.

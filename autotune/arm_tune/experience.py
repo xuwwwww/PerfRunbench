@@ -199,7 +199,11 @@ def create_starter_bundle(
     }
 
 
-def guided_project_status(project_dir: str | Path) -> dict[str, Any]:
+def guided_project_status(
+    project_dir: str | Path,
+    *,
+    command_prefix: str = "autotuneai arm",
+) -> dict[str, Any]:
     root = Path(project_dir).expanduser()
     expected = {
         "manifest": root / "armtune-project.json",
@@ -235,7 +239,7 @@ def guided_project_status(project_dir: str | Path) -> dict[str, Any]:
         "missing_files": missing,
         "invalid_json_files": invalid_json,
         "placeholder_fields": sorted(placeholders),
-        "workflow": _guided_workflow(root),
+        "workflow": _guided_workflow(root, command_prefix=command_prefix),
         "safety": [
             "doctor and guide do not run a benchmark",
             "production performance requires a real Linux Arm64 target",
@@ -255,7 +259,11 @@ def concept_payload(term: str | None = None) -> dict[str, Any]:
     }
 
 
-def format_starter_result(result: dict[str, Any]) -> str:
+def format_starter_result(
+    result: dict[str, Any],
+    *,
+    guide_command: str = "autotuneai arm guide",
+) -> str:
     files = result["files"]
     return "\n".join(
         [
@@ -267,7 +275,7 @@ def format_starter_result(result: dict[str, Any]) -> str:
             f"optimize_config: {files['optimize']}",
             "",
             "Next: replace angle-bracket placeholders, then run:",
-            f"  autotuneai arm guide --project \"{result['output_directory']}\"",
+            f"  {guide_command} --project \"{result['output_directory']}\"",
         ]
     )
 
@@ -423,14 +431,14 @@ def _placeholder_paths(value: Any, prefix: str = "") -> list[str]:
     return found
 
 
-def _guided_workflow(root: Path) -> list[dict[str, str]]:
+def _guided_workflow(root: Path, *, command_prefix: str = "autotuneai arm") -> list[dict[str, str]]:
     target = root / "target.json"
     benchmark = root / "benchmark.json"
     optimize = root / "optimize.json"
     return [
-        {"label": "Validate the controller and Arm target", "command": f'autotuneai arm doctor --target-config "{target}" --require-production'},
-        {"label": "Inspect CPU identity, topology, and environment", "command": f'autotuneai arm inspect-host --target-config "{target}"'},
-        {"label": "Establish a fixed baseline", "command": f'autotuneai arm benchmark --config "{benchmark}"'},
-        {"label": "Run a bounded runtime search and confirmation", "command": f'autotuneai arm optimize --config "{optimize}"'},
-        {"label": "Review artifacts before generating or applying a recommendation", "command": "autotuneai arm explain performance-passport"},
+        {"label": "Validate the controller and Arm target", "command": f'{command_prefix} doctor --target-config "{target}" --require-production'},
+        {"label": "Inspect CPU identity, topology, and environment", "command": f'{command_prefix} inspect-host --target-config "{target}"'},
+        {"label": "Establish a fixed baseline", "command": f'{command_prefix} benchmark --config "{benchmark}"'},
+        {"label": "Run a bounded runtime search and confirmation", "command": f'{command_prefix} optimize --config "{optimize}"'},
+        {"label": "Review artifacts before generating or applying a recommendation", "command": f"{command_prefix} explain performance-passport"},
     ]

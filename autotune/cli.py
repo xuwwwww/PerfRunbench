@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 from pathlib import Path
 
 from autotune.profiler.hardware_info import collect_hardware_info, write_hardware_info
@@ -63,6 +64,18 @@ from autotune.serving.cli import add_serve_parser
 from autotune.system_profiles.cli import add_system_parser
 from autotune.training_adapter.errors import TrainingConfigError
 from autotune.training_adapter.init_config import write_init_config
+from autotune.arm_tune.experience import (
+    CONCEPTS as ARM_TUNE_CONCEPTS,
+    STARTER_PRESETS as ARM_TUNE_PRESETS,
+    STARTER_TARGET_TYPES as ARM_TUNE_TARGET_TYPES,
+    concept_payload as arm_tune_concept_payload,
+    create_starter_bundle as create_arm_tune_starter_bundle,
+    format_concepts as format_arm_tune_concepts,
+    format_guided_status as format_arm_tune_guided_status,
+    format_starter_result as format_arm_tune_starter_result,
+    guided_project_status as arm_tune_guided_project_status,
+)
+from autotune.arm_tune.errors import ArmTuneError
 
 DEMO_WORKLOAD = ["python", "examples/dummy_train.py"]
 DEMO_CONFIG = "examples/train_config.yaml"
@@ -85,14 +98,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    init = subparsers.add_parser("init", help="Create a public PerfRunbench adapter configuration.")
-    init.add_argument("--adapter", required=True, choices=["pytorch-training"])
-    init.add_argument("--output", default="autotune.yaml")
+    init = subparsers.add_parser("init", help="Create a workload configuration without choosing a CPU architecture.")
+    init.add_argument("--adapter", required=True, choices=["pytorch-training", "llama-bench", "llama-server"])
+    init.add_argument("--output")
+    init.add_argument("--target", choices=ARM_TUNE_TARGET_TYPES, help="Execution target for inference adapters; defaults to SSH.")
+    init.add_argument("--preset", choices=ARM_TUNE_PRESETS, default="quick", help="Bounded search budget for inference adapters.")
+    init.add_argument("--json", action="store_true")
     init.add_argument("--overwrite", "--force", dest="overwrite", action="store_true", help="Overwrite an existing output config.")
     init.set_defaults(handler=_cmd_init)
 
+    guide = subparsers.add_parser("guide", help="Show the shortest safe workflow for this controller or project.")
+    guide.add_argument("--project", help="Optional generated inference project directory.")
+    guide.add_argument("--json", action="store_true")
+    guide.set_defaults(handler=_cmd_guide)
+
+    explain = subparsers.add_parser("explain", help="Explain inference workloads, metrics, and statistical guards.")
+    explain.add_argument("term", nargs="?", choices=sorted(ARM_TUNE_CONCEPTS))
+    explain.add_argument("--json", action="store_true")
+    explain.set_defaults(handler=_cmd_explain)
+
     doctor = subparsers.add_parser("doctor", help="Check PerfRunbench readiness without running or tuning the workload.")
-    doctor.add_argument("--config", required=True)
+    doctor.add_argument("--config", help="Command or training workload configuration.")
+    doctor.add_argument("--target-config", help="Local or SSH target configuration for inference validation.")
+    doctor.add_argument("--project", help="Generated inference project directory; uses its target.json.")
+    doctor.add_argument("--require-production", action="store_true", help="Require a measured-production-ready Linux Arm64 target.")
+    doctor.add_argument("--summary", action="store_true", help="Print a concise target summary.")
     doctor.add_argument("--json", action="store_true")
     doctor.add_argument("--debug", action="store_true")
     doctor.add_argument("workload", nargs=argparse.REMAINDER)
@@ -117,6 +147,15 @@ def build_parser() -> argparse.ArgumentParser:
     arm.add_argument("--help", action="store_true", dest="arm_help")
     arm.add_argument("arm_args", nargs=argparse.REMAINDER)
     arm.set_defaults(handler=_cmd_arm)
+
+    inference = subparsers.add_parser(
+        "inference",
+        help="Run inference target inspection, benchmarking, build/runtime tuning, and Passport commands.",
+        add_help=False,
+    )
+    inference.add_argument("--help", action="store_true", dest="inference_help")
+    inference.add_argument("inference_args", nargs=argparse.REMAINDER)
+    inference.set_defaults(handler=_cmd_inference)
 
     recommendation = subparsers.add_parser("recommendation", help="Validate and apply guarded PerfRunbench recommendations.", add_help=False)
     recommendation.add_argument("--help", action="store_true", dest="recommendation_help")
@@ -447,8 +486,27 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
+    if args.adapter in {"llama-bench", "llama-server"}:
+        try:
+            result = create_arm_tune_starter_bundle(
+                args.output or ".autotuneai/perfrunbench-project",
+                target_type=args.target or "ssh",
+                workload=args.adapter,
+                preset_name=args.preset,
+                overwrite=bool(args.overwrite),
+            )
+        except ArmTuneError as exc:
+            raise SystemExit(str(exc)) from exc
+        print(
+            json.dumps(result, indent=2, sort_keys=True)
+            if args.json
+            else format_arm_tune_starter_result(result, guide_command="autotuneai guide")
+        )
+        return 0
+    if args.target is not None:
+        raise SystemExit("--target is available only for llama-bench and llama-server adapters")
     try:
-        path = write_init_config(args.output, adapter=args.adapter, force=bool(args.overwrite))
+        path = write_init_config(args.output or "autotune.yaml", adapter=args.adapter, force=bool(args.overwrite))
     except TrainingConfigError as exc:
         raise SystemExit(str(exc)) from exc
     print(f"Created {path}")
@@ -461,7 +519,41 @@ def _cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_guide(args: argparse.Namespace) -> int:
+    if args.project:
+        status = arm_tune_guided_project_status(args.project, command_prefix="autotuneai inference")
+        print(json.dumps(status, indent=2, sort_keys=True) if args.json else format_arm_tune_guided_status(status))
+        return 0 if status["readiness"] in {"needs_configuration", "ready_for_doctor"} else 1
+    payload = _controller_guide_payload()
+    print(json.dumps(payload, indent=2, sort_keys=True) if args.json else _format_controller_guide(payload))
+    return 0
+
+
+def _cmd_explain(args: argparse.Namespace) -> int:
+    payload = arm_tune_concept_payload(args.term)
+    print(json.dumps(payload, indent=2, sort_keys=True) if args.json else format_arm_tune_concepts(payload))
+    return 0
+
+
 def _cmd_doctor(args: argparse.Namespace) -> int:
+    if args.target_config or args.project:
+        if args.config or args.workload or args.debug:
+            raise SystemExit("target doctor cannot be combined with command workload --config, --debug, or -- <command>")
+        if args.summary and args.json:
+            raise SystemExit("choose either --summary or --json")
+        target_config = Path(args.target_config) if args.target_config else Path(args.project) / "target.json"
+        arm_args = ["doctor", "--target-config", str(target_config)]
+        if args.require_production:
+            arm_args.append("--require-production")
+        if args.summary:
+            arm_args.append("--summary")
+        return _run_arm_cli(arm_args)
+    if not args.config:
+        raise SystemExit(
+            "doctor requires --config for a command workload, or --target-config/--project for inference target validation"
+        )
+    if args.require_production or args.summary:
+        raise SystemExit("--require-production and --summary apply only to inference target validation")
     command = _command_after_separator(args.workload, "Usage: autotuneai doctor --config <config> -- <command>")
     result = run_doctor(args.config, command, debug=bool(args.debug))
     if args.json:
@@ -482,17 +574,84 @@ def _cmd_executors(args: argparse.Namespace) -> int:
 
 
 def _cmd_arm(args: argparse.Namespace) -> int:
-    from autotune.arm_tune.cli import main as arm_main
-
     arm_args = list(args.arm_args)
     if getattr(args, "arm_help", False):
         arm_args.insert(0, "--help")
+    return _run_arm_cli(arm_args)
+
+
+def _cmd_inference(args: argparse.Namespace) -> int:
+    inference_args = list(args.inference_args)
+    if getattr(args, "inference_help", False):
+        inference_args.insert(0, "--help")
+    return _run_arm_cli(inference_args, prog="autotuneai inference")
+
+
+def _run_arm_cli(arm_args: list[str], *, prog: str = "autotuneai arm") -> int:
+    from autotune.arm_tune.cli import main as arm_main
+
     try:
-        return arm_main(arm_args)
+        return arm_main(arm_args, prog=prog)
     except SystemExit as exc:
         if isinstance(exc.code, int):
             return exc.code
         return 0
+
+
+def _controller_guide_payload() -> dict[str, object]:
+    system = platform.system() or "unknown"
+    machine = platform.machine() or "unknown"
+    normalized_machine = machine.lower().replace("-", "_")
+    local_arm_target_ready = system.lower() == "linux" and normalized_machine in {"aarch64", "arm64"}
+    return {
+        "schema_version": "1.0",
+        "kind": "perfrunbench_guided_start",
+        "controller": {"system": system, "machine": machine, "ready": True},
+        "local_command_workloads_supported": True,
+        "local_arm_target_ready": local_arm_target_ready,
+        "workflows": [
+            {
+                "name": "any-command",
+                "command": "autotuneai run --auto --preset quick -- <command>",
+                "description": "Benchmark and tune a local command on the current platform.",
+            },
+            {
+                "name": "llama-inference",
+                "command": "autotuneai init --adapter llama-bench --target ssh --preset quick",
+                "description": "Create an inference project; measured Arm claims require a Linux Arm64 target.",
+            },
+            {
+                "name": "pytorch-training",
+                "command": "autotuneai init --adapter pytorch-training",
+                "description": "Create a bounded PyTorch training adapter configuration.",
+            },
+        ],
+        "notes": [
+            "Choose a workload adapter, not a CPU architecture.",
+            "An x86 controller can run local workloads and control a remote Arm target.",
+            "ArmTune activates for Arm target inspection and architecture-aware inference tuning.",
+        ],
+    }
+
+
+def _format_controller_guide(payload: dict[str, object]) -> str:
+    controller = payload["controller"]
+    assert isinstance(controller, dict)
+    arm_status = "ready" if payload["local_arm_target_ready"] else "remote Linux Arm64 target required for measured Arm evidence"
+    lines = [
+        "PerfRunbench guided start",
+        f"controller: {controller['system']} {controller['machine']} (ready)",
+        "local_command_workloads: supported",
+        f"armtune_local_target: {arm_status}",
+        "",
+        "Choose the workload, not the CPU architecture:",
+    ]
+    for workflow in payload["workflows"]:
+        assert isinstance(workflow, dict)
+        lines.append(f"  {workflow['name']}: {workflow['command']}")
+        lines.append(f"    {workflow['description']}")
+    lines.extend(["", "ArmTune is the Arm architecture-aware inference subsystem inside PerfRunbench."])
+    return "\n".join(lines)
 
 
 def _cmd_recommendation(args: argparse.Namespace) -> int:

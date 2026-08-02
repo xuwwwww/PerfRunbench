@@ -54,8 +54,8 @@ from autotune.resource.executor_capabilities import collect_executor_capabilitie
 from autotune.resource.run_state import create_run, finish_run
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
+def main(argv: list[str] | None = None, *, prog: str = "autotuneai arm") -> int:
+    parser = build_parser(prog=prog)
     args = parser.parse_args(argv)
     if not hasattr(args, "handler"):
         parser.print_help()
@@ -67,9 +67,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(*, prog: str = "autotuneai arm") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="autotuneai arm",
+        prog=prog,
         description="ArmTune Arm platform inspection, reproducible benchmarking, runtime tuning, and Performance Passport generation.",
     )
     subparsers = parser.add_subparsers(dest="arm_command")
