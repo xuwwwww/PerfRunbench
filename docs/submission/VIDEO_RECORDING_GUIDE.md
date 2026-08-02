@@ -21,6 +21,18 @@ Recommended tools:
 - Windows Snipping Tool or Clipchamp only for trimming and captions;
 - a wired or stable microphone at a fixed distance.
 
+## Recording Method
+
+Do not narrate while operating the CLI, and do not turn the entire demo into
+an animation. Record silent, short product clips first, then record each
+voice-over segment separately. Commands may be pasted before pressing Enter;
+the evidence is the real tool behavior, not typing speed.
+
+Use motion only for a short title, architecture arrows, before/after emphasis,
+guard rejection, and section transitions. Keep the CLI, charts, Passport, and
+repository views as real screen captures. This makes mistakes cheap to rerecord
+and keeps the product demonstration credible.
+
 ## Prepare The Live Demo
 
 Create an isolated environment from a clean source checkout or installed wheel:
