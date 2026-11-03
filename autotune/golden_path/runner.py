@@ -178,9 +178,18 @@ def tune_command_config(
         ]
         if len(baseline_samples) >= int(tuning["min_valid_trials"]):
             evidence_status = "baseline_retained"
-            statistical_evidence["status"] = "baseline_retained"
-            statistical_evidence["classification"] = "baseline_selected_no_improvement_claim"
-            statistical_evidence["baseline_confirmation_samples"] = len(baseline_samples)
+            statistical_evidence = {
+                "status": "baseline_retained",
+                "classification": "baseline_selected_no_improvement_claim",
+                "metric": objective["metric"],
+                "direction": objective["direction"],
+                "baseline_confirmation_samples": len(baseline_samples),
+                "baseline_median": median(float(trial["objective_metric_value"]) for trial in baseline_samples),
+                "selected_median": None,
+                "improvement_percent": None,
+                "paired_confirmation_count": 0,
+                "guard_results": [],
+            }
             statistical_evidence["note"] = (
                 "Baseline ranked first in screening and passed baseline-only "
                 "confirmation. No improvement claim or paired comparison was made."
