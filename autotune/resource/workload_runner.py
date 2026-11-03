@@ -126,6 +126,8 @@ def run_with_budget(
                 stdout=stdout_handle,
                 stderr=stderr_handle,
                 cwd=cwd,
+                cpu_affinity_budget=budget if selected_executor == "local" else None,
+                affinity_notes=manifest.notes,
             )
             if selected_executor == "systemd" and unit_name:
                 terminate_process = lambda item: _terminate_systemd_scope(unit_name, item, use_sudo=selected_use_sudo)
@@ -228,7 +230,13 @@ def launch_performance(
                 docker_image=docker_image,
                 monitored=False,
             )
-            process = _open_process(command_to_run, child_env, new_process_group=selected_executor != "systemd")
+            process = _open_process(
+                command_to_run,
+                child_env,
+                new_process_group=selected_executor != "systemd",
+                cpu_affinity_budget=budget if selected_executor == "local" else None,
+                affinity_notes=manifest.notes,
+            )
             if selected_executor == "systemd" and unit_name:
                 terminate_process = lambda item: _terminate_systemd_scope(unit_name, item, use_sudo=selected_use_sudo)
             with _interrupt_restore_guard(lambda: process, terminate_process=terminate_process):
@@ -327,8 +335,7 @@ def _build_executor_command(
     monitored: bool,
 ) -> tuple[list[str], str | None]:
     if selected_executor == "local":
-        affinity_context = apply_cpu_affinity(budget)
-        manifest.notes.append(f"affinity_context={affinity_context}")
+        # Apply affinity only while spawning the child, never while preparing its command.
         return wrap_command_with_numa(command, advanced_options), None
     if selected_executor == "systemd":
         unit_name = make_systemd_scope_name(manifest.run_id)
@@ -456,6 +463,8 @@ def _open_process(
     stdout: object | None = None,
     stderr: object | None = None,
     cwd: str | Path | None = None,
+    cpu_affinity_budget: ResourceBudget | None = None,
+    affinity_notes: list[str] | None = None,
 ) -> subprocess.Popen:
     kwargs: dict[str, Any] = {"env": env}
     if cwd is not None:
@@ -469,7 +478,39 @@ def _open_process(
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         else:
             kwargs["start_new_session"] = True
-    return subprocess.Popen(command, **kwargs)
+    if cpu_affinity_budget is None or not cpu_affinity_budget.enabled:
+        return subprocess.Popen(command, **kwargs)
+
+    try:
+        import psutil
+
+        caller = psutil.Process()
+        original_mask = caller.cpu_affinity()
+    except (AttributeError, NotImplementedError, OSError, ModuleNotFoundError):
+        if affinity_notes is not None:
+            affinity_notes.append("affinity_context=unsupported")
+        return subprocess.Popen(command, **kwargs)
+
+    # POSIX children inherit the mask at spawn. Restore the caller before monitoring.
+    context = apply_cpu_affinity(cpu_affinity_budget)
+    if affinity_notes is not None:
+        affinity_notes.append(f"affinity_context={context}")
+    child: subprocess.Popen | None = None
+    try:
+        child = subprocess.Popen(command, **kwargs)
+    finally:
+        if context.get("cpu_affinity_applied"):
+            try:
+                caller.cpu_affinity(original_mask)
+                if set(caller.cpu_affinity()) != set(original_mask):
+                    raise RuntimeError("caller CPU mask readback mismatch")
+            except Exception as exc:
+                if child is not None:
+                    _terminate_process_tree(child)
+                raise RuntimeError("failed to restore caller CPU affinity after spawn") from exc
+            if affinity_notes is not None:
+                affinity_notes.append("caller_cpu_affinity_restored=True")
+    return child
 
 
 def _terminate_process_tree(process: subprocess.Popen, *, timeout_seconds: float = 10.0) -> None:
