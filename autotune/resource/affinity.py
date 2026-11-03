@@ -35,7 +35,9 @@ def apply_cpu_affinity(budget: ResourceBudget) -> dict:
 
         process = psutil.Process()
         current = process.cpu_affinity()
-        selected = current[: min(allowed, len(current))]
+        # Reserve against CPUs actually permitted to the caller, not host-wide CPU count.
+        local_allowed = budget.allowed_threads(len(current))
+        selected = current[: min(local_allowed or len(current), len(current))]
         if selected:
             process.cpu_affinity(selected)
             result.update(
