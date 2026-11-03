@@ -139,6 +139,16 @@ def compare_environment_fingerprints(expected: dict[str, Any], observed: dict[st
                 )
             )
             continue
+        if field == "available_memory_mb" and _memory_drift_within_tolerance(expected_value, observed_value):
+            guard_results.append(
+                guard_pass(
+                    "preflight",
+                    "fingerprint_memory_within_tolerance",
+                    "Available-memory drift is below the 5% / 256 MiB threshold.",
+                    evidence_refs=[f"environment_fingerprint.soft.{field}"],
+                )
+            )
+            continue
         if expected_value != observed_value:
             soft_mismatches.append({"field": field, "expected": expected_value, "observed": observed_value})
             guard_results.append(
@@ -296,3 +306,15 @@ def _is_unknown(value: Any) -> bool:
     if isinstance(value, str) and value.strip().lower() in {"", UNKNOWN, "not_available"}:
         return True
     return False
+
+
+def _memory_drift_within_tolerance(expected: Any, observed: Any) -> bool:
+    """Ignore ordinary MemAvailable fluctuations, not large resource shifts."""
+    try:
+        expected_mb = float(expected)
+        observed_mb = float(observed)
+    except (TypeError, ValueError):
+        return False
+    if not (expected_mb >= 0 and observed_mb >= 0):
+        return False
+    return abs(observed_mb - expected_mb) <= max(256.0, expected_mb * 0.05)
