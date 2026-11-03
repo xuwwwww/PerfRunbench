@@ -148,6 +148,28 @@ def tune_command_config(
     )
     evidence_status = statistical_evidence["status"]
     required_confirmation_pairs = int(tuning["confirmation_runs"]) if selected["id"] != "baseline" else 0
+    if selected["id"] == "baseline" and not search_budget.exhausted:
+        # Keeping the baseline is a valid search outcome; it is not evidence
+        # of an improvement and does not require paired confirmation.
+        baseline_samples = [
+            trial for trial in trials
+            if trial.get("candidate_id") == "baseline"
+            and trial.get("phase") == "search"
+            and trial.get("trial_status") == "valid"
+            and isinstance(trial.get("objective_metric_value"), (int, float))
+        ]
+        if len(baseline_samples) >= int(tuning["min_valid_trials"]):
+            evidence_status = "baseline_retained"
+            statistical_evidence["status"] = "baseline_retained"
+            statistical_evidence["classification"] = "no_candidate_improvement_confirmed"
+            statistical_evidence["baseline_search_samples"] = len(baseline_samples)
+            statistical_evidence["note"] = (
+                "Baseline ranked first in screening. No improvement claim or "
+                "paired confirmation was made."
+            )
+        else:
+            evidence_status = "inconclusive"
+            statistical_evidence["classification"] = "insufficient_baseline_search_samples"
     if search_budget.exhausted or completed_confirmation_pairs < required_confirmation_pairs:
         evidence_status = "inconclusive"
         statistical_evidence["status"] = "inconclusive"
@@ -234,6 +256,9 @@ def run_auto_config(
     if should_retune(str(lookup["state"]), policy["retune_policy"]):
         tuned = tune_command_config(config, command, config_path=config_path)
         if tuned.get("status") != "recommended" or "cache_entry" not in tuned:
+            if tuned.get("status") == "baseline_retained":
+                # A verified safe fallback, without pretending a better profile exists.
+                return _launch_without_recommendation(config, command, tuned)
             if launch_without_recommendation:
                 return _launch_without_recommendation(config, command, tuned)
             detail = tuned.get("reason")
@@ -563,6 +588,10 @@ def _launch_without_recommendation(
         "newly_tuned": False,
         "return_code": return_code,
         "run_dir": str(run_dir),
-        "reason": "tuning completed without an eligible recommendation; baseline command executed",
+        "reason": (
+            "baseline ranked first; no tuned improvement claimed"
+            if tuning_result.get("status") == "baseline_retained"
+            else "tuning completed without an eligible recommendation; baseline command executed"
+        ),
         "tuning_result": _public_tuning(tuning_result),
     }
