@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from autotune.resource.budget import ResourceBudget
-from autotune.resource.workload_runner import launch_performance, run_with_budget
+from autotune.resource.workload_runner import _open_process, launch_performance, run_with_budget
 from autotune.recommendation.fingerprints import HARD_FIELDS, compare_environment_fingerprints
 from autotune.golden_path.config import default_command_config
 from autotune.golden_path.runner import tune_command_config
@@ -51,9 +51,12 @@ class CallerAffinityRegressionTest(unittest.TestCase):
             self.skipTest("requires at least two permitted CPUs")
         try:
             with self.assertRaises(FileNotFoundError):
-                run_with_budget(
-                    ["/perfrunbench/nonexistent/executable"],
-                    ResourceBudget(reserve_cores=1),
+                _open_process(
+                    [sys.executable, "-c", "pass"],
+                    os.environ.copy(),
+                    new_process_group=True,
+                    cwd="/perfrunbench/nonexistent/directory",
+                    cpu_affinity_budget=ResourceBudget(reserve_cores=1),
                 )
         finally:
             self.assertEqual(os.sched_getaffinity(0), before)
