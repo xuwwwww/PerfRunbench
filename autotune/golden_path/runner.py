@@ -136,6 +136,24 @@ def tune_command_config(
                 )
                 search_budget.cooldown(float(tuning.get("cooldown_seconds", 0.0)))
             completed_confirmation_pairs += 1
+    else:
+        # Verify that the selected baseline itself runs successfully before
+        # reporting baseline retention. Do not present this as a paired gain.
+        for index in range(int(tuning["min_valid_trials"])):
+            if not search_budget.can_start(trial_timeout, phase="baseline_confirmation", candidate_id="baseline"):
+                break
+            trials.append(
+                _run_trial(
+                    command,
+                    config,
+                    candidates[0],
+                    phase="confirmation",
+                    role="baseline",
+                    index=index,
+                    timeout_seconds=search_budget.bounded_timeout(trial_timeout),
+                )
+            )
+            search_budget.cooldown(float(tuning.get("cooldown_seconds", 0.0)))
     statistical_evidence = evaluate_statistical_evidence(
         {"trials": trials},
         StatisticalGuardConfig(
@@ -154,22 +172,22 @@ def tune_command_config(
         baseline_samples = [
             trial for trial in trials
             if trial.get("candidate_id") == "baseline"
-            and trial.get("phase") == "search"
+            and trial.get("phase") == "confirmation"
             and trial.get("trial_status") == "valid"
             and isinstance(trial.get("objective_metric_value"), (int, float))
         ]
         if len(baseline_samples) >= int(tuning["min_valid_trials"]):
             evidence_status = "baseline_retained"
             statistical_evidence["status"] = "baseline_retained"
-            statistical_evidence["classification"] = "no_candidate_improvement_confirmed"
-            statistical_evidence["baseline_search_samples"] = len(baseline_samples)
+            statistical_evidence["classification"] = "baseline_selected_no_improvement_claim"
+            statistical_evidence["baseline_confirmation_samples"] = len(baseline_samples)
             statistical_evidence["note"] = (
-                "Baseline ranked first in screening. No improvement claim or "
-                "paired confirmation was made."
+                "Baseline ranked first in screening and passed baseline-only "
+                "confirmation. No improvement claim or paired comparison was made."
             )
         else:
             evidence_status = "inconclusive"
-            statistical_evidence["classification"] = "insufficient_baseline_search_samples"
+            statistical_evidence["classification"] = "insufficient_baseline_confirmation_samples"
     if search_budget.exhausted or completed_confirmation_pairs < required_confirmation_pairs:
         evidence_status = "inconclusive"
         statistical_evidence["status"] = "inconclusive"
