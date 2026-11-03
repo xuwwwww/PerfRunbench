@@ -8,7 +8,7 @@ from pathlib import Path
 
 from autotune.resource.budget import ResourceBudget
 from autotune.resource.workload_runner import launch_performance, run_with_budget
-from autotune.recommendation.fingerprints import compare_environment_fingerprints
+from autotune.recommendation.fingerprints import HARD_FIELDS, compare_environment_fingerprints
 from autotune.golden_path.config import default_command_config
 from autotune.golden_path.runner import tune_command_config
 
@@ -61,7 +61,7 @@ class CallerAffinityRegressionTest(unittest.TestCase):
 
 class MemoryDriftRegressionTest(unittest.TestCase):
     def test_small_memory_changes_do_not_trigger_canary(self) -> None:
-        hard = {"architecture": "aarch64"}
+        hard = {field: "fixture" for field in HARD_FIELDS}
         before = {"hard": hard, "soft": {"available_memory_mb": 20000}}
         minor = {"hard": hard, "soft": {"available_memory_mb": 19800}}
         material = {"hard": hard, "soft": {"available_memory_mb": 17000}}
